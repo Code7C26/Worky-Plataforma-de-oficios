@@ -1,0 +1,697 @@
+openapi: 3.1.0
+info:
+  # Do not change the title, if the title changes, the import paths will be broken
+  title: Api
+  version: 0.1.0
+  description: API specification
+servers:
+  - url: /api/v1
+    description: Base API path
+tags:
+  - name: health
+    description: Health operations
+  - name: professionals
+  - name: jobs
+  - name: messages
+  - name: appointments
+paths:
+  /healthz:
+    get:
+      operationId: healthCheck
+      tags: [health]
+      summary: Health check
+      description: Returns server health status
+      responses:
+        "200":
+          description: Healthy
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthStatus"
+  /profesionales:
+    get:
+      operationId: listProfessionals
+      tags: [professionals]
+      summary: List professionals
+      parameters:
+        - name: categoria
+          in: query
+          schema: { type: string }
+        - name: search
+          in: query
+          schema: { type: string }
+        - name: limit
+          in: query
+          schema: { type: number, minimum: 1, maximum: 50 }
+        - name: latitud
+          in: query
+          schema: { type: number, minimum: -90, maximum: 90 }
+        - name: longitud
+          in: query
+          schema: { type: number, minimum: -180, maximum: 180 }
+      responses:
+        "200":
+          description: Professionals
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/ProfessionalProfile" }
+  /profesionales/{id}:
+    get:
+      operationId: getProfessional
+      tags: [professionals]
+      summary: Get a professional
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: number }
+      responses:
+        "200":
+          description: Professional
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ProfessionalProfile" }
+        "404": { description: Not found }
+  /profesionales/{id}/reputacion:
+    get:
+      operationId: getProfessionalReputation
+      tags: [professionals]
+      summary: Get a professional reputation
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: number }
+      responses:
+        "200":
+          description: Reputation
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ProfessionalReputation" }
+        "404": { description: Not found }
+  /partner-profile:
+    post:
+      operationId: createMyProfessionalProfile
+      tags: [professionals]
+      summary: Create the current user's professional profile
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ProfessionalProfileInput" }
+      responses:
+        "201":
+          description: Created profile
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ProfessionalProfile" }
+        "200":
+          description: Existing profile
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ProfessionalProfile" }
+  /partner-profile/me:
+    get:
+      operationId: getMyProfessionalProfile
+      tags: [professionals]
+      summary: Get current professional profile
+      responses:
+        "200":
+          description: Current profile or null when it has not been created
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: "#/components/schemas/ProfessionalProfile"
+                  - type: "null"
+    put:
+      operationId: updateMyProfessionalProfile
+      tags: [professionals]
+      summary: Update current professional profile
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ProfessionalProfileInput" }
+      responses:
+        "200":
+          description: Updated profile
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ProfessionalProfile" }
+  /trabajos:
+    post:
+      operationId: createJob
+      tags: [jobs]
+      summary: Publish or directly assign a job
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/JobInput" }
+      responses:
+        "201":
+          description: Created job
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Job" }
+  /trabajos/mias:
+    get:
+      operationId: listMyJobs
+      tags: [jobs]
+      summary: List jobs created by the current user
+      responses:
+        "200":
+          description: Jobs
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Job" }
+  /trabajos/disponibles:
+    get:
+      operationId: listAvailableJobs
+      tags: [jobs]
+      summary: List jobs available to the current professional
+      responses:
+        "200":
+          description: Jobs
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Job" }
+  /trabajos/asignadas:
+    get:
+      operationId: listAssignedJobs
+      tags: [jobs]
+      summary: List jobs assigned to the current professional
+      responses:
+        "200":
+          description: Jobs
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Job" }
+  /trabajos/{id}:
+    get:
+      operationId: getJob
+      tags: [jobs]
+      summary: Get a job
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: number }
+      responses:
+        "200":
+          description: Job
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Job" }
+    patch:
+      operationId: updateJob
+      tags: [jobs]
+      summary: Update job state
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: number }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/JobUpdate" }
+      responses:
+        "200":
+          description: Updated job
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Job" }
+  /trabajos/{id}/aceptar:
+    patch:
+      operationId: acceptJob
+      tags: [jobs]
+      summary: Accept an available job
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: number }
+      responses:
+        "200":
+          description: Accepted job
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Job" }
+  /conversaciones:
+    get:
+      operationId: listConversations
+      tags: [messages]
+      summary: List the current user's conversations
+      responses:
+        "200":
+          description: Conversations
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Conversation" }
+  /chats/{changaId}/mensajes:
+    get:
+      operationId: listMessages
+      tags: [messages]
+      summary: List messages for a job
+      parameters:
+        - name: changaId
+          in: path
+          required: true
+          schema: { type: number }
+      responses:
+        "200":
+          description: Messages
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/ChatMessage" }
+    post:
+      operationId: createMessage
+      tags: [messages]
+      summary: Send a message
+      parameters:
+        - name: changaId
+          in: path
+          required: true
+          schema: { type: number }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/MessageInput" }
+      responses:
+        "201":
+          description: Created message
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ChatMessage" }
+  /chats/{changaId}/leidos:
+    post:
+      operationId: markMessagesRead
+      tags: [messages]
+      summary: Mark the other participant's messages as read
+      parameters:
+        - name: changaId
+          in: path
+          required: true
+          schema: { type: number }
+      responses:
+        "204":
+          description: Messages marked as read
+  /chats/{changaId}/citas:
+    get:
+      operationId: listAppointments
+      tags: [appointments]
+      summary: List appointments for a conversation
+      parameters:
+        - name: changaId
+          in: path
+          required: true
+          schema: { type: number }
+      responses:
+        "200":
+          description: Appointments
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Appointment" }
+        "403": { description: Not a conversation participant }
+    post:
+      operationId: proposeAppointment
+      tags: [appointments]
+      summary: Propose an appointment in a conversation
+      parameters:
+        - name: changaId
+          in: path
+          required: true
+          schema: { type: number }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AppointmentInput" }
+      responses:
+        "201":
+          description: Proposed appointment
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Appointment" }
+        "400": { description: Invalid appointment date }
+        "403": { description: Not allowed to propose }
+  /chats/{changaId}/historial-visitas:
+    get:
+      operationId: listAppointmentAttempts
+      tags: [appointments]
+      summary: List coordination attempts for a conversation
+      parameters:
+        - name: changaId
+          in: path
+          required: true
+          schema: { type: number }
+      responses:
+        "200":
+          description: Coordination attempt history
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/AppointmentAttempt" }
+        "403": { description: Not a conversation participant }
+    post:
+      operationId: logAppointmentAttempt
+      tags: [appointments]
+      summary: Log a coordination attempt outcome
+      parameters:
+        - name: changaId
+          in: path
+          required: true
+          schema: { type: number }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AppointmentAttemptInput" }
+      responses:
+        "201":
+          description: Logged coordination attempt
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AppointmentAttempt" }
+        "400": { description: Invalid attempt }
+        "403": { description: Not a conversation participant }
+  /citas/{id}/aceptar:
+    post:
+      operationId: acceptAppointment
+      tags: [appointments]
+      summary: Accept an appointment
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: number }
+      responses:
+        "200":
+          description: Accepted appointment
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Appointment" }
+        "403": { description: Only the client can accept }
+        "404": { description: Appointment not found }
+  /citas/{id}/rechazar:
+    post:
+      operationId: rejectAppointment
+      tags: [appointments]
+      summary: Reject an appointment
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: number }
+      responses:
+        "200":
+          description: Rejected appointment
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Appointment" }
+        "403": { description: Only the client can reject }
+        "404": { description: Appointment not found }
+components:
+  schemas:
+    HealthStatus:
+      type: object
+      properties:
+        status:
+          type: string
+      required:
+        - status
+    UserLocation:
+      type: object
+      properties:
+        direccionTexto: { type: string }
+        ciudad: { type: string }
+        provincia: { type: string }
+        zona: { type: string }
+        coordinates:
+          type: array
+          items: { type: number }
+    PublicUser:
+      type: object
+      required: [id, nombre, rol]
+      properties:
+        id: { type: number }
+        nombre: { type: string }
+        rol: { type: string, enum: [cliente, profesional, admin] }
+        ubicacion:
+          oneOf:
+            - type: object
+              properties:
+                zona: { type: string }
+            - type: "null"
+    ParticipantUser:
+      type: object
+      required: [id, nombre, email, rol]
+      properties:
+        id: { type: number }
+        nombre: { type: string }
+        email: { type: string }
+        telefono: { type: ["string", "null"] }
+        rol: { type: string, enum: [cliente, profesional, admin] }
+        ubicacion:
+          oneOf:
+            - $ref: "#/components/schemas/UserLocation"
+            - type: "null"
+    ProfessionalProfile:
+      type: object
+      required: [id, usuarioId, oficio, categoria, verificado, estadoVerificacion, skills, experienciaAnios, precioReferencia, disponible, rating, cantidadChangas, createdAt, updatedAt, usuario, reviewsCount, completedJobs, recommendationsCount]
+      properties:
+        id: { type: number }
+        usuarioId: { type: number }
+        oficio: { type: string }
+        categoria: { type: string }
+        matriculaHabilitante: { type: ["string", "null"] }
+        verificado: { type: boolean }
+        estadoVerificacion: { type: string, enum: [pending_verification, verified, rejected] }
+        skills:
+          type: array
+          items: { type: string }
+        about: { type: ["string", "null"] }
+        experienciaAnios: { type: number }
+        precioReferencia: { type: number }
+        disponible: { type: boolean }
+        rating: { type: number }
+        cantidadChangas: { type: number }
+        createdAt: { type: string }
+        updatedAt: { type: string }
+        usuario: { $ref: "#/components/schemas/PublicUser" }
+        reviewsCount: { type: number }
+        completedJobs: { type: number }
+        recommendationsCount: { type: number }
+        distanceKm: { type: ["number", "null"] }
+    ProfessionalProfileInput:
+      type: object
+      required: [oficio, categoria, precioReferencia]
+      properties:
+        oficio: { type: string, minLength: 2 }
+        categoria: { type: string }
+        precioReferencia: { type: number, minimum: 0 }
+        experienciaAnios: { type: number, minimum: 0 }
+        about: { type: ["string", "null"] }
+        skills:
+          type: array
+          items: { type: string }
+        disponible: { type: boolean }
+        matriculaHabilitante: { type: ["string", "null"] }
+    ReputationAuthor:
+      type: object
+      required: [id, nombre]
+      properties:
+        id: { type: number }
+        nombre: { type: string }
+    ProfessionalReview:
+      type: object
+      required: [id, rating, autor, adjuntos]
+      properties:
+        id: { type: number }
+        rating: { type: number }
+        comentario: { type: ["string", "null"] }
+        adjuntos:
+          type: array
+          items:
+            type: object
+            required: [objectPath, nombre, contentType, sizeBytes]
+            properties:
+              objectPath: { type: string }
+              nombre: { type: string }
+              contentType: { type: string }
+              sizeBytes: { type: number }
+        autor: { $ref: "#/components/schemas/ReputationAuthor" }
+    ProfessionalRecommendation:
+      type: object
+      required: [id, autor]
+      properties:
+        id: { type: number }
+        comentario: { type: ["string", "null"] }
+        autor: { $ref: "#/components/schemas/ReputationAuthor" }
+    ProfessionalReputation:
+      type: object
+      required: [rating, reviewsCount, recommendationsCount, completedJobs, reviews, recommendations]
+      properties:
+        rating: { type: number }
+        reviewsCount: { type: number }
+        recommendationsCount: { type: number }
+        completedJobs: { type: number }
+        reviews:
+          type: array
+          items: { $ref: "#/components/schemas/ProfessionalReview" }
+        recommendations:
+          type: array
+          items: { $ref: "#/components/schemas/ProfessionalRecommendation" }
+    Job:
+      type: object
+      required: [id, clienteId, profesionalId, ubicacion, categoria, precioOfrecido, detalle, estado, createdAt, updatedAt, cliente, profesional, calificada]
+      properties:
+        id: { type: number }
+        clienteId: { type: number }
+        profesionalId: { type: ["number", "null"] }
+        ubicacion: { $ref: "#/components/schemas/UserLocation" }
+        categoria: { type: string }
+        precioOfrecido: { type: number }
+        detalle: { type: ["string", "null"] }
+        estado: { type: string, enum: [publicada, aceptada, en_curso, finalizada, cancelada] }
+        createdAt: { type: string }
+        updatedAt: { type: string }
+        cliente: { $ref: "#/components/schemas/ParticipantUser" }
+        profesional:
+          oneOf:
+            - $ref: "#/components/schemas/ParticipantUser"
+            - type: "null"
+        calificada: { type: boolean }
+    JobInput:
+      type: object
+      required: [ubicacion, categoria, precioOfrecido]
+      properties:
+        ubicacion: { $ref: "#/components/schemas/UserLocation" }
+        categoria: { type: string, minLength: 2 }
+        precioOfrecido: { type: number, minimum: 0 }
+        detalle: { type: ["string", "null"], minLength: 3 }
+        profesionalId: { type: ["number", "null"] }
+    JobUpdate:
+      type: object
+      required: [estado]
+      properties:
+        estado: { type: string, enum: [publicada, aceptada, en_curso, finalizada, cancelada] }
+    MessageAttachment:
+      type: object
+      required: [objectPath]
+      properties:
+        objectPath: { type: string }
+        nombre: { type: string }
+    ChatMessage:
+      type: object
+      required: [id, changaId, emisorId, texto, adjuntos, leido, createdAt, emisor]
+      properties:
+        id: { type: number }
+        changaId: { type: number }
+        emisorId: { type: number }
+        texto: { type: string }
+        adjuntos:
+          type: array
+          items: { $ref: "#/components/schemas/MessageAttachment" }
+        leido: { type: boolean }
+        createdAt: { type: string }
+        emisor: { $ref: "#/components/schemas/ParticipantUser" }
+    MessageInput:
+      type: object
+      required: [texto]
+      properties:
+        texto: { type: string, minLength: 1, maxLength: 1000 }
+        adjuntos:
+          type: array
+          maxItems: 5
+          items: { $ref: "#/components/schemas/MessageAttachment" }
+    Appointment:
+      type: object
+      required: [id, changaId, clienteId, profesionalId, empiezaAt, terminaAt, estado, createdAt, updatedAt]
+      properties:
+        id: { type: number }
+        changaId: { type: number }
+        clienteId: { type: number }
+        profesionalId: { type: number }
+        empiezaAt: { type: string, format: date-time }
+        terminaAt: { type: ["string", "null"], format: date-time }
+        estado: { type: string, enum: [solicitada, confirmada, en_curso, completada, cancelada] }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+    AppointmentInput:
+      type: object
+      required: [empiezaAt]
+      properties:
+        empiezaAt: { type: string, format: date-time }
+        terminaAt: { type: ["string", "null"], format: date-time }
+    AppointmentAttempt:
+      type: object
+      required: [id, changaId, accion, resultado, detalle, appointmentId, empiezaAt, createdAt]
+      properties:
+        id: { type: number }
+        changaId: { type: number }
+        accion: { type: string, enum: [proponer, aceptar, rechazar, cancelar] }
+        resultado: { type: string, enum: [exitoso, rechazado, error_permiso, error_validacion, error_red] }
+        detalle: { type: ["string", "null"] }
+        appointmentId: { type: ["number", "null"] }
+        empiezaAt: { type: ["string", "null"], format: date-time }
+        createdAt: { type: string, format: date-time }
+    AppointmentAttemptInput:
+      type: object
+      required: [accion, resultado]
+      properties:
+        accion: { type: string, enum: [proponer, aceptar, rechazar, cancelar] }
+        resultado: { type: string, enum: [error_permiso, error_validacion, error_red] }
+        detalle: { type: string, maxLength: 500 }
+    ConversationLastMessage:
+      type: object
+      required: [id, changaId, emisorId, texto, adjuntos, leido, createdAt, emisor]
+      properties:
+        id: { type: number }
+        changaId: { type: number }
+        emisorId: { type: number }
+        texto: { type: string }
+        adjuntos:
+          type: array
+          items: { $ref: "#/components/schemas/MessageAttachment" }
+        leido: { type: boolean }
+        createdAt: { type: string }
+        emisor: { $ref: "#/components/schemas/ParticipantUser" }
+    Conversation:
+      type: object
+      required: [changaId, estado, categoria, detalle, updatedAt, unread, interlocutor, ultimoMensaje]
+      properties:
+        changaId: { type: number }
+        estado: { type: string, enum: [publicada, aceptada, en_curso, finalizada, cancelada] }
+        categoria: { type: string }
+        detalle: { type: ["string", "null"] }
+        updatedAt: { type: string }
+        unread: { type: number }
+        interlocutor:
+          oneOf:
+            - $ref: "#/components/schemas/ParticipantUser"
+            - type: "null"
+        ultimoMensaje:
+          oneOf:
+            - $ref: "#/components/schemas/ConversationLastMessage"
+            - type: "null"
+

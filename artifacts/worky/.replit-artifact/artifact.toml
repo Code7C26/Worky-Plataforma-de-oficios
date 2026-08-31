@@ -1,0 +1,28 @@
+kind = "web"
+previewPath = "/"
+title = "Worky — Plataforma de oficios"
+description = "Marketplace de oficios que conecta clientes con profesionales verificados para buscar, publicar, aceptar y coordinar trabajos."
+version = "1.0.0"
+id = "artifacts/worky"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 22943
+
+[services.development]
+run = "pnpm --filter @workspace/worky run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/worky", "run", "build" ]
+serve = "static"
+publicDir = "artifacts/worky/dist/public"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "22943"
+BASE_PATH = "/"

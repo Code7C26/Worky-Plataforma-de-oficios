@@ -1,0 +1,16 @@
+uploads = []
+generated = []
+
+[[outputs]]
+id = "a9tu3LKXlAFDkNC2xglob"
+uri = "file://docs/historial-de-cambios-worky.md"
+type = "text"
+title = "Historial de cambios de Worky"
+description = "Documento cronológico con las mejoras funcionales, visuales, auditorías, validaciones y pendientes de Worky."
+logical_id = "ea30af06-aa8e-4b5f-b5bd-4e66c1c97a5b"
+content_hash = "sha256:bb6f1faa54cfc09f6e9aa2b041b1141f70da5eca7048fe54c75e28a828b7ce48"
+size = 10991
+mtime_ms = 1787537356528
+storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:30cdce69-26de-4bbd-be5a-e35f8db8dfd8/ea30af06-aa8e-4b5f-b5bd-4e66c1c97a5b/cb78de13-5e9e-4411-b38c-08db18504a4e"
+storage_version_token = "1787537361071494"
+content_type = "text/markdown"

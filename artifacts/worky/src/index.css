@@ -1,0 +1,288 @@
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap');
+@import 'tailwindcss';
+
+:root {
+  --background: 37 43% 96%;
+  --foreground: 222 43% 16%;
+  --card: 40 33% 99%;
+  --card-foreground: 222 43% 16%;
+  --border: 35 22% 86%;
+  --input: 35 22% 86%;
+  --ring: 27 91% 55%;
+  --primary: 27 91% 55%;
+  --primary-foreground: 222 43% 16%;
+  --secondary: 215 45% 23%;
+  --secondary-foreground: 40 33% 99%;
+  --muted: 36 30% 91%;
+  --muted-foreground: 221 18% 45%;
+  --accent: 42 92% 66%;
+  --accent-foreground: 222 43% 16%;
+  --destructive: 4 72% 53%;
+  --destructive-foreground: 40 33% 99%;
+  --sidebar: 215 45% 23%;
+  --sidebar-foreground: 39 44% 95%;
+  --sidebar-border: 215 32% 32%;
+  --sidebar-primary: 27 91% 55%;
+  --sidebar-primary-foreground: 222 43% 16%;
+  --sidebar-accent: 215 36% 30%;
+  --sidebar-accent-foreground: 39 44% 95%;
+  --app-font-sans: 'DM Sans', sans-serif;
+  --app-font-display: 'Space Grotesk', sans-serif;
+  --app-font-mono: 'Space Mono', monospace;
+  --radius: 0.9rem;
+}
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body { margin: 0; min-width: 320px; background: hsl(var(--background)); color: hsl(var(--foreground)); font-family: var(--app-font-sans); font-size: 15px; }
+button, input, textarea, select { font: inherit; }
+button, a { -webkit-tap-highlight-color: transparent; }
+a { color: inherit; text-decoration: none; }
+::selection { background: hsl(var(--accent)); color: hsl(var(--foreground)); }
+.display-font { font-family: var(--app-font-display); }
+.app-shell { min-height: 100dvh; }
+.app-shell > main > header { position: relative; z-index: 50; }
+.chat-client-view form:has([data-testid="button-propose-appointment"]),
+.chat-client-view [data-testid="appointment-attempt-history"],
+.chat-client-view [data-testid="text-appointment-error"] { display: none; }
+.grain::after { content: ""; position: fixed; inset: 0; pointer-events: none; opacity: .035; z-index: 20; background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 180 180' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.55'/%3E%3C/svg%3E"); }
+.page-enter { animation: page-enter .45s ease both; }
+@keyframes page-enter { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+.float-in { animation: float-in .7s cubic-bezier(.2,.8,.2,1) both; }
+@keyframes float-in { from { opacity: 0; transform: translateY(18px) scale(.98); } to { opacity: 1; transform: translateY(0) scale(1); } }
+.delay-1 { animation-delay: 80ms; } .delay-2 { animation-delay: 160ms; } .delay-3 { animation-delay: 240ms; }
+.nav-link { transition: background .2s ease, color .2s ease, transform .2s ease; }
+.nav-link:hover { transform: translateX(2px); }
+.btn { transition: transform .18s ease, box-shadow .18s ease, background .18s ease; }
+.btn:hover { transform: translateY(-1px); }
+.btn:active { transform: translateY(0); }
+.card-lift { transition: transform .22s ease, box-shadow .22s ease, border-color .22s ease; }
+.card-lift:hover { transform: translateY(-3px); box-shadow: 0 18px 34px rgba(28, 44, 70, .1); border-color: hsl(var(--primary) / .42); }
+.skeleton { background: linear-gradient(90deg, hsl(var(--muted)) 25%, hsl(var(--card)) 50%, hsl(var(--muted)) 75%); background-size: 200% 100%; animation: shimmer 1.25s infinite; }
+@keyframes shimmer { to { background-position: -200% 0; } }
+.focus-ring:focus-visible { outline: 3px solid hsl(var(--accent)); outline-offset: 3px; }
+.appointment-error { display: flex; align-items: flex-start; gap: .45rem; border: 1px solid hsl(var(--destructive) / .3); border-radius: .75rem; background: hsl(var(--destructive) / .08); color: hsl(var(--destructive)); padding: .65rem .75rem; font-size: .75rem; font-weight: 700; line-height: 1.35; }
+/* El panel y los avisos de lectura viven en capas hermanas dentro del header.
+   Cuando coexisten, el aviso debe quedar debajo del panel y no debajo de él. */
+header:has(> div[class*="top-[66px]"]):has(> div[class*="top-[82px]"]) > div[class*="top-[82px]"] { top: min(28rem, calc(100vh - 10rem)) !important; }
+@media (max-width: 767px) {
+  header:has(> div[class*="top-[66px]"]):has(> div[class*="top-[82px]"]) > div[class*="top-[82px]"] { top: min(29rem, calc(100vh - 8rem)) !important; }
+}
+.field { width: 100%; border: 1px solid hsl(var(--border)); background: hsl(var(--card)); color: hsl(var(--foreground)); border-radius: .75rem; padding: .72rem .85rem; outline: none; transition: border-color .18s ease, box-shadow .18s ease; }
+.field:focus { border-color: hsl(var(--primary)); box-shadow: 0 0 0 3px hsl(var(--primary) / .16); }
+.field::placeholder { color: hsl(var(--muted-foreground) / .65); }
+.label { display: block; color: hsl(var(--foreground)); font-size: .79rem; font-weight: 700; letter-spacing: .01em; margin-bottom: .42rem; }
+.eyebrow { color: hsl(var(--primary)); text-transform: uppercase; letter-spacing: .16em; font-size: .68rem; font-weight: 700; }
+/* Los navegadores pueden aplicar autofill claro al completar el registro.
+   Mantener el contraste de los datos escritos sobre la superficie oscura. */
+body:has([data-testid="input-auth-confirm"]) .grain .field {
+  background: hsl(0 0% 100% / .09) !important;
+  color: #fff !important;
+  -webkit-text-fill-color: #fff !important;
+  caret-color: hsl(var(--accent));
+}
+body:has([data-testid="input-auth-email"]) .grain .field {
+  background: hsl(0 0% 100% / .09) !important;
+  color: #fff !important;
+  -webkit-text-fill-color: #fff !important;
+  caret-color: hsl(var(--accent));
+}
+body:has([data-testid="input-auth-confirm"]) .grain .field:-webkit-autofill,
+body:has([data-testid="input-auth-confirm"]) .grain .field:-webkit-autofill:hover,
+body:has([data-testid="input-auth-confirm"]) .grain .field:-webkit-autofill:focus {
+  -webkit-text-fill-color: #fff !important;
+  -webkit-box-shadow: 0 0 0 1000px hsl(0 0% 100% / .09) inset !important;
+  box-shadow: 0 0 0 1000px hsl(0 0% 100% / .09) inset !important;
+  caret-color: hsl(var(--accent));
+}
+body:has([data-testid="input-auth-email"]) .grain .field:-webkit-autofill,
+body:has([data-testid="input-auth-email"]) .grain .field:-webkit-autofill:hover,
+body:has([data-testid="input-auth-email"]) .grain .field:-webkit-autofill:focus {
+  -webkit-text-fill-color: #fff !important;
+  -webkit-box-shadow: 0 0 0 1000px hsl(0 0% 100% / .09) inset !important;
+  box-shadow: 0 0 0 1000px hsl(0 0% 100% / .09) inset !important;
+  caret-color: hsl(var(--accent));
+}
+/* El botón ghost de navegación no debe perderse sobre el fondo claro
+   aplicado por los estilos base de Button. */
+body:has(input[placeholder="Oficio"]) .grain form > div:has(> button[type="submit"]) > button[type="button"] {
+  border: 1px solid hsl(0 0% 100% / .15) !important;
+  background: transparent !important;
+  color: #fff !important;
+  min-height: 3.15rem;
+}
+/* En el primer paso no existe un paso anterior: mostrar solo Continuar. */
+body:has([data-testid="input-auth-confirm"]) .grain form > div:has(> button[type="submit"]) > button[type="button"]:disabled {
+  display: none;
+}
+.service-row {
+  grid-template-columns: 1fr 1fr 140px;
+}
+.service-row [data-service-labels] {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: 1fr 1fr 140px;
+  gap: .75rem;
+  color: hsl(0 0% 100% / .75);
+  font-size: .79rem;
+  font-weight: 700;
+  letter-spacing: .01em;
+}
+.service-remove {
+  grid-column: 1 / -1;
+  justify-self: start;
+  color: hsl(var(--accent));
+  font-size: .72rem;
+  font-weight: 700;
+}
+@media (max-width: 639px) {
+  .service-row, .service-row [data-service-labels] {
+    grid-template-columns: 1fr;
+  }
+  .service-row [data-service-labels] span:not(:first-child) {
+    display: none;
+  }
+}
+.scrollbar-thin::-webkit-scrollbar { width: 6px; height: 6px; }
+.scrollbar-thin::-webkit-scrollbar-thumb { background: hsl(var(--border)); border-radius: 10px; }
+@media (max-width: 767px) { .mobile-scroll { overflow-x: auto; scrollbar-width: none; } .mobile-scroll::-webkit-scrollbar { display: none; } }
+
+/* La pantalla de acceso usa el mismo lenguaje de marca, pero necesita una
+   composición más editorial que las pantallas internas de la app. */
+@media (min-width: 768px) {
+  body:has([data-testid="input-auth-email"]) .grain > section:first-child {
+    background:
+      radial-gradient(circle at 8% 58%, hsl(var(--primary) / .12), transparent 30%),
+      radial-gradient(circle at 85% 12%, hsl(var(--accent) / .08), transparent 26%);
+    border-right: 1px solid hsl(0 0% 100% / .08);
+  }
+  body:has([data-testid="input-auth-email"]) .grain > section:first-child::after {
+    content: "";
+    position: absolute;
+    right: 12%;
+    top: 28%;
+    width: 7rem;
+    height: 7rem;
+    border: 1px solid hsl(var(--accent) / .18);
+    border-radius: 2rem;
+    transform: rotate(18deg);
+    pointer-events: none;
+  }
+  body:has([data-testid="input-auth-email"]) .grain > section:nth-child(2) {
+    background: linear-gradient(135deg, hsl(var(--secondary)), hsl(215 42% 19%));
+  }
+  body:has([data-testid="input-auth-email"]) .grain > section:nth-child(2) > div {
+    border: 1px solid hsl(0 0% 100% / .1);
+    border-radius: 1.75rem;
+    background: hsl(0 0% 100% / .045);
+    padding: 2.25rem;
+    box-shadow: 0 24px 70px hsl(222 50% 8% / .22);
+    backdrop-filter: blur(12px);
+  }
+  body:has([data-testid="input-auth-email"]) .grain > section:nth-child(2) .field {
+    min-height: 3.15rem;
+    border-color: hsl(0 0% 100% / .14);
+    background: hsl(0 0% 100% / .09);
+  }
+}
+
+/* Shared product surface: keep the internal routes as intentional as login. */
+.app-shell {
+  overflow-x: clip;
+}
+.app-shell > main {
+  min-width: 0;
+  background:
+    radial-gradient(circle at 90% 0%, hsl(var(--accent) / .12), transparent 22rem),
+    hsl(var(--background));
+}
+.app-shell > main > header {
+  border-bottom: 1px solid hsl(var(--border) / .72);
+  background: hsl(var(--background) / .82);
+  backdrop-filter: blur(18px);
+}
+.app-shell > main > header > div { min-height: 4.75rem; }
+.app-shell > main > div { animation: page-enter .45s ease both; }
+.app-shell aside {
+  background:
+    radial-gradient(circle at 12% 4%, hsl(var(--primary) / .16), transparent 15rem),
+    linear-gradient(175deg, hsl(var(--sidebar)), hsl(215 46% 19%));
+  box-shadow: 12px 0 38px hsl(222 50% 10% / .08);
+}
+.app-shell aside .nav-link { min-height: 2.75rem; }
+.app-shell main .rounded-2xl.border,
+.app-shell main form.rounded-2xl,
+.app-shell main section.rounded-2xl {
+  box-shadow: 0 8px 26px hsl(222 43% 16% / .035);
+}
+.app-shell main .card-lift {
+  position: relative;
+  overflow: hidden;
+  background: linear-gradient(145deg, hsl(var(--card)), hsl(40 33% 98%));
+}
+.app-shell main .card-lift::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto;
+  height: 3px;
+  background: linear-gradient(90deg, hsl(var(--primary)), hsl(var(--accent)));
+  opacity: .85;
+}
+.app-shell main .field {
+  min-height: 2.9rem;
+  box-shadow: inset 0 1px 1px hsl(222 43% 16% / .025);
+}
+.app-shell main textarea.field { min-height: 7rem; }
+.app-shell main [data-testid^="status-job-"],
+.app-shell main .status {
+  display: inline-flex;
+  align-items: center;
+  gap: .35rem;
+  border-radius: 999px;
+  padding: .32rem .65rem;
+  font-size: .68rem;
+  line-height: 1;
+  font-weight: 800;
+}
+.app-shell main [data-testid^="status-job-"]::before,
+.app-shell main .status::before {
+  content: "";
+  width: .38rem;
+  height: .38rem;
+  border-radius: 999px;
+  background: currentColor;
+}
+.app-shell main [data-testid^="card-job-"],
+.app-shell main [data-testid^="card-conversation-"] {
+  transition: transform .2s ease, box-shadow .2s ease, border-color .2s ease;
+}
+.app-shell main [data-testid^="card-job-"]:hover,
+.app-shell main [data-testid^="card-conversation-"]:hover {
+  transform: translateY(-2px);
+  border-color: hsl(var(--primary) / .4);
+  box-shadow: 0 14px 30px hsl(222 43% 16% / .08);
+}
+
+@media (max-width: 767px) {
+  body { overflow-x: hidden; }
+  .app-shell > main > header > div { min-height: 4.1rem; }
+  .app-shell > main > div { padding-bottom: 1.5rem; }
+  .app-shell main h1 { font-size: clamp(2rem, 9vw, 2.65rem); line-height: 1.02; }
+  .app-shell main h2 { line-height: 1.08; }
+  .app-shell main .rounded-\[26px\] { border-radius: 1.35rem; }
+  .app-shell main form.rounded-2xl,
+  .app-shell main section.rounded-2xl { border-radius: 1.2rem; }
+  .app-shell main .card-lift { padding: 1.05rem; }
+  .app-shell aside { width: min(84vw, 290px); }
+}
+@media (min-width: 768px) and (max-width: 1100px) {
+  .app-shell aside { width: 230px; padding-inline: 1rem; }
+  .app-shell > main > div { padding-inline: clamp(1.25rem, 4vw, 2.5rem); }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    scroll-behavior: auto !important;
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .01ms !important;
+  }
+}

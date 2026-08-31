@@ -1,0 +1,17 @@
+- [API contract validation](api-contract-validation.md) — use OpenAPI number for numeric fields until the generated Zod runtime supports z.int().
+- [Test isolation for audit histories](test-isolation.md) — isolate entity histories before assertions so interrupted cleanup cannot leak stale audit rows.
+- [Offline queue synchronization](offline-queue-synchronization.md) — serialize retries per conversation and remove local attempts only after the server confirms them.
+- [Build environment defaults](build-environment-defaults.md) — align Vite fallbacks with artifact service values because recursive root builds lack injected service env.
+- [Artifact config validation](artifact-config-validation.md) — filtered pnpm commands run from the package directory, so cross-package checks need an explicit workspace root.
+- [JSDOM integration test isolation](jsdom-integration-test-isolation.md) — keep React/JSDOM integration cases in separate test processes when global DOM state is replaced between tests.
+- [Visual audit browser runtime](visual-audit-browser-runtime.md) — browser-based layout checks need Playwright plus explicit Nix graphics libraries in this workspace.
+- [PNG visual comparison formats](png-visual-comparison.md) — Playwright screenshots may be RGB PNGs, so comparisons must support RGB and RGBA.
+- [Visual baseline noise](visual-baseline-noise.md) — rerun one-pixel visual mismatches before approving a baseline update; headless rendering can vary minimally.
+- [Object Storage provisioning](object-storage-provisioning.md) — provision App Storage before relying on GCS signed uploads; configured env names alone do not guarantee server credentials.
+- [Profile photo delivery](profile-photo-delivery.md) — browser image tags cannot send Bearer tokens, so public profile photos need a restricted public read route.
+- [Deployment build separation](deployment-build-separation.md) — publication pre-builds must not invoke visual regression; keep release preparation separate from development validation.
+- [Visual regression route mocks](visual-regression-route-mocks.md) — mock detail endpoints before collection endpoints so profile audits receive an object, not an array.
+- [API stream routing](api-stream-routing.md) — notification SSE paths belong to the API artifact, not the web service path list.
+- [Direct image upload validation](direct-image-upload-validation.md) — signed upload URLs cannot inspect bytes; validate image content before associating the object.
+- [Profile photo cleanup races](profile-photo-cleanup-races.md) — lock the account before claiming photo objects and re-check the current path before deletion.
+- [Development schema synchronization](development-schema-synchronization.md) — API privacy tests require generated database declarations and the development schema to match the current Drizzle source.

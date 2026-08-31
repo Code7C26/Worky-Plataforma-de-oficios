@@ -1,0 +1,1638 @@
+Quiero que tomes este mensaje como **feedback directo sobre la implementación actual de Worky** y que trabajes sobre el producto existente, no como si fueras a crear una plataforma nueva desde cero.
+
+Worky ya tiene frontend en React + Vite, backend en Node.js + Express, PostgreSQL con Drizzle ORM, autenticación JWT, bcrypt, roles, changas, perfiles profesionales y mensajería básica.
+
+A partir de ahora quiero que la evolución sea mucho más profesional y consistente entre frontend y backend.
+
+El foco principal es:
+
+**1. Consolidar la arquitectura actual.**
+
+**2. Mejorar profundamente la experiencia del usuario.**
+
+**3. Separar correctamente la experiencia de cliente y Partner sin crear dos plataformas distintas.**
+
+**4. Hacer que todo lo visible en frontend tenga soporte real en backend y base de datos.**
+
+**5. No dejar funciones simuladas o solamente visuales.**
+
+---
+
+# PRINCIPIO GENERAL DE PRODUCTO
+
+Quiero modificar la lógica actual para que Worky funcione más parecido a Mercado Libre en su relación comprador/vendedor.
+
+Cuando una persona entra a Worky, la experiencia por defecto debe ser la de una persona que quiere contratar servicios.
+
+NO quiero que durante el registro inicial tenga que decidir obligatoriamente entre:
+
+* Cliente
+* Profesional
+
+Quiero una única cuenta de usuario.
+
+Esa cuenta inicialmente puede:
+
+* Buscar servicios.
+* Buscar profesionales.
+* Publicar changas.
+* Contactar profesionales.
+* Contratar.
+* Chatear.
+* Guardar profesionales.
+* Calificar.
+* Recomendar.
+
+Y dentro de la misma cuenta debe existir una opción:
+
+**“Ofrecer mis servicios”**
+
+Cuando el usuario selecciona esa opción, comienza el proceso para convertirse en Partner.
+
+El Partner no debe ser una cuenta diferente.
+
+Debe ser una ampliación de la cuenta original.
+
+Una misma persona puede contratar servicios y ofrecer servicios.
+
+---
+
+# PRIORIDAD TÉCNICA 1 — REVISAR EL MODELO DE USUARIO
+
+Actualmente existen roles.
+
+Quiero que revises si la implementación actual obliga a que un usuario sea exclusivamente cliente o profesional.
+
+Si es así, refactorizar esa lógica.
+
+## Backend
+
+El modelo debería conceptualmente funcionar así:
+
+`users`
+
+Contiene la identidad y autenticación principal.
+
+Ejemplo de campos:
+
+* id
+* firstName
+* lastName
+* email
+* passwordHash
+* phone
+* avatar
+* createdAt
+* updatedAt
+* lastLoginAt
+* status
+* emailVerified
+* phoneVerified
+
+Y luego:
+
+`partner_profiles`
+
+Relacionada 1:1 con `users`.
+
+Un usuario que todavía no ofrece servicios simplemente no tiene un `partner_profile`.
+
+Cuando activa:
+
+**Ofrecer mis servicios**
+
+se crea o empieza a completar su perfil Partner.
+
+No duplicar:
+
+* email
+* contraseña
+* identidad
+* sesión
+
+entre ambas estructuras.
+
+Revisar las migraciones necesarias con Drizzle.
+
+No eliminar datos existentes durante la migración.
+
+---
+
+# PRIORIDAD TÉCNICA 2 — PERSISTENCIA REAL DE SESIÓN
+
+Quiero solucionar completamente la permanencia de sesión.
+
+Actualmente ya existe JWT, pero quiero que el comportamiento final sea profesional.
+
+## Frontend
+
+Cuando el usuario inicia sesión:
+
+* Mantener correctamente su sesión.
+* Recuperar el usuario autenticado cuando se recarga la página.
+* No enviar al login cada vez que se refresca la aplicación.
+* Mostrar loading mientras se recupera la sesión.
+* Mantener información del usuario centralizada.
+
+Crear una arquitectura de autenticación clara.
+
+Por ejemplo:
+
+`AuthProvider`
+
+o solución equivalente.
+
+Debe exponer:
+
+* user
+* isAuthenticated
+* isLoading
+* login()
+* logout()
+* refreshUser()
+
+No quiero lógica de autenticación repetida en múltiples componentes.
+
+## Backend
+
+Agregar o revisar endpoint:
+
+`GET /api/v1/auth/me`
+
+Debe devolver el usuario autenticado actual.
+
+Nunca devolver:
+
+* passwordHash
+* secretos
+* información privada innecesaria
+
+Revisar también:
+
+`POST /api/v1/auth/register`
+
+`POST /api/v1/auth/login`
+
+`POST /api/v1/auth/logout`
+
+y, si corresponde por arquitectura:
+
+`POST /api/v1/auth/refresh`
+
+Si se utilizan refresh tokens, implementarlos de manera segura.
+
+No crear una implementación insegura solo para mantener el login.
+
+---
+
+# PRIORIDAD TÉCNICA 3 — MIGRAR FRONTEND COMPLETAMENTE A `/api/v1`
+
+Todavía existe una capa legacy de compatibilidad.
+
+Quiero eliminar progresivamente esa deuda técnica.
+
+Revisar TODO el frontend y localizar:
+
+* fetch directos.
+* Axios calls.
+* servicios.
+* hooks.
+* endpoints legacy.
+* datos temporales.
+* mocks.
+
+Migrar todo a:
+
+`/api/v1`
+
+Crear una capa centralizada.
+
+Por ejemplo:
+
+`src/lib/api`
+
+o:
+
+`src/services/api`
+
+Con:
+
+* baseURL.
+* token.
+* interceptores.
+* manejo de 401.
+* errores.
+* tipado.
+
+No quiero componentes React haciendo manualmente:
+
+`fetch("...")`
+
+en distintas partes de la aplicación sin una arquitectura común.
+
+---
+
+# EXPERIENCIA DE REGISTRO
+
+Quiero rehacer el onboarding.
+
+Actualmente debe sentirse demasiado cercano a un formulario tradicional.
+
+Quiero una experiencia progresiva.
+
+## Frontend
+
+Una pregunta o bloque pequeño por pantalla.
+
+Ejemplo:
+
+### Paso 1
+
+**¿Cómo te llamás?**
+
+### Paso 2
+
+**¿Cuál es tu email?**
+
+### Paso 3
+
+**Creá una contraseña**
+
+### Paso 4
+
+**¿Dónde estás?**
+
+Provincia.
+
+Ciudad/localidad.
+
+### Paso 5
+
+Confirmar cuenta.
+
+Mostrar:
+
+**Paso 2 de 5**
+
+Permitir:
+
+* volver.
+* continuar.
+* mantener datos ya ingresados.
+
+Validar cada paso antes de continuar.
+
+No esperar al final para informar todos los errores.
+
+## Backend
+
+Mantener validación completa en servidor aunque exista validación en frontend.
+
+Validar:
+
+* email.
+* password.
+* email único.
+* longitud.
+* campos obligatorios.
+* formato de teléfono si existe.
+
+Nunca confiar únicamente en el frontend.
+
+---
+
+# EXPERIENCIA POR DEFECTO: CLIENTE
+
+Cuando el usuario entra autenticado, debe continuar viendo Worky como marketplace.
+
+La navegación principal debe contener elementos como:
+
+* Inicio.
+* Buscar.
+* Categorías.
+* Mis changas.
+* Mensajes.
+* Perfil.
+
+Y de forma secundaria:
+
+**Ofrecer mis servicios**
+
+No mostrar todavía:
+
+* Liquidaciones.
+* Saldo.
+* Oportunidades.
+* Dashboard Partner.
+
+Hasta que active su perfil profesional.
+
+---
+
+# CONVERTIRSE EN PARTNER
+
+Agregar una acción visible:
+
+**Ofrecer mis servicios**
+
+Al seleccionarla:
+
+abrir onboarding Partner.
+
+No crear otra cuenta.
+
+## Backend
+
+Endpoint sugerido:
+
+`POST /api/v1/partner-profile`
+
+o equivalente.
+
+Debe crear el perfil relacionado al usuario autenticado.
+
+Luego endpoints:
+
+`GET /api/v1/partner-profile/me`
+
+`PATCH /api/v1/partner-profile/me`
+
+No permitir que un usuario edite el perfil Partner de otro usuario.
+
+---
+
+# ONBOARDING PARTNER
+
+Quiero un onboarding paso a paso.
+
+No un formulario gigantesco.
+
+## Paso 1 — Categorías
+
+Pregunta:
+
+**¿Qué servicios ofrecés?**
+
+Permitir múltiples categorías.
+
+Agregar muchas más categorías.
+
+Agregar:
+
+**Otros**
+
+Si elige Otros:
+
+pedir descripción.
+
+## Paso 2 — Especialidades
+
+Ejemplo:
+
+Electricidad:
+
+* Instalaciones.
+* Reparaciones.
+* Tableros.
+* Iluminación.
+* Urgencias.
+
+## Paso 3 — Experiencia
+
+Solicitar:
+
+* años de experiencia.
+* descripción profesional.
+* trayectoria.
+
+## Paso 4 — Ubicación
+
+Solicitar:
+
+* provincia.
+* localidad.
+* barrio.
+* zona de trabajo.
+* radio de cobertura.
+
+No mostrar públicamente dirección exacta.
+
+## Paso 5 — Portfolio
+
+Permitir:
+
+* fotos.
+* videos.
+* descripción.
+
+## Paso 6 — Disponibilidad
+
+Días y horarios.
+
+## Paso 7 — Confirmación
+
+Mostrar preview del perfil.
+
+---
+
+# BACKEND DEL PERFIL PARTNER
+
+Extender `partner_profiles`.
+
+Revisar qué campos ya existen.
+
+Agregar los necesarios sin duplicar información.
+
+Posibles campos:
+
+* userId
+* bio
+* yearsExperience
+* serviceRadiusKm
+* location
+* availability
+* profileStatus
+* averageRating
+* completedJobsCount
+* recommendedCount
+* createdAt
+* updatedAt
+
+No guardar `averageRating` manualmente si es mejor calcularlo mediante reviews o mantenerlo sincronizado de forma segura.
+
+Crear tablas separadas cuando corresponda.
+
+Ejemplo:
+
+`partner_categories`
+
+`partner_specialties`
+
+`partner_portfolio_items`
+
+---
+
+# CATEGORÍAS
+
+Quiero ampliar las categorías.
+
+No hardcodearlas en veinte componentes.
+
+Crear una fuente única.
+
+Preferentemente en DB si la arquitectura actual lo permite.
+
+Tabla:
+
+`service_categories`
+
+Posibles campos:
+
+* id
+* name
+* slug
+* parentId
+* icon
+* isActive
+* sortOrder
+
+Ejemplos de categorías:
+
+Hogar y reparaciones.
+
+* Plomería.
+* Electricidad.
+* Gas.
+* Pintura.
+* Albañilería.
+* Carpintería.
+* Cerrajería.
+* Aire acondicionado.
+* Calefacción.
+* Techos.
+* Impermeabilización.
+
+Limpieza.
+
+Jardinería.
+
+Automotor.
+
+Tecnología.
+
+Belleza.
+
+Mudanzas.
+
+Servicios profesionales.
+
+Otros.
+
+Frontend debe obtenerlas mediante API.
+
+Ejemplo:
+
+`GET /api/v1/categories`
+
+---
+
+# PUBLICAR CHANGA — FOTOS Y VIDEOS
+
+Quiero agregar multimedia en la publicación.
+
+## Frontend
+
+Dentro del formulario:
+
+**Agregar fotos o videos**
+
+Permitir:
+
+* múltiples fotografías.
+* videos cortos.
+
+Mostrar preview.
+
+Permitir eliminar antes de publicar.
+
+Mostrar progreso de carga.
+
+Validar:
+
+* tamaño.
+* formato.
+* cantidad.
+
+## Backend
+
+No guardar imágenes/videos como base64 dentro de PostgreSQL.
+
+Crear infraestructura para object storage.
+
+Guardar en DB solamente:
+
+* URL.
+* tipo.
+* metadata.
+* changaId.
+
+Tabla sugerida:
+
+`job_attachments`
+
+Campos:
+
+* id
+* jobId
+* uploadedByUserId
+* type
+* url
+* mimeType
+* fileSize
+* createdAt
+
+Proteger uploads.
+
+---
+
+# SISTEMA DE REVIEWS
+
+Quiero que la reputación funcione parecido a Uber.
+
+Una vez finalizado un trabajo:
+
+mostrar automáticamente un popup.
+
+Texto:
+
+**¿Cómo estuvo el trabajo de [nombre]?**
+
+1 a 5 estrellas.
+
+Comentario opcional.
+
+## Frontend
+
+Crear componente de review.
+
+Debe ser:
+
+* rápido.
+* sencillo.
+* mobile friendly.
+
+No obligar a escribir texto.
+
+Después de enviar:
+
+mostrar confirmación.
+
+## Backend
+
+Crear tabla:
+
+`reviews`
+
+Campos mínimos:
+
+* id
+* jobId
+* clientUserId
+* partnerUserId
+* rating
+* comment
+* createdAt
+
+Constraints:
+
+* rating entre 1 y 5.
+* una review por trabajo.
+* solamente el cliente del trabajo puede crearla.
+* solamente cuando el trabajo esté finalizado.
+
+No permitir reseñas arbitrarias.
+
+Endpoints:
+
+`POST /api/v1/jobs/:jobId/review`
+
+`GET /api/v1/partners/:partnerId/reviews`
+
+---
+
+# SISTEMA DE RANKING
+
+No quiero ordenar profesionales solamente por promedio de estrellas.
+
+Crear un sistema equilibrado.
+
+Factores sugeridos:
+
+* rating promedio.
+* cantidad de reviews.
+* trabajos completados.
+* tasa de finalización.
+* recomendaciones.
+* cercanía.
+* actividad reciente.
+
+Separar:
+
+**rankingScore**
+
+de:
+
+**averageRating**
+
+La fórmula debe vivir en backend.
+
+No en frontend.
+
+No exponer una lógica fácilmente manipulable.
+
+Inicialmente puede ser una fórmula sencilla pero bien estructurada.
+
+---
+
+# RECOMENDACIONES / BOCA A BOCA
+
+Esta función es muy importante.
+
+Después de terminar un trabajo:
+
+además de calificar, permitir:
+
+**Recomendar profesional**
+
+Crear una relación real.
+
+Tabla sugerida:
+
+`partner_recommendations`
+
+Campos:
+
+* id
+* userId
+* partnerId
+* jobId
+* createdAt
+
+Constraint:
+
+un usuario no puede recomendar múltiples veces al mismo profesional por el mismo trabajo.
+
+Mostrar:
+
+**96 personas recomiendan a este profesional**
+
+---
+
+# PERFIL PÚBLICO DE USUARIO
+
+Quiero una capa social ligera.
+
+No mostrar información privada.
+
+Permitir que un usuario tenga:
+
+**Mis recomendados**
+
+Y si el usuario elige hacerlo público:
+
+otros pueden ver los profesionales que recomienda.
+
+Backend:
+
+Agregar preferencia de privacidad.
+
+Ejemplo:
+
+`recommendationsVisibility`
+
+Valores:
+
+* public
+* users
+* private
+
+No exponer automáticamente historial completo de trabajos.
+
+Solo recomendaciones explícitas.
+
+---
+
+# BANDEJA DE MENSAJES
+
+Quiero que sea realmente funcional.
+
+## Frontend
+
+Ubicar icono en navbar superior derecha.
+
+Cuando existan mensajes no leídos:
+
+mostrar badge.
+
+Ejemplo:
+
+`3`
+
+Al abrir:
+
+mostrar lista de conversaciones.
+
+Cada conversación:
+
+* avatar.
+* nombre.
+* servicio/changa.
+* último mensaje.
+* hora.
+* unread.
+
+Orden:
+
+más reciente primero.
+
+## Backend
+
+Revisar estructura actual de `messages`.
+
+Si los mensajes están únicamente asociados a una changa, mantener esa relación.
+
+Agregar si hace falta:
+
+* readAt
+* createdAt
+
+Endpoint:
+
+`GET /api/v1/conversations`
+
+o generar conversaciones a partir de jobs.
+
+Endpoint:
+
+`GET /api/v1/jobs/:jobId/messages`
+
+`POST /api/v1/jobs/:jobId/messages`
+
+`PATCH /api/v1/messages/:id/read`
+
+No permitir leer chats donde el usuario no participa.
+
+---
+
+# CHAT MULTIMEDIA
+
+Agregar:
+
+* fotos.
+* videos.
+
+Backend puede reutilizar una tabla de attachments.
+
+Ejemplo:
+
+`message_attachments`
+
+o un sistema genérico bien diseñado.
+
+Frontend:
+
+preview.
+
+upload progress.
+
+error.
+
+galería.
+
+---
+
+# ETIQUETAS DE CHAT
+
+Quiero etiquetas para organizar conversaciones.
+
+Ejemplos:
+
+* Nuevo.
+* Presupuesto solicitado.
+* Esperando respuesta.
+* Visita coordinada.
+* Confirmado.
+* Finalizado.
+
+Diferenciar:
+
+**estado real del trabajo**
+
+de:
+
+**etiqueta visual del chat**
+
+Cuando sea posible, derivar automáticamente la etiqueta del estado de la changa para evitar inconsistencias.
+
+No duplicar información innecesariamente.
+
+---
+
+# CALENDARIO Y COORDINACIÓN
+
+Dentro del chat:
+
+Agregar acción:
+
+**Coordinar visita**
+
+## Frontend
+
+Modal con:
+
+* fecha.
+* hora.
+* duración.
+* comentario opcional.
+
+El Partner propone.
+
+El cliente puede:
+
+* aceptar.
+* rechazar.
+* proponer otro horario.
+
+## Backend
+
+Crear entidad:
+
+`appointments`
+
+Campos:
+
+* id
+* jobId
+* proposedByUserId
+* startAt
+* endAt
+* status
+* createdAt
+* updatedAt
+
+Estados:
+
+* proposed.
+* accepted.
+* rejected.
+* cancelled.
+
+Una cita aceptada debe aparecer en:
+
+* calendario cliente.
+* calendario Partner.
+
+---
+
+# PASARELA DE PAGO / RESERVA
+
+No implementar pago ficticio.
+
+Pero preparar la arquitectura.
+
+Cuando una visita queda aceptada:
+
+permitir solicitar una reserva.
+
+Crear modelo:
+
+`payments`
+
+o:
+
+`booking_payments`
+
+Campos:
+
+* id
+* jobId
+* appointmentId
+* userId
+* partnerId
+* grossAmount
+* platformFee
+* partnerAmount
+* status
+* provider
+* externalPaymentId
+* createdAt
+* updatedAt
+
+Estados:
+
+* pending.
+* approved.
+* rejected.
+* refunded.
+* cancelled.
+
+La integración futura debe poder trabajar con Mercado Pago.
+
+NO marcar un pago aprobado solamente porque el frontend muestra éxito.
+
+La confirmación debe venir del backend/proveedor de pagos.
+
+---
+
+# DASHBOARD PARTNER
+
+Cuando existe `partner_profile`, habilitar una experiencia profesional.
+
+Mantener el mismo usuario.
+
+## Sidebar
+
+Quiero:
+
+* Inicio.
+* Oportunidades.
+* Mis trabajos.
+* Calendario.
+* Mensajes.
+* Clientes.
+* Portfolio.
+* Reputación.
+* Liquidaciones.
+* Perfil.
+* Configuración.
+
+En mobile:
+
+transformarlo en navegación adaptada.
+
+---
+
+# HOME DEL PARTNER
+
+Cuando un Partner entra al dashboard quiero ver inmediatamente:
+
+* próximo trabajo.
+* trabajos de esta semana.
+* nuevas oportunidades.
+* mensajes pendientes.
+* saldo.
+* dinero pendiente de liquidar.
+
+No mostrar valores inventados.
+
+---
+
+# SALDO
+
+En la parte superior izquierda del dashboard Partner:
+
+Mostrar:
+
+**Saldo disponible**
+
+y debajo:
+
+**Pendiente**
+
+Ejemplo visual:
+
+Saldo
+
+$235.480
+
+Pendiente: $82.500
+
+Estos valores deben calcularse desde datos financieros reales.
+
+No hardcodearlos.
+
+---
+
+# LIQUIDACIONES
+
+Crear sección:
+
+**Liquidaciones**
+
+Tabla/listado con:
+
+* fecha.
+* trabajo.
+* cliente.
+* monto total.
+* comisión Worky.
+* neto Partner.
+* estado.
+* fecha estimada de pago.
+
+Backend:
+
+crear entidad si todavía no existe.
+
+Ejemplo:
+
+`settlements`
+
+No implementar movimiento de dinero ficticio.
+
+Inicialmente puede existir estructura + estados reales provenientes de pagos.
+
+---
+
+# CALENDARIO PARTNER
+
+Vista semanal como principal.
+
+También permitir:
+
+* día.
+* mes.
+
+Mostrar:
+
+* visitas.
+* trabajos.
+* horarios.
+
+La semana debe ser operativamente útil.
+
+Cada evento debe abrir:
+
+* cliente.
+* trabajo.
+* hora.
+* ubicación.
+* chat.
+
+---
+
+# OPORTUNIDADES CERCANAS
+
+Backend debe filtrar oportunidades según:
+
+* categoría.
+* especialidades.
+* estado.
+* ubicación.
+* radio.
+
+No mostrar todas las changas a todos los profesionales.
+
+Preparar ubicación para geolocalización futura.
+
+Si hoy location es JSONB, revisar si conviene estructurarlo mejor.
+
+Considerar:
+
+* province
+* city
+* neighborhood
+* latitude
+* longitude
+
+sin romper compatibilidad.
+
+---
+
+# NOTIFICACIONES
+
+Crear tabla:
+
+`notifications`
+
+Campos:
+
+* id
+* userId
+* type
+* title
+* body
+* entityType
+* entityId
+* readAt
+* createdAt
+
+Eventos:
+
+Cliente:
+
+* mensaje nuevo.
+* trabajo aceptado.
+* cita propuesta.
+* cita aceptada.
+* reserva.
+* trabajo finalizado.
+* review pendiente.
+
+Partner:
+
+* nueva oportunidad.
+* mensaje.
+* cita aceptada.
+* reserva pagada.
+* review recibida.
+* recomendación.
+* liquidación.
+
+Frontend:
+
+campana/icono.
+
+badge.
+
+panel de notificaciones.
+
+---
+
+# PERMISOS Y SEGURIDAD
+
+Revisar todo el backend.
+
+No confiar en que frontend oculta botones.
+
+Ejemplos:
+
+Solo el cliente propietario puede editar su changa.
+
+Solo un Partner autorizado puede aceptar un trabajo.
+
+Solo participantes pueden leer mensajes.
+
+Solo el cliente puede dejar review.
+
+Solo usuarios autenticados pueden recomendar.
+
+Solo el dueño del perfil Partner puede editarlo.
+
+Solo participantes pueden acceder a appointment.
+
+Validar todo mediante middleware + queries seguras.
+
+---
+
+# ESTADOS DE CHANGA
+
+Revisar estados actuales.
+
+Quiero un flujo claro.
+
+Posible propuesta:
+
+`open`
+
+`accepted`
+
+`coordinating`
+
+`scheduled`
+
+`in_progress`
+
+`completed`
+
+`cancelled`
+
+No agregar estados sin necesidad.
+
+En frontend mostrar español:
+
+* Publicada.
+* Aceptada.
+* Coordinando.
+* Visita agendada.
+* En curso.
+* Finalizada.
+* Cancelada.
+
+Crear reglas claras de transición.
+
+Idealmente centralizar la lógica de transiciones en backend.
+
+---
+
+# UX DE ERRORES
+
+Frontend debe mostrar mensajes claros.
+
+No mostrar:
+
+`500 Internal Server Error`
+
+al usuario.
+
+Ejemplos:
+
+**No pudimos enviar el mensaje. Intentá nuevamente.**
+
+**Ese trabajo ya fue aceptado por otro profesional.**
+
+**Tu sesión venció. Iniciá sesión nuevamente.**
+
+Backend debe devolver estructura consistente.
+
+Ejemplo:
+
+```json
+{
+  "error": {
+    "code": "JOB_ALREADY_ACCEPTED",
+    "message": "Este trabajo ya fue aceptado."
+  }
+}
+```
+
+---
+
+# LOADING Y ESTADOS VACÍOS
+
+Cada pantalla debe tener:
+
+* loading.
+* success.
+* empty.
+* error.
+
+Ejemplo:
+
+Oportunidades:
+
+**Todavía no encontramos trabajos compatibles con tu perfil.**
+
+Changas:
+
+**Todavía no publicaste ninguna changa.**
+
+Mensajes:
+
+**Todavía no tenés conversaciones.**
+
+No mostrar contenedores vacíos.
+
+---
+
+# RESPONSIVE
+
+Revisar absolutamente toda la nueva implementación en:
+
+* desktop.
+* tablet.
+* mobile.
+
+Especial prioridad:
+
+360–430 px.
+
+El Partner probablemente utilice Worky mientras trabaja desde el celular.
+
+Especial atención a:
+
+* chat.
+* cámara.
+* calendario.
+* oportunidades.
+* publicación.
+* dashboard.
+
+---
+
+# ARQUITECTURA FRONTEND
+
+Quiero evitar componentes gigantescos.
+
+Separar:
+
+* pages.
+* components.
+* features.
+* hooks.
+* services.
+* types.
+
+Cuando corresponda.
+
+Ejemplo conceptual:
+
+`features/auth`
+
+`features/jobs`
+
+`features/chat`
+
+`features/partners`
+
+`features/reviews`
+
+`features/payments`
+
+`features/notifications`
+
+No hacer una refactorización artificial si la arquitectura actual ya tiene una buena estructura.
+
+Pero evitar lógica de dominio mezclada directamente con JSX.
+
+---
+
+# ARQUITECTURA BACKEND
+
+Separar claramente:
+
+* routes.
+* controllers.
+* services.
+* repositories/data access.
+* validation.
+* middleware.
+
+Si actualmente la arquitectura es más simple, evolucionarla de forma gradual.
+
+No mover todo solo por moverlo.
+
+Pero la lógica importante no debe quedar directamente escrita dentro de handlers enormes.
+
+Especialmente:
+
+* aceptación atómica.
+* ranking.
+* pagos.
+* reviews.
+* appointments.
+* notificaciones.
+
+---
+
+# VALIDACIÓN
+
+Usar un sistema centralizado de validación si ya existe o agregar uno compatible con la stack.
+
+Validar:
+
+* params.
+* query.
+* body.
+* uploads.
+
+No permitir inputs arbitrarios.
+
+---
+
+# TESTS
+
+Agregar tests de las nuevas reglas críticas.
+
+Prioridad:
+
+### Auth
+
+* registro.
+* login.
+* me.
+* sesión inválida.
+
+### Partner
+
+* crear perfil.
+* actualizar propio.
+* impedir actualizar ajeno.
+
+### Changa
+
+* publicar.
+* aceptar.
+* impedir doble aceptación.
+
+### Reviews
+
+* solo trabajo completado.
+* solo cliente.
+* impedir review duplicada.
+
+### Mensajes
+
+* solo participantes.
+
+### Appointments
+
+* solo participantes.
+* estados válidos.
+
+### Payments
+
+* estados y permisos.
+
+No hace falta perseguir cobertura artificial del 100%.
+
+Quiero tests sobre lógica crítica.
+
+---
+
+# ORDEN DE TRABAJO
+
+No intentes implementar todo en un único cambio masivo.
+
+Trabajá en este orden.
+
+## ETAPA 1
+
+Arquitectura de usuario y sesión.
+
+* cuenta única.
+* persistencia.
+* `/auth/me`.
+* frontend auth.
+* migración `/api/v1`.
+
+## ETAPA 2
+
+Partner.
+
+* onboarding.
+* perfil.
+* categorías.
+* especialidades.
+* portfolio.
+* ubicación.
+
+## ETAPA 3
+
+Changa.
+
+* publicación.
+* multimedia.
+* oportunidades.
+* matching básico.
+
+## ETAPA 4
+
+Comunicación.
+
+* inbox.
+* unread.
+* multimedia.
+* notificaciones.
+
+## ETAPA 5
+
+Confianza.
+
+* reviews.
+* ranking.
+* recomendaciones.
+* perfiles públicos.
+
+## ETAPA 6
+
+Agenda.
+
+* appointments.
+* calendario.
+* coordinación.
+
+## ETAPA 7
+
+Pagos.
+
+* modelo financiero.
+* reserva.
+* integración real.
+* saldo.
+* liquidaciones.
+
+---
+
+# MUY IMPORTANTE
+
+Antes de comenzar cada etapa:
+
+1. Revisá qué existe.
+2. Reutilizá lo que ya funciona.
+3. Detectá qué tablas deben cambiar.
+4. Creá migraciones.
+5. Evitá breaking changes innecesarios.
+6. Actualizá frontend y backend de forma coordinada.
+7. Typecheck.
+8. Build.
+9. Tests.
+10. Probar recorrido completo.
+
+No quiero funcionalidades visuales sin backend.
+
+No quiero endpoints que no tengan interfaz cuando sean parte de esta etapa.
+
+No quiero duplicar sistemas.
+
+No quiero información ficticia para aparentar que una funcionalidad funciona.
+
+---
+
+# RESULTADO FINAL ESPERADO
+
+Quiero que Worky evolucione hacia una plataforma donde la experiencia completa sea coherente.
+
+## Usuario
+
+Se registra.
+
+Mantiene su sesión.
+
+Busca.
+
+Publica.
+
+Adjunta fotos/videos.
+
+Habla con profesionales.
+
+Coordina fecha.
+
+Reserva.
+
+Recibe el servicio.
+
+Califica.
+
+Recomienda.
+
+Guarda profesionales.
+
+## Partner
+
+Usa la misma cuenta.
+
+Activa “Ofrecer mis servicios”.
+
+Completa onboarding.
+
+Crea perfil profesional.
+
+Muestra portfolio.
+
+Recibe trabajos compatibles.
+
+Habla con clientes.
+
+Coordina agenda.
+
+Realiza trabajos.
+
+Recibe reviews.
+
+Construye reputación.
+
+Acumula recomendaciones.
+
+Visualiza saldo.
+
+Consulta liquidaciones.
+
+Todo debe estar conectado a datos reales.
+
+La regla a seguir en adelante es:
+
+**si existe en frontend, debe existir realmente en backend; si existe en backend como funcionalidad de usuario, debe tener una experiencia clara y usable en frontend.**
+
+Quiero que trabajes sobre esta implementación como una evolución profesional del producto actual y no como una reconstrucción.

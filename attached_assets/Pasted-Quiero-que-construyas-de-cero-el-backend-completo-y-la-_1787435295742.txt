@@ -1,0 +1,116 @@
+Quiero que construyas de cero el backend completo y la base de datos para "Worky", una app de conexión entre clientes y profesionales de oficios (plomería, electricidad, gas, albañilería). Armá todo desde cero: no busques adaptar ni reutilizar nada existente, simplemente creá el proyecto entero siguiendo esta especificación al pie de la letra.
+
+## Stack
+
+- Node.js + Express (confirmar si se requiere o no)
+- Autenticación con JWT (jsonwebtoken + bcryptjs para hashear contraseñas).
+- Variables sensibles (connection string, JWT secret) en variables de entorno, nunca hardcodeadas.
+
+## Modelos de datos
+
+### Usuario
+- nombre (string, obligatorio)
+- email (string, obligatorio, único, minúsculas)
+- passwordHash (string, obligatorio — nunca guardar la contraseña en texto plano)
+- telefono (string, opcional)
+- rol (enum: "cliente" | "profesional" | "admin", obligatorio, default "cliente")
+- ubicacion: { type: "Point", coordinates: [lng, lat], direccionTexto: string } (para búsquedas geoespaciales más adelante)
+- activo (boolean, default true)
+- timestamps (createdAt, updatedAt automáticos)
+
+### PerfilProfesional (uno por cada usuario con rol "profesional")
+- usuario (referencia a Usuario, obligatorio, único)
+- oficio (string, obligatorio) — ej: "Gasista matriculado"
+- categoria (enum: "Plomería" | "Electricidad" | "Gas" | "Albañilería" | "Otro", obligatorio)
+- matriculaHabilitante (string, opcional)
+- verificado (boolean, default false)
+- skills (array de strings)
+- about (string, opcional)
+- experienciaAnios (number, default 0)
+- precioReferencia (number, obligatorio)
+- disponible (boolean, default true)
+- rating (number, default 0, entre 0 y 5)
+- cantidadChangas (number, default 0)
+- timestamps
+
+### Changa (el "trabajo"/pedido que publica un cliente)
+- cliente (referencia a Usuario, obligatorio)
+- profesional (referencia a Usuario, opcional — se asigna recién cuando alguien la acepta)
+- ubicacion: { direccionTexto: string (obligatorio), coordinates: [lng, lat] (opcional) }
+- categoria (mismo enum que arriba, obligatorio)
+- precioOfrecido (number, obligatorio)
+- detalle (string, opcional)
+- estado (enum: "publicada" | "aceptada" | "en_curso" | "finalizada" | "cancelada", default "publicada")
+- timestamps
+
+### Mensaje (chat, ligado siempre a una changa puntual — no hay chat "genérico")
+- changa (referencia a Changa, obligatorio)
+- emisor (referencia a Usuario, obligatorio)
+- texto (string, obligatorio)
+- leido (boolean, default false)
+- timestamps
+
+## Endpoints necesarios (prefijo base: /api/v1)
+
+Todas las rutas "protegidas" requieren el header `Authorization: Bearer <token>`.
+
+### Auth (públicas)
+- `POST /auth/register` — body: `{ nombre, email, password, rol }`. Devuelve `{ token, usuario: { id, nombre, email, rol } }`. Status 201. Si el email ya existe, 409 con `{ error }`.
+- `POST /auth/login` — body: `{ email, password }`. Devuelve lo mismo que register. Si falla, 401 con `{ error }`.
+
+### Profesionales (públicas)
+- `GET /profesionales` — lista perfiles, acepta query param opcional `?categoria=`. Devuelve un array de PerfilProfesional con el campo `usuario` populado (al menos `nombre` y `ubicacion`).
+- `GET /profesionales/:id` — un perfil puntual, con `usuario` populado (`nombre`, `telefono`, `ubicacion`).
+
+### Perfil profesional propio (protegidas — operan sobre el usuario del token, sin pedir id)
+- `GET /perfil-profesional/mio` — devuelve el perfil del usuario logueado, o `null` si todavía no lo cargó.
+- `PUT /perfil-profesional/mio` — crea o actualiza (upsert) el perfil del usuario logueado. Body: `{ oficio, categoria, matriculaHabilitante, skills, about, experienciaAnios, precioReferencia, disponible }`. Si faltan `oficio`, `categoria` o `precioReferencia`, devolver 400 con `{ error, campos_faltantes: [...] }`.
+
+### Changas (protegidas)
+- `POST /trabajos` — crea una changa. Body: `{ ubicacion: { direccionTexto }, categoria, precioOfrecido, detalle }`. El `cliente` sale del token, no del body. Si falta `ubicacion.direccionTexto`, `categoria` o `precioOfrecido`, devolver 400 con `{ error, campos_faltantes: [...] }`. Status 201 si sale bien.
+- `GET /trabajos/mias` — changas publicadas por el usuario logueado (como cliente).
+- `GET /trabajos/disponibles` — changas con estado "publicada" que coincidan con la categoría del PerfilProfesional del usuario logueado (buscala automáticamente, no la pidas por parámetro). Si el usuario no tiene perfil profesional cargado, devolver 400 con un mensaje claro.
+- `GET /trabajos/asignadas` — changas donde `profesional` sea el usuario logueado y el estado sea "aceptada" o "en_curso".
+- `PATCH /trabajos/:id/aceptar` — asigna `profesional` = usuario logueado y cambia `estado` a "aceptada". Si la changa ya no está en estado "publicada" (otro profesional se la agarró antes), devolver 409 con `{ error }`.
+- `GET /trabajos/:id` — detalle de una changa, con `cliente` y `profesional` populados (`nombre`, `telefono`).
+
+### Chat (protegidas)
+- `GET /chats/:changaId/mensajes` — historial de mensajes de esa changa, ordenados del más viejo al más nuevo, con `emisor` populado (`nombre`).
+- `POST /chats/:changaId/mensajes` — body: `{ texto }`. El `emisor` sale del token. Si `texto` viene vacío, 400.
+
+## Reglas de negocio importantes
+
+1. Nunca devolver `passwordHash` en ninguna respuesta.
+2. El middleware de autenticación debe leer el JWT del header `Authorization: Bearer <token>`, verificarlo, y adjuntar el id del usuario al request para que los controladores lo usen (no confiar en un `usuarioId` que venga del body).
+3. Al aceptar una changa, verificar el estado actual antes de asignarla, para evitar que dos profesionales la acepten al mismo tiempo.
+4. Las contraseñas se guardan siempre hasheadas con bcrypt (nunca en texto plano).
+
+## Seguridad
+
+- Las credenciales de la base de datos y el JWT secret van en variables de entorno, nunca en el código.
+- Agregar CORS habilitado para que el frontend pueda conectarse.
+- Devolver siempre JSON con forma `{ error: "mensaje claro" }` para los errores, en español.
+
+## Datos de prueba
+
+Generá un script de seed que cree al menos 3 usuarios con rol "profesional" (uno de cada categoría: Gas, Electricidad, Plomería), con su PerfilProfesional ya cargado, contraseña de prueba `123456` para todos, y un usuario cliente de prueba también con contraseña `123456`.
+
+## Mejoras a tu criterio
+
+Además de lo especificado arriba, quiero que uses tu propio criterio para proponer e implementar mejoras que optimicen el rendimiento y la experiencia de quien use la app — no te limites solo a lo que pedí. Algunas áreas donde podrías aportar valor (no es una lista cerrada, sumá lo que consideres):
+
+- **Paginación** en `GET /profesionales` y `GET /trabajos/disponibles`, para que no se carguen de golpe cientos de resultados.
+- **Índices de base de datos** en los campos que más se consultan (email, categoria, estado, ubicacion geoespacial) para que las búsquedas no se vuelvan lentas a medida que crecen los datos.
+- **Rate limiting** en las rutas de login/registro, para prevenir fuerza bruta.
+- **Mensajes de error más específicos y consistentes**, pensados para que el frontend los pueda mostrar directo al usuario sin traducirlos.
+- **Validación de formato de email y fuerza de contraseña** en el registro.
+- **Ordenamiento inteligente** en `GET /profesionales` (por ejemplo, verificados y mejor rating primero).
+- **Soft delete** en vez de borrado definitivo para usuarios/changas, si te parece más seguro para el negocio.
+- **Logs estructurados** de errores del servidor, para poder debuggear más fácil.
+- Cualquier otra optimización de performance, seguridad o experiencia que veas pertinente para este tipo de app (marketplace de servicios con dos roles de usuario).
+
+Si agregás algo que cambie el contrato de la API (nuevos parámetros opcionales, campos extra en las respuestas, etc.), está bien — pero explicame al final qué agregaste y por qué, para que yo lo entienda.
+
+---
+
+Generá el proyecto completo con esta estructura, listo para correr. Al terminar, contame qué base de datos usaste finalmente (Mongo o Postgres), pegame el connection string / instrucciones de conexión (sin la contraseña), y un resumen de las mejoras que decidiste sumar por tu cuenta.

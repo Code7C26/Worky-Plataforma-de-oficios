@@ -1,0 +1,22 @@
+{
+  "name": "workspace",
+  "version": "0.0.0",
+  "license": "MIT",
+  "scripts": {
+    "preinstall": "sh -c 'rm -f package-lock.json yarn.lock; case \"$npm_config_user_agent\" in pnpm/*) ;; *) echo \"Use pnpm instead\" >&2; exit 1 ;; esac'",
+    "build": "pnpm run typecheck && pnpm -r --if-present run build",
+    "typecheck:libs": "tsc --build",
+    "typecheck": "pnpm run typecheck:libs && pnpm -r --filter \"./artifacts/**\" --filter \"./scripts\" --if-present run typecheck",
+    "build:worky": "pnpm run validate:artifact-config && pnpm --filter @workspace/api-spec run codegen && pnpm --filter @workspace/api-client-react run build",
+    "validate:artifact-config": "pnpm --filter @workspace/scripts test && pnpm --filter @workspace/scripts exec tsx src/validate-artifact-config.ts",
+    "validate:worky": "pnpm run validate:artifact-config && pnpm --filter @workspace/api-spec run codegen && pnpm --filter @workspace/api-client-react run build && pnpm --filter @workspace/api-server run test:privacy && pnpm --filter @workspace/worky run validate"
+  },
+  "private": true,
+  "dependencies": {
+    "@replit/connectors-sdk": "^0.4.1"
+  },
+  "devDependencies": {
+    "prettier": "^3.9.6",
+    "typescript": "~5.9.3"
+  }
+}

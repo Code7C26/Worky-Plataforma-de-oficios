@@ -1,0 +1,409 @@
+Implementación del registro y onboarding de Worky
+
+Estoy desarrollando Worky, una aplicación que conecta clientes con profesionales/oficios. Quiero mejorar y estructurar el flujo de registro, verificación y onboarding teniendo siempre como prioridad una experiencia de usuario simple, moderna, clara y sin fricciones.
+
+Antes de modificar el código, analizá la estructura actual del proyecto y reutilizá los componentes, estilos, sistema de autenticación y arquitectura existentes siempre que sea posible. No quiero duplicar funcionalidades ni romper funcionalidades existentes.
+
+OBJETIVO GENERAL
+
+Crear un flujo de registro progresivo de máximo 3 etapas.
+
+El usuario debe sentir que está completando un proceso sencillo y rápido. No quiero mostrarle todos los campos de una sola vez.
+
+Utilizar:
+
+Indicador visual de progreso: Paso 1 de 3, Paso 2 de 3, etc.
+Diseño responsive, especialmente pensado para mobile.
+Validación de campos en tiempo real o al avanzar.
+Mensajes de error claros y amigables.
+Botón principal claramente visible.
+Posibilidad de volver al paso anterior sin perder la información.
+Estados de carga durante subidas de archivos.
+Confirmación visual cuando un archivo fue cargado correctamente.
+No pedir información innecesaria.
+Mantener los datos ingresados si el usuario vuelve atrás.
+Evitar que el usuario pueda avanzar si faltan datos obligatorios.
+PASO 1 — DATOS BÁSICOS
+
+Crear una pantalla de registro con los siguientes campos:
+
+Foto de perfil
+Permitir subir una foto.
+Mostrar preview antes de continuar.
+Permitir reemplazar/eliminar la foto.
+Idealmente permitir utilizar la cámara desde dispositivos móviles.
+Datos personales
+Nombre completo
+Email
+Teléfono
+Contraseña
+Repetir contraseña
+Dirección
+
+La dirección debe estar estructurada como:
+
+Direccion
+Ciudad
+Provincia
+Edad
+
+Solicitar la edad del usuario.
+
+Validar que sea un valor válido.
+
+¿Para qué vas a utilizar Worky?
+
+Mostrar una selección de dos opciones:
+
+Tengo un oficio
+Soy cliente
+
+Quiero que la selección sea visualmente atractiva, por ejemplo mediante cards/botones seleccionables, y no mediante un select tradicional.
+
+Cuando el usuario selecciona una opción, debe quedar claramente marcada.
+
+Por ejemplo:
+
+[ Tengo un oficio ]
+[ Soy cliente ]
+
+La elección del rol determinará el flujo del resto del registro.
+
+PASO 1 — UX
+
+No mostrar todos los campos de manera abrumadora.
+
+Organizar visualmente la información en bloques:
+
+Foto
+Información personal
+Ubicación
+Rol dentro de Worky
+
+Utilizar labels claros y placeholders útiles.
+
+Ejemplo:
+
+Nombre completo
+Ej: Juan Pérez
+
+Teléfono
+Ej: +54 9 351...
+
+Evitar textos técnicos o mensajes de error difíciles de entender.
+
+PASO 2 — FLUJO CONDICIONAL
+
+Una vez completado el Paso 1, el comportamiento debe depender del rol seleccionado.
+
+CASO A — USUARIO CLIENTE
+
+Si el usuario seleccionó:
+
+"Soy cliente"
+
+NO debe solicitar documentación adicional.
+
+El usuario debe poder completar el registro y acceder directamente a la aplicación.
+
+Después del registro:
+
+Registro → Onboarding de cliente → Home/App
+
+No mostrar el flujo de verificación profesional.
+
+CASO B — USUARIO PROFESIONAL
+
+Si el usuario seleccionó:
+
+"Tengo un oficio"
+
+debe continuar con un proceso adicional de verificación.
+
+Solicitar:
+
+1. Oficio y experiencia
+
+Permitir seleccionar uno o varios oficios.
+
+El sistema debe permitir agregar múltiples oficios.
+
+Para cada oficio, solicitar:
+
+Años de experiencia
+
+Idealmente utilizar una interfaz sencilla para que el usuario pueda agregar más de un oficio.
+
+2. Verificación de identidad
+
+Solicitar fotografías del DNI para verificar identidad.
+
+Campos:
+
+Foto frente del DNI
+Foto dorso del DNI
+
+La interfaz debe explicar claramente qué debe fotografiar el usuario.
+
+Ejemplo:
+
+Frente del DNI
+"Tomá una foto clara del frente de tu DNI. Asegurate de que todos los datos sean visibles."
+
+Dorso del DNI
+"Tomá una foto clara del dorso de tu DNI."
+
+En mobile, priorizar la opción de abrir directamente la cámara.
+
+Mostrar preview después de tomar/subir cada imagen.
+
+3. Antecedentes penales
+
+Solicitar:
+
+PDF de antecedentes penales
+
+Permitir subir únicamente formatos compatibles, especialmente PDF.
+
+Mostrar:
+
+Nombre del archivo
+Estado de carga
+Posibilidad de reemplazarlo
+Confirmación cuando se cargó correctamente
+
+Validar tamaño máximo de archivo y mostrar un mensaje claro si supera el límite.
+
+ESTADO DE VERIFICACIÓN (NO ACTIVAR AHORA, PORQUE VAMOS A ESTAR USANDO CUENTAS DE PRUEBA)
+
+Es importante que el profesional entienda que completar estos datos/documentos no significa necesariamente que ya está verificado.
+
+Después de enviar la documentación, mostrar una pantalla de confirmación como:
+
+"¡Listo! Recibimos tu información."
+
+"Nuestro equipo revisará tus datos y documentación. Te avisaremos cuando tu perfil esté verificado."
+
+El perfil profesional debería tener un estado, por ejemplo:
+
+pending_verification
+verified
+rejected
+
+No permitir que el usuario tenga acceso a funcionalidades que requieran estar verificado si todavía está pendiente, según las reglas actuales de la aplicación.
+
+PASO 3 — ONBOARDING PERSONALIZADO
+
+Después del registro, crear un onboarding corto.
+
+IMPORTANTE: las preguntas deben depender del rol seleccionado.
+
+No quiero un cuestionario largo.
+
+Máximo:
+
+3 preguntas por usuario.
+
+Las preguntas deben ayudar a personalizar la experiencia dentro de Worky y no simplemente pedir información que ya se solicitó durante el registro.
+
+ONBOARDING — CLIENTE
+
+Si el usuario es cliente, hacer preguntas relacionadas con sus necesidades.
+
+Ejemplo:
+
+Pregunta 1
+
+¿Qué servicios te gustaría encontrar en Worky?
+
+Permitir seleccionar múltiples opciones.
+
+Pregunta 2
+
+¿Con qué frecuencia necesitás contratar servicios?
+
+Opciones:
+
+Ocasionalmente
+Algunas veces al mes
+Frecuentemente
+Es para una necesidad puntual
+Pregunta 3
+
+¿Qué es lo más importante para vos al elegir un profesional?
+
+Opciones:
+
+Precio
+Experiencia
+Calificaciones
+Rapidez
+Cercanía
+
+Estas preguntas deben poder modificarse posteriormente desde el perfil si es necesario.
+
+ONBOARDING — PROFESIONAL
+
+Si el usuario es profesional, hacer preguntas relacionadas con su actividad y objetivos dentro de Worky.
+
+Ejemplo:
+
+Pregunta 1
+
+¿Qué tipo de trabajos te gustaría recibir?
+
+Permitir seleccionar opciones relacionadas con sus oficios.
+
+Pregunta 2
+
+¿En qué zona te gustaría trabajar?
+
+Permitir seleccionar zonas/barrios/ciudades según la estructura geográfica que ya utilice la aplicación.
+
+Pregunta 3
+
+¿Qué buscás principalmente en Worky?
+
+Opciones:
+
+Conseguir nuevos clientes
+Conseguir más trabajos
+Hacer crecer mi negocio
+Mostrar mis servicios
+Otro
+UX DEL ONBOARDING
+
+El onboarding debe sentirse rápido y sencillo.
+
+Mostrar una pregunta por pantalla en lugar de mostrar las 3 simultáneamente si esto mejora la experiencia.
+
+Utilizar una barra/progreso:
+
+● ○ ○
+
+o:
+
+Pregunta 1 de 3
+
+Permitir:
+
+Selección múltiple cuando corresponda.
+Selección única cuando corresponda.
+Botón "Continuar".
+Opción "Omitir" únicamente si la pregunta no es esencial.
+Animaciones/transiciones suaves, sin exagerar.
+FLUJO FINAL
+
+El flujo completo debería quedar así:
+
+CLIENTE
+
+Registro
+↓
+Paso 1 — Datos básicos
+↓
+Selecciona "Soy cliente"
+↓
+Paso 2 — No requiere documentación
+↓
+Paso 3 — Onboarding personalizado
+↓
+Home de Worky
+
+PROFESIONAL
+
+Registro
+↓
+Paso 1 — Datos básicos
+↓
+Selecciona "Tengo un oficio"
+↓
+Paso 2 — Oficios + experiencia + DNI + antecedentes penales
+↓
+Estado: pendiente de verificación
+↓
+Paso 3 — Onboarding personalizado
+↓
+Home de Worky / área correspondiente
+
+CONSIDERACIONES TÉCNICAS
+
+Antes de implementar:
+
+Revisá cómo está estructurada actualmente la autenticación.
+Revisá el modelo de usuario existente.
+Revisá cómo se almacenan actualmente las imágenes y archivos.
+Revisá si ya existe un sistema de roles.
+Revisá si ya existe un sistema de perfiles.
+Reutilizá componentes existentes.
+No dupliques tablas, componentes o lógica que ya exista.
+No rompas funcionalidades existentes.
+
+Si es necesario modificar el modelo de datos, hacerlo de forma compatible con los datos existentes.
+
+El usuario debería tener un estado de onboarding para poder saber en qué punto abandonó el proceso y permitirle continuar posteriormente.
+
+Por ejemplo:
+
+registration_started
+basic_info_completed
+professional_verification_pending
+onboarding_completed
+
+No quiero que un usuario que cierre la aplicación durante el registro tenga que comenzar nuevamente desde cero.
+
+SEGURIDAD Y PRIVACIDAD
+
+La documentación de identidad y antecedentes penales contiene información sensible.
+
+Implementar el almacenamiento y acceso siguiendo buenas prácticas de seguridad.
+
+No mostrar documentos sensibles públicamente en el perfil.
+
+Los documentos deben estar disponibles únicamente para los procesos internos/autorizados de verificación.
+
+No almacenar contraseñas en texto plano.
+
+Validar correctamente los archivos subidos.
+
+IMPORTANTE — CRITERIO DE IMPLEMENTACIÓN
+
+No quiero simplemente agregar formularios.
+
+Quiero que diseñes el flujo pensando como product designer + UX designer + desarrollador.
+
+Antes de implementar, analizá:
+
+¿Qué información realmente necesita el usuario ingresar?
+¿Qué pasos pueden generar abandono?
+¿Qué campos pueden simplificarse?
+¿Cómo podemos reducir la fricción?
+¿Cómo hacer que el proceso se sienta rápido?
+¿Cómo explicar claramente por qué solicitamos DNI y antecedentes?
+¿Cómo hacer que el usuario entienda en todo momento en qué etapa está?
+¿Cómo hacer que el flujo sea excelente en mobile?
+
+Si detectás problemas de UX en mi propuesta, no los implementes ciegamente. Señalalos y proponé una alternativa mejor antes de realizar cambios estructurales.
+
+Quiero priorizar:
+
+1. Simplicidad
+2. Claridad
+3. Confianza
+4. Velocidad
+5. Mobile-first
+6. Seguridad
+7. Conversión/menor abandono
+
+Al finalizar, verificá que:
+
+El flujo de cliente funcione correctamente.
+El flujo profesional funcione correctamente.
+Las validaciones funcionen.
+Los archivos puedan cargarse correctamente.
+El usuario pueda volver atrás sin perder datos.
+El onboarding sea diferente según el rol.
+El proceso sea responsive.
+No se hayan roto funcionalidades existentes.
+
+Si alguna parte de la arquitectura actual impide implementar correctamente este flujo, explicame primero cuál es el problema y proponé la solución más segura antes de hacer cambios importantes.
