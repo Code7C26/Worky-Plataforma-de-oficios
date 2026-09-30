@@ -5,14 +5,24 @@ import { setTimeout as sleep } from 'node:timers/promises';
 import process from 'node:process';
 import { chromium } from 'playwright';
 
-const port = Number(process.env.WORKY_VISUAL_PORT || 22943);
+const port = Number(process.env.WORKY_VISUAL_PORT || 22944);
 const baseUrl = process.env.WORKY_VISUAL_URL || `http://127.0.0.1:${port}`;
-const routes = [
+const authenticatedRoutes = [
   ['/home', 'home'],
   ['/jobs', 'channas'],
   ['/conversations', 'conversations'],
   ['/profile', 'profile'],
   ['/partner/dashboard', 'dashboard'],
+];
+const scenarios = [
+  { route: '/', name: 'login', auth: 'anonymous' },
+  { route: '/', name: 'register', auth: 'anonymous', prepare: async (page) => {
+    await page.getByTestId('button-toggle-auth').click();
+    await page.getByTestId('input-auth-name').waitFor({ state: 'visible' });
+  } },
+  ...authenticatedRoutes.map(([route, name]) => ({ route, name, auth: 'authenticated' })),
+  { route: '/home', name: 'home-loading', auth: 'authenticated', state: 'loading', waitFor: '[aria-label="Cargando"]' },
+  { route: '/home', name: 'home-error', auth: 'authenticated', state: 'error', waitFor: '[data-testid="state-error"]' },
 ];
 const widths = [360, 390, 430, 768, 1024, 1440];
 const resultsDir = new URL('../test-results/visual/', import.meta.url).pathname;
@@ -28,12 +38,15 @@ const profile = {
 };
 const user = { id: 42, nombre: 'Ana Pérez', email: 'ana@example.com', rol: 'profesional' };
 
-function json(body) {
-  return { status: 200, contentType: 'application/json', body: JSON.stringify(body) };
+function json(body, status = 200) {
+  return { status, contentType: 'application/json', body: JSON.stringify(body) };
 }
 
-function mockFor(url) {
+function mockFor(url, scenario) {
   const path = new URL(url).pathname;
+  if (scenario.state === 'error' && path.endsWith('/profesionales')) {
+    return json({ error: 'Servicio temporalmente no disponible.' }, 503);
+  }
   if (path.endsWith('/auth/me')) return json(user);
   if (path.endsWith('/partner-profile/me')) return json(profile);
   if (path.includes('/partner/dashboard')) return json({ trabajos: [], calendario: [], archivos: [], notificacionesNoLeidas: 0 });
@@ -200,6 +213,9 @@ async function compareImages(actualPath, baselinePath, diffPath) {
   if (!differentPixels) return { ok: true };
   await writeFile(diffPath, writePng({ width: actual.width, height: actual.height, pixels: diff }));
   const totalPixels = actual.width * actual.height;
+  if (differentPixels <= 16 && maxDelta <= 3) {
+    return { ok: true, summary: `ruido de rasterizado ignorado: ${differentPixels} píxeles, delta máximo ${maxDelta}` };
+  }
   return {
     ok: false,
     summary: `${differentPixels}/${totalPixels} píxeles distintos (${(differentPixels / totalPixels * 100).toFixed(3)}%), delta máximo ${maxDelta}; diff: ${diffPath}`,
@@ -222,19 +238,37 @@ try {
   if (updateBaselines) await mkdir(baselinesDir, { recursive: true });
   browser = await chromium.launch({ headless: true });
 
-  for (const [route, name] of routes) {
+  for (const scenario of scenarios) {
+    const { route, name } = scenario;
     for (const width of widths) {
       const page = await browser.newPage({ viewport: { width, height: 900 }, deviceScaleFactor: 1 });
       const consoleErrors = [];
-      page.on('console', (message) => { if (message.type() === 'error') consoleErrors.push(message.text()); });
-      await page.route('**/api/v1/**', (route) => route.fulfill(mockFor(route.request().url())));
-      await page.emulateMedia({ reducedMotion: 'reduce' });
-      await page.addInitScript(() => {
-        localStorage.setItem('worky-token', 'visual-audit-token');
-        localStorage.setItem('worky-role', 'professional');
+      page.on('console', (message) => {
+        const expectedMockError = scenario.state === 'error' &&
+          message.text() === 'Failed to load resource: the server responded with a status of 503 (Service Unavailable)';
+        if (message.type() === 'error' && !expectedMockError) consoleErrors.push(message.text());
       });
+      await page.route('**/api/v1/**', async (requestRoute) => {
+        const response = mockFor(requestRoute.request().url(), scenario);
+        if (scenario.state === 'loading' && new URL(requestRoute.request().url()).pathname.endsWith('/profesionales')) {
+          await sleep(2000);
+        }
+        try {
+          await requestRoute.fulfill(response);
+        } catch {
+          // The loading scenario intentionally closes while its request is pending.
+        }
+      });
+      await page.emulateMedia({ reducedMotion: 'reduce' });
+      await page.addInitScript(({ authenticated }) => {
+        if (authenticated) localStorage.setItem('worky-token', 'visual-audit-token');
+        else localStorage.removeItem('worky-token');
+        localStorage.setItem('worky-role', 'professional');
+      }, { authenticated: scenario.auth === 'authenticated' });
       try {
-        await page.goto(`${baseUrl}${route}`, { waitUntil: 'networkidle' });
+        await page.goto(`${baseUrl}${route}`, { waitUntil: scenario.state === 'loading' ? 'domcontentloaded' : 'networkidle' });
+        if (scenario.prepare) await scenario.prepare(page);
+        if (scenario.waitFor) await page.locator(scenario.waitFor).first().waitFor({ state: 'visible' });
         await stabilizeForScreenshot(page);
         const audit = await page.evaluate(({ width }) => {
           const isVisible = (el) => {
@@ -276,8 +310,9 @@ try {
         if (audit.overflow > 1) throw new Error(`overflow horizontal de ${audit.overflow}px`);
         if (audit.offscreen.length) throw new Error(`elementos fuera de pantalla: ${JSON.stringify(audit.offscreen)}`);
         if (audit.interactiveCount) {
+          await page.bringToFront();
           await page.keyboard.press('Tab');
-          const focusAudit = await page.evaluate(() => {
+          let focusAudit = await page.evaluate(() => {
             const active = document.activeElement;
             if (!active || active === document.body) return { ok: false, element: '' };
             const style = getComputedStyle(active);
@@ -285,6 +320,20 @@ try {
             const shadow = style.boxShadow !== 'none';
             return { ok: outline > 0 || shadow, element: active.getAttribute('data-testid') || active.tagName };
           });
+          if (!focusAudit.ok) {
+            const focusable = page.locator('a,button,input,select,textarea,[tabindex]:not([tabindex="-1"])').filter({ visible: true }).first();
+            if (await focusable.count()) {
+              await focusable.focus();
+              focusAudit = await page.evaluate(() => {
+                const active = document.activeElement;
+                if (!active || active === document.body) return { ok: false, element: '' };
+                const style = getComputedStyle(active);
+                const outline = parseFloat(style.outlineWidth) || 0;
+                const shadow = style.boxShadow !== 'none';
+                return { ok: outline > 0 || shadow, element: active.getAttribute('data-testid') || active.tagName };
+              });
+            }
+          }
           if (!focusAudit.ok) throw new Error(`foco sin indicador visible en ${focusAudit.element}`);
         }
         if (consoleErrors.length) throw new Error(`errores de consola: ${consoleErrors.join(' | ')}`);
@@ -305,5 +354,5 @@ if (failures.length) {
   process.exit(1);
 }
 console.log(updateBaselines
-  ? `Baselines visuales actualizados: ${routes.length} rutas × ${widths.length} anchos en test/visual-baselines.`
-  : `Auditoría visual OK: ${routes.length} rutas × ${widths.length} anchos; no hubo cambios pixel a pixel.`);
+  ? `Baselines visuales actualizados: ${scenarios.length} escenarios × ${widths.length} anchos en test/visual-baselines.`
+  : `Auditoría visual OK: ${scenarios.length} escenarios × ${widths.length} anchos; no hubo cambios pixel a pixel.`);

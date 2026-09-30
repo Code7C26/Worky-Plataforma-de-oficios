@@ -1,32 +1,36 @@
-import { createContext, useContext, useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react';
+import { createContext, useContext, useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import { QueryClient, QueryClientProvider, useQuery } from '@tanstack/react-query';
 import {
   ArrowDownUp, BriefcaseBusiness, Check, ChevronRight, CircleAlert, Clock3, Inbox, LoaderCircle,
   LockKeyhole, MapPin, Menu, MessageCircle, Plus, Search, Send, ShieldCheck, Sparkles,
   Star, UserRound, X, Bell, CalendarDays, LayoutDashboard, RefreshCw, Trash2, Pencil,
-  ImageIcon, Paperclip, LocateFixed,
+  ImageIcon, Paperclip, LocateFixed, Settings,
 } from 'lucide-react';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import {
   getGetJobQueryKey, getGetMyProfessionalProfileQueryKey, getGetProfessionalQueryKey,
   getGetProfessionalReputationQueryKey, getListAssignedJobsQueryKey, getListAvailableJobsQueryKey,
-  getListConversationsQueryKey, getListMessagesQueryKey, getListMyJobsQueryKey, getListAppointmentAttemptsQueryKey,
+  getListMessagesQueryKey, getListMyJobsQueryKey, getListAppointmentAttemptsQueryKey,
   getListProfessionalsQueryKey, getListAppointmentsQueryKey, markMessagesRead, useAcceptJob, useAcceptAppointment, useCreateJob,
   useCreateMessage, useCreateMyProfessionalProfile, useGetJob, useGetMyProfessionalProfile,
   useGetProfessional, useGetProfessionalReputation,
-  useListAssignedJobs, useListAvailableJobs, useListConversations, useListMessages,
-  useListAppointments, useListMyJobs, useListProfessionals, useProposeAppointment, useRejectAppointment, useUpdateJob, useUpdateMyProfessionalProfile,
+  useListAssignedJobs, useListAvailableJobs, useListMessages,
+   useListAppointments, useListMyJobs, useListProfessionals, useProposeAppointment, useRejectAppointment, useUpdateJob, useUpdateMyProfessionalProfile,
+   updateProfessionalLocation,
 } from '@workspace/api-client-react';
-import type { Appointment, AppointmentAttempt, Job, ProfessionalProfile } from '@workspace/api-client-react';
+import type { Appointment, AppointmentAttempt, Conversation, Job, ProfessionalProfile } from '@workspace/api-client-react';
 import { ErrorBoundary } from '@/components/error-boundary';
 import NotFound from '@/pages/not-found';
 import { Route, Switch, Link, Router as WouterRouter, useLocation, useParams } from 'wouter';
-import { AuthUser, WorkyApiError, addPendingAppointmentAttempt, apiRequest, clearToken, configureApiAuth, currentUser, fetchWorkyObject, getPendingAppointmentAttempts, getToken, login, logout, markNotificationRead, register, savePendingAppointmentAttempts, syncPendingAppointmentAttempts, uploadWorkyFile, type PendingAppointmentAttempt } from '@/lib/api';
+import { AuthUser, WorkyApiError, addPendingAppointmentAttempt, apiRequest, clearToken, configureApiAuth, currentUser, fetchWorkyObject, getPendingAppointmentAttempts, getToken, login, logout, markNotificationRead, register, requestPasswordRecovery, resetPassword, savePendingAppointmentAttempts, syncPendingAppointmentAttempts, uploadWorkyFile, type PendingAppointmentAttempt } from '@/lib/api';
 import { appointmentErrorMessage, type AppointmentAction } from '@/appointment-errors';
+import { sortProfessionalsByDistance } from '@/lib/professionals';
+import SettingsPage from '@/pages/settings';
 
 export const queryClient = new QueryClient();
 type Role = 'client' | 'professional' | 'admin';
 type JobStatus = 'published' | 'accepted' | 'in_progress' | 'completed' | 'cancelled';
+const conversationsQueryKey = (role: Role) => ['worky-conversations', role] as const;
 type WorkyProfessional = {
   id: number;
   userId: number;
@@ -179,7 +183,7 @@ function clearRegistrationDraft() {
 
 type AuthContextValue = { user: AuthUser | null; isAuthenticated: boolean; isLoading: boolean; login: (email: string, password: string) => Promise<void>; register: (payload: RegistrationPayload) => Promise<void>; logout: () => Promise<void>; refreshUser: () => Promise<void> };
 const AuthContext = createContext<AuthContextValue | null>(null);
-function useAuth() { const value = useContext(AuthContext); if (!value) throw new Error('AuthProvider requerido'); return value; }
+export function useAuth() { const value = useContext(AuthContext); if (!value) throw new Error('AuthProvider requerido'); return value; }
 function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [isLoading, setLoading] = useState(true);
@@ -189,6 +193,101 @@ function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => { configureApiAuth(() => setSessionUser(null)); }, []);
   const value: AuthContextValue = { user, isAuthenticated: Boolean(user), isLoading, login: async (email, password) => setSessionUser(await login(email, password)), register: async (payload) => setSessionUser(await register(payload)), logout: async () => { await logout(); setSessionUser(null); }, refreshUser };
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+}
+
+const PROFESSIONAL_LOCATION_MIN_UPDATE_INTERVAL_MS = 30_000;
+const PROFESSIONAL_LOCATION_HEARTBEAT_INTERVAL_MS = 60_000;
+const LOCATION_UPDATED_EVENT = 'worky-location-updated';
+
+function ProfessionalLocationTracker({ enabled }: { enabled: boolean }) {
+  const auth = useAuth();
+  const professionalProfile = useGetMyProfessionalProfile({ query: { queryKey: getGetMyProfessionalProfileQueryKey(), enabled } });
+  const lastSentAtRef = useRef(0);
+
+  useEffect(() => {
+    if (!enabled || (auth.user?.rol !== 'profesional' && !professionalProfile.data) || typeof navigator === 'undefined' || !navigator.geolocation) return;
+
+    let active = true;
+    let latestCoordinates: [number, number] | null = null;
+    let inFlight = false;
+    let pendingCoordinates: [number, number] | null = null;
+    let watchId: number | null = null;
+    let heartbeat: number | null = null;
+
+    const sendLocation = async (coordinates: [number, number]) => {
+      if (!active) return;
+      if (inFlight) {
+        pendingCoordinates = coordinates;
+        return;
+      }
+      if (Date.now() - lastSentAtRef.current < PROFESSIONAL_LOCATION_MIN_UPDATE_INTERVAL_MS) return;
+
+      inFlight = true;
+      lastSentAtRef.current = Date.now();
+      try {
+        await updateProfessionalLocation({ coordinates });
+      } catch {
+        // La próxima lectura o heartbeat reintentará sin interrumpir la sesión.
+        lastSentAtRef.current = 0;
+      } finally {
+        inFlight = false;
+        if (active && pendingCoordinates) {
+          const nextCoordinates = pendingCoordinates;
+          pendingCoordinates = null;
+          void sendLocation(nextCoordinates);
+        }
+      }
+    };
+
+    const stopTracking = () => {
+      if (watchId !== null) {
+        navigator.geolocation.clearWatch(watchId);
+        watchId = null;
+      }
+      if (heartbeat !== null) {
+        window.clearInterval(heartbeat);
+        heartbeat = null;
+      }
+    };
+    const startTracking = () => {
+      if (!active || !navigator.onLine || watchId !== null) return;
+      watchId = navigator.geolocation.watchPosition(
+        (position) => {
+          latestCoordinates = [position.coords.longitude, position.coords.latitude];
+           window.dispatchEvent(new CustomEvent(LOCATION_UPDATED_EVENT, { detail: { coordinates: latestCoordinates } }));
+          void sendLocation(latestCoordinates);
+        },
+        () => {
+          // Si el permiso se deniega no se envían coordenadas.
+        },
+        { enableHighAccuracy: true, maximumAge: 30_000, timeout: 20_000 },
+      );
+      heartbeat = window.setInterval(() => {
+        if (latestCoordinates) void sendLocation(latestCoordinates);
+      }, PROFESSIONAL_LOCATION_HEARTBEAT_INTERVAL_MS);
+    };
+    const handleOffline = () => {
+      pendingCoordinates = null;
+      stopTracking();
+    };
+    const handleOnline = () => {
+      lastSentAtRef.current = 0;
+      startTracking();
+    };
+    window.addEventListener('offline', handleOffline);
+    window.addEventListener('online', handleOnline);
+    startTracking();
+
+    return () => {
+      active = false;
+      pendingCoordinates = null;
+      stopTracking();
+      window.removeEventListener('offline', handleOffline);
+      window.removeEventListener('online', handleOnline);
+    };
+  }, [auth.user?.id, auth.user?.rol, enabled, professionalProfile.data]);
+
+  return null;
 }
 
 const categories = ['Plomería', 'Electricidad', 'Gas', 'Albañilería', 'Otro'];
@@ -465,14 +564,21 @@ function AppShell({ children, role, setRole }: { children: ReactNode; role: Role
   return <div className="app-shell grain flex bg-[hsl(var(--background))]">
       <aside className={`fixed inset-y-0 left-0 z-30 flex w-[258px] flex-col bg-[hsl(var(--sidebar))] px-5 py-6 text-[hsl(var(--sidebar-foreground))] transition-transform duration-300 md:fixed md:translate-x-0 ${mobileOpen ? 'translate-x-0' : '-translate-x-full'}`}>
       <div className="mb-9 flex items-center justify-between"><Brand light /><button onClick={() => setMobileOpen(false)} className="text-white/60 md:hidden" data-testid="button-close-menu"><X size={20} /></button></div>
-       <div className="mb-7 rounded-2xl border border-white/10 bg-white/[.06] p-3.5"><div className="flex items-center gap-3"><Avatar name={accountName} initials={profile?.initials} size="sm" warm /><div className="min-w-0"><p className="truncate text-xs font-bold">{accountName}</p><p className="mt-0.5 text-[11px] text-white/55">{role === 'professional' ? 'Profesional' : role === 'admin' ? 'Administración' : 'Cliente'}</p></div></div>{role !== 'admin' && <button onClick={() => { if (role === 'client' && !profile) setLocation('/partner'); else setRole(role === 'client' ? 'professional' : 'client'); setMobileOpen(false); }} className="mt-3 flex w-full items-center justify-between border-t border-white/10 pt-3 text-[11px] font-bold text-[hsl(var(--accent))]" data-testid="button-switch-role">{role === 'client' && !profile ? 'Ofrecer mis servicios' : 'Cambiar vista'} <ChevronRight size={13} /></button>}</div>
+       <div className="mb-7 rounded-2xl border border-white/10 bg-white/[.06] p-3.5"><div className="flex items-center gap-3"><Avatar name={accountName} initials={profile?.initials} size="sm" warm /><div className="min-w-0"><p className="truncate text-xs font-bold">{accountName}</p><p className="mt-0.5 text-[11px] text-white/55">{role === 'professional' ? 'Profesional' : role === 'admin' ? 'Administración' : 'Cliente'}</p></div></div>{role === 'professional' || (role === 'client' && profile) ? <button onClick={() => { setRole(role === 'client' ? 'professional' : 'client'); setMobileOpen(false); }} className="focus-ring mt-3 flex w-full items-center justify-between rounded-xl border border-white/10 bg-white/[.04] px-2.5 py-2 text-[11px] font-bold text-[hsl(var(--accent))] transition-colors hover:border-[hsl(var(--accent)/.35)] hover:bg-white/[.08]" data-testid="button-switch-role">Cambiar vista <ChevronRight size={13} /></button> : null}</div>
       <p className="mb-3 px-3 text-[10px] font-bold uppercase tracking-[.17em] text-white/35">Tu espacio</p>
-      <nav className="space-y-1.5">{navItems.map(({ href, label, icon: Icon }) => <Link key={href} href={href} onClick={() => setMobileOpen(false)} className={`nav-link focus-ring flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold ${location === href ? 'bg-[hsl(var(--sidebar-accent))] text-white' : 'text-white/65 hover:bg-white/[.07] hover:text-white'}`} data-testid={`link-nav-${href.slice(1).replace('/', '-')}`}><Icon size={18} strokeWidth={location === href ? 2.5 : 2} /><span>{label}</span>{href === '/jobs' && <span className="ml-auto h-1.5 w-1.5 rounded-full bg-[hsl(var(--primary))]" />}</Link>)}{role === 'professional' && <Link href="/partner/dashboard" onClick={() => setMobileOpen(false)} className={`nav-link focus-ring flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold ${location === '/partner/dashboard' ? 'bg-[hsl(var(--sidebar-accent))] text-white' : 'text-white/65 hover:bg-white/[.07] hover:text-white'}`} data-testid="link-nav-partner-dashboard"><LayoutDashboard size={18} /> <span>Panel Partner</span></Link>}</nav>{role === 'client' && <Link href="/partner" onClick={() => setMobileOpen(false)} className="mt-6 flex items-center gap-2 rounded-xl border border-[hsl(var(--accent)/.35)] px-3 py-2.5 text-xs font-bold text-[hsl(var(--accent))]" data-testid="link-offer-services"><Sparkles size={15} /> Ofrecer mis servicios</Link>}
-       {role === 'client' && <div className="mt-auto rounded-2xl bg-[hsl(var(--primary))] p-4 text-[hsl(var(--primary-foreground))]"><Sparkles size={18} /><p className="mt-3 text-sm font-bold leading-snug">La changa justa, con gente de confianza.</p><p className="mt-1 text-[11px] leading-relaxed opacity-75">Todo empieza cerca de casa.</p></div>}
-       <button onClick={() => { void auth.logout(); setLocation('/'); }} className="mt-5 flex items-center gap-2 px-3 text-xs font-bold text-white/45 hover:text-white" data-testid="button-logout"><LockKeyhole size={14} /> Salir de Worky</button>
+       <nav className="space-y-1.5">{navItems.map(({ href, label, icon: Icon }) => <Link key={href} href={href} onClick={() => setMobileOpen(false)} className={`nav-link focus-ring flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold ${location === href ? 'bg-[hsl(var(--sidebar-accent))] text-white' : 'text-white/65 hover:bg-white/[.07] hover:text-white'}`} data-testid={`link-nav-${href.slice(1).replace('/', '-')}`}><Icon size={18} strokeWidth={location === href ? 2.5 : 2} /><span>{label}</span>{href === '/jobs' && <span className="ml-auto h-1.5 w-1.5 rounded-full bg-[hsl(var(--primary))]" />}</Link>)}{role === 'professional' && <Link href="/partner/dashboard" onClick={() => setMobileOpen(false)} className={`nav-link focus-ring flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold ${location === '/partner/dashboard' ? 'bg-[hsl(var(--sidebar-accent))] text-white' : 'text-white/65 hover:bg-white/[.07] hover:text-white'}`} data-testid="link-nav-partner-dashboard"><LayoutDashboard size={18} /> <span>Panel Partner</span></Link>}</nav>
+        {role === 'client' && <div className="mt-auto pt-5"><div className="rounded-2xl bg-[hsl(var(--primary))] p-4 text-[hsl(var(--primary-foreground))]"><Sparkles size={18} /><p className="mt-3 text-sm font-bold leading-snug">La changa justa, con gente de confianza.</p><p className="mt-1 text-[11px] leading-relaxed opacity-75">Todo empieza cerca de casa.</p><Link href="/partner" onClick={() => setMobileOpen(false)} className="focus-ring mt-3 flex items-center justify-between rounded-xl bg-black/10 px-3 py-2 text-xs font-bold transition-colors hover:bg-black/20" data-testid="link-offer-services"><span>Ofrecer mis servicios</span><ChevronRight size={14} /></Link></div></div>}
+       {role !== 'admin' && (
+          <div className={role === 'client' ? 'mt-5 mb-3' : 'mt-auto mb-3'}>
+           <Link href="/settings" onClick={() => setMobileOpen(false)} className={`nav-link focus-ring flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold ${location === '/settings' ? 'bg-[hsl(var(--sidebar-accent))] text-white' : 'text-white/65 hover:bg-white/[.07] hover:text-white'}`} data-testid="link-nav-settings">
+             <Settings size={18} /><span>Configuración</span>
+           </Link>
+         </div>
+       )}
+        <button onClick={() => { void auth.logout(); setLocation('/'); }} className={`${role === 'admin' ? 'mt-auto' : ''} mt-1 flex items-center gap-2 px-3 pb-1 text-xs font-bold text-white/45 hover:text-white`} data-testid="button-logout"><LockKeyhole size={14} /> Salir de Worky</button>
     </aside>
     {mobileOpen && <button aria-label="Cerrar menú" onClick={() => setMobileOpen(false)} className="fixed inset-0 z-20 bg-[hsl(var(--secondary)/.45)] md:hidden" data-testid="button-menu-overlay" />}
-          <main className="min-w-0 flex-1 md:ml-[258px]"><header className="relative flex h-[76px] items-center justify-between border-b border-[hsl(var(--border))] bg-[hsl(var(--background)/.85)] px-5 backdrop-blur md:px-10"><button onClick={() => setMobileOpen(true)} className="rounded-lg p-2 md:hidden" data-testid="button-open-menu"><Menu size={22} /></button><div className="flex items-center gap-3"><button onClick={() => setShowNotifications(!showNotifications)} className="relative rounded-xl p-2.5 text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--muted))]" data-testid="button-notifications"><Bell size={19} />{Boolean(notifications.data?.unread) && <span data-testid="notification-unread-count" className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-[hsl(var(--primary))] px-1 text-[9px] font-bold text-white">{notifications.data?.unread}</span>}</button><Link href="/profile" className="focus-ring flex items-center gap-2" data-testid="link-header-profile"><Avatar name={accountName} initials={profile?.initials} size="sm" warm /><span className="hidden text-xs font-bold sm:block">{accountName.split(' ')[0]}</span></Link></div>{showNotifications && <div className="absolute right-5 top-[66px] z-40 w-[min(360px,calc(100vw-2rem))] rounded-2xl border border-[hsl(var(--border))] bg-[hsl(var(--card))] p-3 shadow-2xl md:right-10"><div className="flex items-center justify-between border-b border-[hsl(var(--border))] px-2 pb-3"><p className="display-font font-bold">Notificaciones</p><button className="text-[10px] font-bold text-[hsl(var(--primary))]" onClick={() => { void apiRequest('/notificaciones/leidas', { method: 'POST' }).then(() => notifications.refetch()); }}>Marcar leídas</button></div>{!notifications.data?.items.length ? <p className="px-2 py-6 text-center text-xs text-[hsl(var(--muted-foreground))]">No tenés novedades.</p> : <div className="max-h-72 overflow-auto">{notifications.data.items.slice(0, 6).map((item) => { const className = `block border-b border-[hsl(var(--border))] px-2 py-3 last:border-0 ${item.leida ? 'opacity-55' : ''} ${item.href ? 'cursor-pointer hover:bg-[hsl(var(--muted)/.55)]' : ''}`; const content = <><p className="text-xs font-bold">{item.titulo}</p><p className="mt-1 text-[11px] leading-relaxed text-[hsl(var(--muted-foreground))]">{item.detalle}</p>{item.href && <p className="mt-2 text-[10px] font-bold text-[hsl(var(--primary))]">Abrir conversación <ChevronRight size={12} className="inline" /></p>}</>; return item.href ? <Link key={item.id} href={item.href} onClick={() => { setShowNotifications(false); if (!item.leida) void markNotificationAsRead(item); }} className={className} data-testid={`notification-${item.id}`}>{content}</Link> : <div key={item.id} className={className} data-testid={`notification-${item.id}`}>{content}</div>; })}</div>}</div>}{notificationReadFailures.size > 0 && <div className="absolute left-5 right-5 top-[82px] z-30 flex flex-col gap-2 md:left-auto md:right-10 md:max-w-[360px]">{Array.from(notificationReadFailures.values()).map((failure) => <div key={failure.id} className="flex items-center gap-3 rounded-xl border border-[hsl(var(--destructive)/.3)] bg-[hsl(var(--card))] px-4 py-3 text-xs shadow-lg" role="alert" data-testid={`notification-read-error-${failure.id}`}><CircleAlert size={16} className="shrink-0 text-[hsl(var(--destructive))]" /><p className="min-w-0 flex-1 text-[hsl(var(--muted-foreground))]">No pudimos marcar “{failure.title}” como leída. Revisá tu conexión.</p><button onClick={() => { void markNotificationAsRead({ id: failure.id, titulo: failure.title }); }} disabled={retryingNotificationId === failure.id} className="shrink-0 font-bold text-[hsl(var(--primary))] disabled:opacity-50" data-testid={`button-retry-notification-read-${failure.id}`}>{retryingNotificationId === failure.id ? <LoaderCircle size={15} className="animate-spin" aria-label="Reintentando" /> : <><RefreshCw size={14} className="mr-1 inline" />Reintentar</>}</button></div>)}</div>}</header><div className="page-enter mx-auto max-w-[1440px] px-5 py-7 md:px-10 md:py-10">{children}</div></main>
+          <main className="min-w-0 flex-1 md:ml-[258px]"><header className="relative flex h-[76px] items-center justify-between border-b border-[hsl(var(--border))] bg-[hsl(var(--background)/.85)] px-5 backdrop-blur md:px-10"><button onClick={() => setMobileOpen(true)} className="rounded-lg p-2 md:hidden" data-testid="button-open-menu"><Menu size={22} /></button><div className="ml-auto flex items-center gap-3"><button onClick={() => setShowNotifications(!showNotifications)} className="relative rounded-xl p-2.5 text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--muted))]" data-testid="button-notifications"><Bell size={19} />{Boolean(notifications.data?.unread) && <span data-testid="notification-unread-count" className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-[hsl(var(--primary))] px-1 text-[9px] font-bold text-white">{notifications.data?.unread}</span>}</button><Link href="/profile" className="focus-ring flex items-center gap-2" data-testid="link-header-profile"><Avatar name={accountName} initials={profile?.initials} size="sm" warm /><span className="hidden text-xs font-bold sm:block">Mi perfil</span></Link></div>{showNotifications && <div className="absolute right-5 top-[66px] z-40 w-[min(360px,calc(100vw-2rem))] rounded-2xl border border-[hsl(var(--border))] bg-[hsl(var(--card))] p-3 shadow-2xl md:right-10"><div className="flex items-center justify-between border-b border-[hsl(var(--border))] px-2 pb-3"><p className="display-font font-bold">Notificaciones</p><button className="text-[10px] font-bold text-[hsl(var(--primary))]" onClick={() => { void apiRequest('/notificaciones/leidas', { method: 'POST' }).then(() => notifications.refetch()); }}>Marcar leídas</button></div>{!notifications.data?.items.length ? <p className="px-2 py-6 text-center text-xs text-[hsl(var(--muted-foreground))]">No tenés novedades.</p> : <div className="max-h-72 overflow-auto">{notifications.data.items.slice(0, 6).map((item) => { const className = `block border-b border-[hsl(var(--border))] px-2 py-3 last:border-0 ${item.leida ? 'opacity-55' : ''} ${item.href ? 'cursor-pointer hover:bg-[hsl(var(--muted)/.55)]' : ''}`; const content = <><p className="text-xs font-bold">{item.titulo}</p><p className="mt-1 text-[11px] leading-relaxed text-[hsl(var(--muted-foreground))]">{item.detalle}</p>{item.href && <p className="mt-2 text-[10px] font-bold text-[hsl(var(--primary))]">Abrir conversación <ChevronRight size={12} className="inline" /></p>}</>; return item.href ? <Link key={item.id} href={item.href} onClick={() => { setShowNotifications(false); if (!item.leida) void markNotificationAsRead(item); }} className={className} data-testid={`notification-${item.id}`}>{content}</Link> : <div key={item.id} className={className} data-testid={`notification-${item.id}`}>{content}</div>; })}</div>}</div>}{notificationReadFailures.size > 0 && <div className="absolute left-5 right-5 top-[82px] z-30 flex flex-col gap-2 md:left-auto md:right-10 md:max-w-[360px]">{Array.from(notificationReadFailures.values()).map((failure) => <div key={failure.id} className="flex items-center gap-3 rounded-xl border border-[hsl(var(--destructive)/.3)] bg-[hsl(var(--card))] px-4 py-3 text-xs shadow-lg" role="alert" data-testid={`notification-read-error-${failure.id}`}><CircleAlert size={16} className="shrink-0 text-[hsl(var(--destructive))]" /><p className="min-w-0 flex-1 text-[hsl(var(--muted-foreground))]">No pudimos marcar “{failure.title}” como leída. Revisá tu conexión.</p><button onClick={() => { void markNotificationAsRead({ id: failure.id, titulo: failure.title }); }} disabled={retryingNotificationId === failure.id} className="shrink-0 font-bold text-[hsl(var(--primary))] disabled:opacity-50" data-testid={`button-retry-notification-read-${failure.id}`}>{retryingNotificationId === failure.id ? <LoaderCircle size={15} className="animate-spin" aria-label="Reintentando" /> : <><RefreshCw size={14} className="mr-1 inline" />Reintentar</>}</button></div>)}</div>}</header><div className="page-enter mx-auto max-w-[1440px] px-5 py-7 md:px-10 md:py-10">{children}</div></main>
   </div>;
 }
 
@@ -501,16 +607,21 @@ function AuthPageLegacy({ setRole }: { setRole: (role: Role) => void }) {
 function AuthPage({ setRole }: { setRole: (role: Role) => void }) {
   const auth = useAuth();
   const [, navigate] = useLocation();
-  const [mode, setMode] = useState<'login' | 'register'>('login');
+  const [resetToken, setResetToken] = useState(() => typeof window === 'undefined' ? null : new URLSearchParams(window.location.search).get('resetToken'));
+  const [mode, setMode] = useState<'login' | 'register' | 'forgot' | 'reset'>(() => resetToken ? 'reset' : 'login');
   const [draft] = useState(() => readRegistrationDraft());
   const [step, setStep] = useState(draft?.step ?? 1);
   const [role, setRoleLocal] = useState<Role>(draft?.role ?? 'client');
   const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
+  const [busy, setBusy] = useState(false);
   const setLocation = (next: string) => {
     if (next === '/') {
+      setResetToken(null);
       setMode('login');
       setStep(1);
       setError('');
+      setSuccess('');
     }
     navigate(next);
   };
@@ -580,7 +691,47 @@ function AuthPage({ setRole }: { setRole: (role: Role) => void }) {
       setError(cause instanceof Error ? cause.message : 'No pudimos ingresar. Intentá nuevamente.');
     }
   };
-  const input = (key: string, label: string, type = 'text', required = true) => <label className="block"><span className="label !text-white/75">{label}</span><input value={data[key as keyof typeof data]} onChange={(event) => change(key, event.target.value)} type={type} required={required} className="field border-white/15 bg-white/[.08] text-white placeholder:text-white/35" data-testid={`input-auth-${key}`} /></label>;
+  const recoverySubmit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setError('');
+    setSuccess('');
+    setBusy(true);
+    try {
+      const response = await requestPasswordRecovery(data.email);
+      setSuccess(response.message);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'No pudimos procesar la solicitud.');
+    } finally {
+      setBusy(false);
+    }
+  };
+  const resetSubmit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setError('');
+    setSuccess('');
+    if (!resetToken) {
+      setError('El enlace de recuperación no es válido.');
+      return;
+    }
+    if (data.password.length < 8 || data.password !== data.confirm) {
+      setError('La contraseña debe tener al menos 8 caracteres y coincidir.');
+      return;
+    }
+    setBusy(true);
+    try {
+      await resetPassword(resetToken, data.password);
+      setResetToken(null);
+      window.history.replaceState({}, '', window.location.pathname);
+      setData((current) => ({ ...current, password: '', confirm: '' }));
+      setMode('login');
+      setSuccess('Tu contraseña fue actualizada. Ya podés ingresar.');
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'No pudimos cambiar la contraseña.');
+    } finally {
+      setBusy(false);
+    }
+  };
+  const input = (key: string, label: string, type = 'text', required = true) => <label className="block"><span className="label !text-white/75">{label}</span><input value={data[key as keyof typeof data]} onChange={(event) => change(key, event.target.value)} type={type} autoComplete={key === 'email' ? 'email' : key === 'password' ? (mode === 'login' ? 'current-password' : 'new-password') : key === 'confirm' ? 'new-password' : undefined} required={required} className="field border-white/15 bg-white/[.08] text-white placeholder:text-white/35" data-testid={`input-auth-${key}`} /></label>;
   const onboardingOptions: Record<string, string[]> = {
     zona: ['CABA', 'Zona Norte', 'Zona Oeste', 'Zona Sur', 'Otra zona'],
     preferencia: ['Rapidez', 'Precio claro', 'Experiencia', 'Recomendaciones'],
@@ -660,7 +811,10 @@ function AuthPage({ setRole }: { setRole: (role: Role) => void }) {
     form.addEventListener('submit', validateBeforeAdvance, true);
     return () => form.removeEventListener('submit', validateBeforeAdvance, true);
   }, [mode, step, role, photo, docs, selectedFiles]);
-  if (mode === 'login') return <div className="grain flex min-h-[100dvh] flex-col bg-[hsl(var(--secondary))] text-white md:flex-row"><section className="relative hidden w-[46%] overflow-hidden p-12 md:flex md:flex-col"><Brand light /><div className="relative my-auto max-w-md"><p className="eyebrow !text-[hsl(var(--accent))]">La red que mueve tu barrio</p><h1 className="display-font mt-4 text-5xl font-bold leading-[.98] tracking-[-.06em]">Cuando hace falta,<br /><span className="text-[hsl(var(--accent))]">aparece alguien.</span></h1><p className="mt-6 max-w-sm text-base leading-relaxed text-white/65">Una cuenta para encontrar, contratar, ofrecer y recomendar.</p></div></section><section className="flex flex-1 items-center justify-center px-5 py-10"><div className="w-full max-w-[430px]"><div className="mb-8 md:hidden"><Brand light /></div><div className="mb-8"><p className="eyebrow !text-[hsl(var(--accent))]">Volvé a tu red</p><h2 className="display-font mt-3 text-4xl font-bold tracking-[-.06em]">Hola de nuevo.</h2><p className="mt-3 text-sm text-white/60">Ingresá para seguir con tus changas.</p></div><form onSubmit={loginSubmit} className="space-y-4">{input('email', 'Tu email', 'email')}{input('password', 'Contraseña', 'password')} {error && <p className="text-xs font-semibold text-[hsl(var(--accent))]">{error}</p>}<Button type="submit" variant="soft" className="mt-3 w-full py-3.5" disabled={auth.isLoading} testId="button-auth-submit">Entrar a Worky <ChevronRight size={17} /></Button></form><div className="my-7 flex items-center gap-3 text-[11px] text-white/35"><span className="h-px flex-1 bg-white/10" /> acceso simple y seguro <span className="h-px flex-1 bg-white/10" /></div><p className="text-center text-sm text-white/55">¿Todavía no tenés cuenta? <button type="button" onClick={() => { setMode('register'); setStep(1); }} className="font-bold text-[hsl(var(--accent))]" data-testid="button-toggle-auth">Registrate</button></p><p className="mt-7 text-center text-[11px] leading-relaxed text-white/35">Tu información queda protegida.</p></div></section></div>;
+  const authLayout = (content: ReactNode) => <div className="grain flex min-h-[100dvh] flex-col bg-[hsl(var(--secondary))] text-white md:flex-row"><section className="relative hidden w-[46%] overflow-hidden p-12 md:flex md:flex-col"><Brand light /><div className="relative my-auto max-w-md"><p className="eyebrow !text-[hsl(var(--accent))]">La red que mueve tu barrio</p><h1 className="display-font mt-4 text-5xl font-bold leading-[.98] tracking-[-.06em]">Cuando hace falta,<br /><span className="text-[hsl(var(--accent))]">aparece alguien.</span></h1><p className="mt-6 max-w-sm text-base leading-relaxed text-white/65">Una cuenta para encontrar, contratar, ofrecer y recomendar.</p></div></section><section className="flex flex-1 items-center justify-center px-5 py-10"><div className="w-full max-w-[430px]"><div className="mb-8 md:hidden"><Brand light /></div>{content}</div></section></div>;
+  if (mode === 'forgot') return authLayout(<><div className="mb-8"><p className="eyebrow !text-[hsl(var(--accent))]">Recuperá el acceso</p><h2 className="display-font mt-3 text-4xl font-bold tracking-[-.06em]">Verifiquemos tu email.</h2><p className="mt-3 text-sm text-white/60">Te vamos a enviar un enlace para crear una contraseña nueva.</p></div><form onSubmit={recoverySubmit} className="space-y-4">{input('email', 'Tu email', 'email')}{error && <p className="text-xs font-semibold text-[hsl(var(--accent))]" role="alert">{error}</p>}{success && <p className="rounded-xl border border-[hsl(var(--accent)/.35)] bg-[hsl(var(--accent)/.12)] p-3 text-xs font-semibold text-[hsl(var(--accent))]" role="status">{success}</p>}<Button type="submit" variant="soft" className="mt-3 w-full py-3.5" disabled={busy} testId="button-request-password-recovery">{busy ? <LoaderCircle className="animate-spin" size={17} /> : null} Enviar enlace <ChevronRight size={17} /></Button></form><p className="mt-7 text-center text-sm text-white/55"><button type="button" onClick={() => setLocation('/')} className="font-bold text-[hsl(var(--accent))]" data-testid="button-back-to-login">Volver a ingresar</button></p></>);
+  if (mode === 'reset') return authLayout(<><div className="mb-8"><p className="eyebrow !text-[hsl(var(--accent))]">Enlace verificado</p><h2 className="display-font mt-3 text-4xl font-bold tracking-[-.06em]">Elegí una contraseña nueva.</h2><p className="mt-3 text-sm text-white/60">Usá al menos 8 caracteres y no repitas tu contraseña anterior.</p></div><form onSubmit={resetSubmit} className="space-y-4">{input('password', 'Nueva contraseña', 'password')}{input('confirm', 'Repetí la contraseña', 'password')}{error && <p className="text-xs font-semibold text-[hsl(var(--accent))]" role="alert">{error}</p>}<Button type="submit" variant="soft" className="mt-3 w-full py-3.5" disabled={busy} testId="button-reset-password">{busy ? <LoaderCircle className="animate-spin" size={17} /> : null} Guardar contraseña <ChevronRight size={17} /></Button></form><p className="mt-7 text-center text-sm text-white/55"><button type="button" onClick={() => setLocation('/')} className="font-bold text-[hsl(var(--accent))]">Volver a ingresar</button></p></>);
+  if (mode === 'login') return authLayout(<><div className="mb-8"><p className="eyebrow !text-[hsl(var(--accent))]">Volvé a tu red</p><h2 className="display-font mt-3 text-4xl font-bold tracking-[-.06em]">Hola de nuevo.</h2><p className="mt-3 text-sm text-white/60">Ingresá para seguir con tus changas.</p></div><form onSubmit={loginSubmit} className="space-y-4">{input('email', 'Tu email', 'email')}{input('password', 'Contraseña', 'password')}<div className="flex justify-end"><button type="button" onClick={() => { setMode('forgot'); setError(''); setSuccess(''); }} className="text-xs font-bold text-[hsl(var(--accent))]" data-testid="button-forgot-password">¿Olvidaste tu contraseña?</button></div>{error && <p className="text-xs font-semibold text-[hsl(var(--accent))]" role="alert">{error}</p>}{success && <p className="rounded-xl border border-[hsl(var(--accent)/.35)] bg-[hsl(var(--accent)/.12)] p-3 text-xs font-semibold text-[hsl(var(--accent))]" role="status">{success}</p>}<Button type="submit" variant="soft" className="mt-3 w-full py-3.5" disabled={auth.isLoading} testId="button-auth-submit">Entrar a Worky <ChevronRight size={17} /></Button></form><div className="my-7 flex items-center gap-3 text-[11px] text-white/35"><span className="h-px flex-1 bg-white/10" /> acceso simple y seguro <span className="h-px flex-1 bg-white/10" /></div><p className="text-center text-sm text-white/55">¿Todavía no tenés cuenta? <button type="button" onClick={() => { setMode('register'); setStep(1); }} className="font-bold text-[hsl(var(--accent))]" data-testid="button-toggle-auth">Registrate</button></p><p className="mt-7 text-center text-[11px] leading-relaxed text-white/35">Tu información queda protegida.</p></>);
   return <div className="grain flex min-h-[100dvh] flex-col bg-[hsl(var(--secondary))] text-white md:flex-row"><section className="relative hidden w-[46%] overflow-hidden p-12 md:flex md:flex-col"><Brand light /><div className="relative my-auto max-w-md"><p className="eyebrow !text-[hsl(var(--accent))]">La red que mueve tu barrio</p><h1 className="display-font mt-4 text-5xl font-bold leading-[.98] tracking-[-.06em]">Cuando hace falta,<br /><span className="text-[hsl(var(--accent))]">aparece alguien.</span></h1><p className="mt-6 max-w-sm text-base leading-relaxed text-white/65">Una cuenta para encontrar, contratar, ofrecer y recomendar.</p></div></section><section className="flex flex-1 items-center justify-center px-5 py-10"><div className="w-full max-w-[600px]"><div className="mb-7 md:hidden"><Brand light /></div><div className="mb-5 flex items-center justify-between"><div><p className="eyebrow !text-[hsl(var(--accent))]">Unite a Worky</p><h2 className="display-font mt-2 text-4xl font-bold tracking-[-.06em]">Empecemos cerca.</h2></div><span className="rounded-full bg-white/10 px-3 py-1 text-xs font-bold">Paso {step} de 3</span></div><div className="mb-6 h-1.5 rounded-full bg-white/10"><div className="h-full rounded-full bg-[hsl(var(--accent))] transition-all" style={{ width: `${step * 33.33}%` }} /></div><form onSubmit={(event) => { event.preventDefault(); if (step < 3) setStep((current) => current + 1); else void finish(); }} className="space-y-4">{step === 1 && <><div className="grid gap-4 sm:grid-cols-2">{input('name', 'Nombre y apellido')}{input('email', 'Email', 'email')}{input('phone', 'Teléfono', 'tel')}{input('age', 'Edad', 'number')}{input('password', 'Contraseña', 'password')}{input('confirm', 'Confirmar contraseña', 'password')}</div><div className="grid gap-4 sm:grid-cols-3">{input('address', 'Dirección')}{input('city', 'Ciudad')}{input('province', 'Provincia')}</div><div><span className="label !text-white/75">Foto de perfil (opcional)</span><label className="inline-flex cursor-pointer items-center rounded-xl border border-dashed border-white/25 px-4 py-3 text-xs font-bold">{photo ? 'Reemplazar foto' : 'Subir foto'}<input type="file" accept="image/*" capture="user" className="hidden" onChange={(event) => void file('photo', event.target.files?.[0])} /></label>{photo && <span className="ml-3 inline-flex items-center gap-2"><img src={photo.preview} alt="Vista previa" className="h-12 w-12 rounded-xl object-cover" /><button type="button" className="text-xs text-[hsl(var(--accent))]" onClick={() => setPhoto(null)}>Eliminar</button></span>}</div><div><span className="label !text-white/75">¿Cómo querés usar Worky?</span><div className="grid gap-3 sm:grid-cols-2">{[['client', 'Buscar ayuda'], ['professional', 'Ofrecer mis servicios']].map(([value, label]) => <button type="button" key={value} onClick={() => setRoleLocal(value as Role)} className={`rounded-2xl border p-4 text-left text-sm font-bold ${role === value ? 'border-[hsl(var(--accent))] bg-white/10' : 'border-white/15 bg-white/[.04]'}`}>{label}<span className="mt-1 block text-xs font-normal text-white/55">{value === 'client' ? 'Encontrá un Partner para tu changa.' : 'Mostrá tus oficios y recibí oportunidades.'}</span></button>)}</div></div></>}{step === 2 && <div className="space-y-4">{role === 'client' ? <><p className="text-sm text-white/65">Personalicemos tu experiencia.</p>{question('zona', '¿En qué zona vivís?')}{question('preferencia', '¿Qué valorás más al contratar?')}{question('frecuencia', '¿Con qué frecuencia necesitás ayuda?')}</> : <><p className="text-sm text-white/65">Contanos qué hacés. La verificación es informativa y no bloquea cuentas de prueba.</p>{services.map((service, index) => <div className="grid gap-2 sm:grid-cols-[1fr_1fr_100px]" key={index}><input value={service.oficio} onChange={(event) => setServices((current) => current.map((item, i) => i === index ? { ...item, oficio: event.target.value } : item))} className="field border-white/15 bg-white/[.08] text-white" placeholder="Oficio" required={index === 0} /><select value={service.categoria} onChange={(event) => setServices((current) => current.map((item, i) => i === index ? { ...item, categoria: event.target.value } : item))} className="field border-white/15 bg-white/[.08] text-white"><option>Plomería</option><option>Electricidad</option><option>Gas</option><option>Albañilería</option><option>Otro</option></select><input type="number" value={service.experienciaAnios} onChange={(event) => setServices((current) => current.map((item, i) => i === index ? { ...item, experienciaAnios: Number(event.target.value) } : item))} className="field border-white/15 bg-white/[.08] text-white" placeholder="Años" /></div>)}<button type="button" className="text-xs font-bold text-[hsl(var(--accent))]" onClick={() => setServices((current) => [...current, { oficio: '', categoria: 'Otro', experienciaAnios: 0 }])}>+ Agregar otro oficio</button></>}</div>}{step === 3 && <div className="space-y-4">{role === 'professional' ? <><p className="text-sm text-white/65">Subí tus documentos. Son privados y solo accesibles para verificación.</p><div className="grid gap-3 sm:grid-cols-3">{[['dni_frente', 'DNI frente', 'image/*'], ['dni_dorso', 'DNI dorso', 'image/*'], ['antecedentes_penales', 'Antecedentes penales PDF', 'application/pdf']].map(([key, label, accept]) => <label key={key} className="rounded-2xl border border-dashed border-white/20 p-3 text-xs font-bold">{label}<input type="file" accept={accept} className="mt-2 block w-full text-[10px]" onChange={(event) => void file(key, event.target.files?.[0])} />{docs[key] && <span className="mt-2 block truncate text-white/60">{docs[key].name}</span>}{uploading === key && <span className="mt-2 block text-[hsl(var(--accent))]">Cargando...</span>}</label>)}</div>{question('tipoTrabajo', '¿Qué trabajos hacés mejor?')}{question('zonaTrabajo', '¿En qué zona trabajás?')}{question('objetivo', '¿Qué esperás de Worky?')}</> : <><p className="text-sm text-white/65">Listo. Revisá tus datos y creá tu cuenta.</p><div className="rounded-2xl bg-white/[.07] p-4 text-sm leading-relaxed"><b>{data.name}</b><br />{data.email}<br />{data.city}, {data.province}</div></>}</div>}{error && <p className="text-xs font-semibold text-[hsl(var(--accent))]">{error}</p>}<div className="flex gap-3"><Button type="button" variant="ghost" className="flex-1 text-white" disabled={step === 1} onClick={() => setStep((current) => current - 1)}>Atrás</Button><Button type="submit" variant="soft" className="flex-1 py-3.5" disabled={auth.isLoading || Boolean(uploading)}>{step < 3 ? 'Continuar' : 'Crear mi cuenta'} <ChevronRight size={17} /></Button></div></form><p className="mt-7 text-center text-sm text-white/55">¿Ya tenés una cuenta? <button type="button" onClick={() => setLocation('/')} className="font-bold text-[hsl(var(--accent))]">Ingresá</button></p></div></section></div>;
 }
 
@@ -706,6 +860,16 @@ function HomePage() {
       setLocationState('ready');
     }
   }, [auth.user, savedCoordinates, coordinates]);
+  useEffect(() => {
+    const handleLocationUpdate = (event: Event) => {
+      const nextCoordinates = homeCoordinates((event as CustomEvent<{ coordinates?: unknown }>).detail);
+      if (!nextCoordinates) return;
+      setCoordinates(nextCoordinates);
+      setLocationState('ready');
+    };
+    window.addEventListener(LOCATION_UPDATED_EVENT, handleLocationUpdate);
+    return () => window.removeEventListener(LOCATION_UPDATED_EVENT, handleLocationUpdate);
+  }, []);
   const requestLocation = () => {
     if (!navigator.geolocation) {
       setLocationState('denied');
@@ -719,18 +883,18 @@ function HomePage() {
     );
   };
   const params = useMemo(() => ({ categoria: category || undefined, limit: 50, latitud: coordinates?.[1], longitud: coordinates?.[0] }), [category, coordinates]);
-  const professionals = useListProfessionals(params, { query: { queryKey: getListProfessionalsQueryKey(params), staleTime: 30000 } });
+  const professionals = useListProfessionals(params, {
+    query: {
+      queryKey: getListProfessionalsQueryKey(params),
+      staleTime: 30000,
+      refetchInterval: coordinates ? PROFESSIONAL_LOCATION_MIN_UPDATE_INTERVAL_MS : false,
+    },
+  });
   const list = professionals.data?.map(toProfessional) ?? [];
   const visibleList = useMemo(() => {
     if (sortBy === 'recommended') return list;
-    return [...list].sort((a, b) => {
-      if (sortBy === 'rating') {
-        return b.rating - a.rating || b.reviewsCount - a.reviewsCount || b.jobsCompleted - a.jobsCompleted;
-      }
-      const aDistance = a.distanceKm ?? Number.POSITIVE_INFINITY;
-      const bDistance = b.distanceKm ?? Number.POSITIVE_INFINITY;
-      return aDistance - bDistance || b.rating - a.rating || b.reviewsCount - a.reviewsCount;
-    });
+    if (sortBy === 'rating') return [...list].sort((a, b) => b.rating - a.rating || b.reviewsCount - a.reviewsCount || b.jobsCompleted - a.jobsCompleted);
+    return sortProfessionalsByDistance(list);
   }, [list, sortBy]);
   const clearFilters = () => { setCategory(''); setSortBy('recommended'); };
   const sortOptions: { value: ProfessionalSort; label: string; detail: string }[] = [
@@ -841,13 +1005,13 @@ function ProfessionalPage() {
 function MyPublicProfilePage() {
   const auth = useAuth();
   const [, setLocation] = useLocation();
-  const profile = useGetProfessional(auth.user?.id || 0, { query: { enabled: Boolean(auth.user), retry: false, queryKey: getGetProfessionalQueryKey(auth.user?.id || 0) } });
+  const profile = useGetMyProfessionalProfile({ query: { enabled: Boolean(auth.user), retry: false, queryKey: getGetMyProfessionalProfileQueryKey() } });
   if (!auth.user) return null;
   if (profile.isLoading) return <LoadingBlock label="Cargando tu perfil público..." />;
   if (profile.isError || !profile.data) {
     return <div className="mx-auto max-w-3xl space-y-7"><div><p className="eyebrow">Tu perfil público</p><h1 className="display-font mt-2 text-4xl font-bold tracking-[-.055em]">Todavía no publicaste tu perfil.</h1><p className="mt-2 text-sm text-[hsl(var(--muted-foreground))]">Completá tus datos profesionales para que los clientes puedan conocerte y contratarte.</p></div><section className="rounded-2xl border border-[hsl(var(--border))] bg-[hsl(var(--card))] p-6 md:p-8"><div className="flex items-start gap-4"><div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[hsl(var(--muted))] text-[hsl(var(--primary))]"><UserRound size={21} /></div><div><h2 className="display-font text-xl font-bold">Completá Mis servicios</h2><p className="mt-1 text-sm leading-relaxed text-[hsl(var(--muted-foreground))]">Ahí podés cargar tu oficio, categoría, precio, experiencia, descripción, habilidades y disponibilidad. Después vas a poder ver esta misma ficha como la ven los clientes.</p><Button onClick={() => setLocation('/services')} className="mt-5" testId="button-go-to-services">Completar mis servicios <ChevronRight size={16} /></Button></div></div></section></div>;
   }
-  return <><div className="relative mx-auto max-w-5xl"><ProfessionalPageLegacy professionalId={auth.user.id} publicOnly /><Button onClick={() => setLocation('/services')} variant="soft" className="absolute right-4 top-[9.5rem] z-10 sm:right-8" testId="button-edit-own-profile"><Pencil size={16} /> Editar mi perfil</Button></div><div className="mx-auto max-w-5xl pb-8"><ProfessionalReviews professionalId={auth.user.id} /></div></>;
+  return <><div className="relative mx-auto max-w-5xl"><ProfessionalPageLegacy professionalId={profile.data.id} publicOnly /><Button onClick={() => setLocation('/services')} variant="soft" className="absolute right-4 top-[9.5rem] z-10 sm:right-8" testId="button-edit-own-profile"><Pencil size={16} /> Editar mi perfil</Button></div><div className="mx-auto max-w-5xl pb-8"><ProfessionalReviews professionalId={profile.data.id} /></div></>;
 }
 
 function JobCard({ job, onStatus }: { job: WorkyJob; onStatus?: (status: 'accepted' | 'in_progress' | 'completed' | 'cancelled') => void }) {
@@ -930,8 +1094,13 @@ function AppointmentActions({ appointment, clientId, onAccept, onReject, onCance
   return <>{history?.length ? <AppointmentAttemptHistory attempts={history} onRetry={onRetry} onDelete={onDelete} syncingId={syncingId} /> : null}{(canAct || canCancel) && <span className="flex flex-wrap gap-2">{canAct && <><Button onClick={() => onAccept(appointment.id)} disabled={pendingAction !== null} variant="soft" className="px-2 py-1 text-[10px]" testId={`button-accept-appointment-${appointment.id}`}>{isAccepting && <LoaderCircle className="animate-spin" size={12} />} {isAccepting ? 'Aceptando...' : 'Aceptar'}</Button><Button onClick={() => onReject(appointment.id)} disabled={pendingAction !== null} variant="ghost" className="px-2 py-1 text-[10px]" testId={`button-reject-appointment-${appointment.id}`}>{isRejecting && <LoaderCircle className="animate-spin" size={12} />} {isRejecting ? 'Rechazando...' : 'Rechazar'}</Button></>}{canCancel && <Button onClick={() => onCancel(appointment.id)} disabled={pendingAction !== null} variant="ghost" className="px-2 py-1 text-[10px] text-[hsl(var(--destructive))]" testId={`button-cancel-appointment-${appointment.id}`}>{isCancelling && <LoaderCircle className="animate-spin" size={12} />} {isCancelling ? 'Cancelando...' : 'Cancelar visita'}</Button>}</span>}</>;
 }
 
-function ConversationsPage() {
-  const conversations = useListConversations({ query: { queryKey: getListConversationsQueryKey(), refetchInterval: 30000 } });
+function ConversationsPage({ role }: { role: Role }) {
+  const conversationRole = role === 'professional' ? 'profesional' : 'cliente';
+  const conversations = useQuery<Conversation[]>({
+    queryKey: conversationsQueryKey(role),
+    queryFn: () => apiRequest<Conversation[]>(`/conversaciones?rol=${conversationRole}`),
+    refetchInterval: 30000,
+  });
   return <div className="mx-auto max-w-4xl space-y-7"><div><p className="eyebrow">Tu bandeja</p><h1 className="display-font mt-2 text-4xl font-bold tracking-[-.055em]">Conversaciones en marcha.</h1><p className="mt-2 text-sm text-[hsl(var(--muted-foreground))]">Coordiná cada changa sin perder el hilo.</p></div>{conversations.isLoading ? <LoadingBlock label="Cargando conversaciones..." /> : conversations.isError ? <ErrorState onRetry={() => void conversations.refetch()} /> : !conversations.data?.length ? <EmptyState icon={MessageCircle} title="Todavía no hay conversaciones" copy="Cuando publiques o aceptes una changa, la conversación aparece acá." /> : <div className="space-y-3">{conversations.data.map((conversation) => <Link key={conversation.changaId} href={`/chat/${conversation.changaId}`} className="card-lift flex items-center gap-4 rounded-2xl border border-[hsl(var(--border))] bg-[hsl(var(--card))] p-4" data-testid={`conversation-${conversation.changaId}`}><Avatar name={conversation.interlocutor?.nombre || 'Worky'} size="md" warm /><div className="min-w-0 flex-1"><div className="flex items-center justify-between gap-3"><p className="truncate text-sm font-bold">{conversation.interlocutor?.nombre || 'Changa sin Partner'}</p><StatusBadge status={conversation.estado === 'publicada' ? 'published' : conversation.estado === 'aceptada' ? 'accepted' : conversation.estado === 'en_curso' ? 'in_progress' : conversation.estado === 'finalizada' ? 'completed' : 'cancelled'} /></div><p className="mt-1 truncate text-xs text-[hsl(var(--muted-foreground))]">{conversation.ultimoMensaje?.texto || conversation.detalle || 'Sin mensajes todavía'}</p></div>{conversation.unread > 0 && <span className="flex h-6 min-w-6 items-center justify-center rounded-full bg-[hsl(var(--primary))] px-1.5 text-[10px] font-bold text-white">{conversation.unread}</span>}<ChevronRight size={16} className="text-[hsl(var(--muted-foreground))]" /></Link>)}</div>}</div>;
 }
 
@@ -981,7 +1150,7 @@ function ChatAttachment({ attachment, outgoing }: { attachment: { objectPath: st
   return <span className={`mt-2 flex items-center gap-1.5 text-xs underline ${outgoing ? 'text-white/85' : 'text-[hsl(var(--primary))]'}`}><ImageIcon size={14} /> {failed ? 'No se pudo cargar la imagen' : attachment.nombre || 'Imagen adjunta'}</span>;
 }
 
-function ChatPageLegacy() {
+function ChatPageLegacy({ role }: { role: Role }) {
   const params = useParams<{ id: string }>();
   const id = Number(params.id);
   const auth = useAuth();
@@ -1060,7 +1229,7 @@ function ChatPageLegacy() {
     window.addEventListener('online', sync);
     return () => window.removeEventListener('online', sync);
   }, [id]);
-  useEffect(() => { void markMessagesRead(id).then(() => queryClient.invalidateQueries({ queryKey: getListConversationsQueryKey() })).catch(() => undefined); }, [id]);
+  useEffect(() => { void markMessagesRead(id).then(() => queryClient.invalidateQueries({ queryKey: conversationsQueryKey(role) })).catch(() => undefined); }, [id, role]);
   const selectChatFiles = (files: FileList | null) => {
     if (!files?.length) return;
     const nextFiles = Array.from(files).filter((file) => file.type.startsWith('image/')).slice(0, 5 - chatFiles.length);
@@ -1142,8 +1311,8 @@ function ChatPageLegacy() {
     return <div className="mx-auto max-w-3xl"><Link href="/conversations" className="focus-ring mb-6 inline-flex items-center gap-2 text-xs font-bold text-[hsl(var(--muted-foreground))]" data-testid="link-back-from-chat"><ChevronRight className="rotate-180" size={15} /> Volver a conversaciones</Link><section className="overflow-hidden rounded-2xl border border-[hsl(var(--border))] bg-[hsl(var(--card))]"><header className="flex items-center justify-between border-b border-[hsl(var(--border))] bg-[hsl(var(--muted)/.5)] px-5 py-4"><div className="flex items-center gap-3"><Link href={currentJob.professionalId ? `/professional/${currentJob.professionalId}` : '/home'} className="focus-ring flex items-center gap-3 rounded-xl" data-testid="link-chat-professional-profile" aria-label={`Abrir perfil de ${currentJob.professionalName || 'Partner'}`}><Avatar initials={(currentJob.professionalName || currentJob.clientName).split(' ').map((part) => part[0]).slice(0, 2).join('')} size="sm" warm /><span className="text-xs font-bold">{currentJob.professionalName || currentJob.clientName}</span></Link><div><p className="mt-0.5 text-[11px] text-[hsl(var(--muted-foreground))]">{currentJob.category} · {currentJob.location}</p></div></div><StatusBadge status={currentJob.status} /></header><div className="border-b border-[hsl(var(--border))] bg-[hsl(var(--accent)/.25)] p-4"><div className="mb-3 flex items-center gap-2"><CalendarDays size={16} className="text-[hsl(var(--primary))]" /><p className="text-xs font-bold">Visitas coordinadas</p></div>{appointments.data?.length ? <div className="space-y-2">{appointmentRows}</div> : <p className="text-xs text-[hsl(var(--muted-foreground))]">Todavía no hay una visita propuesta.</p>}{appointmentActionError && <p className="appointment-error mt-3" role="alert" data-testid="text-appointment-error"><CircleAlert size={15} /> {appointmentActionError}</p>}{auth.user?.id === currentJob.professionalId ? canProposeAppointment ? <form onSubmit={proposeAppointment} className="mt-3 flex flex-col gap-2 sm:flex-row"><input type="datetime-local" required value={appointmentDate} onChange={(event) => setAppointmentDate(event.target.value)} className="field flex-1 bg-white/75" aria-label="Fecha y hora de visita" /><Button type="submit" disabled={pendingAppointmentAction !== null} variant="soft" className="whitespace-nowrap" testId="button-propose-appointment">{pendingAppointmentAction === 'propose' && <LoaderCircle className="animate-spin" size={15} />} {pendingAppointmentAction === 'propose' ? 'Proponiendo...' : 'Proponer visita'}</Button></form> : <p className="mt-3 text-xs font-semibold text-[hsl(var(--muted-foreground))]">Ya hay una visita activa. Esperá a que se cancele o finalice antes de proponer otra.</p> : null}</div><div className="flex min-h-[430px] flex-col gap-4 bg-[hsl(var(--background)/.5)] p-5 md:p-8" data-testid="list-messages">{messages.isLoading ? <LoadingBlock label="Cargando mensajes..." /> : messages.isError ? <ErrorState onRetry={() => void messages.refetch()} /> : list.length === 0 ? <EmptyState icon={MessageCircle} title="Arranquen la conversación" copy="Coordiná detalles, horarios y expectativas antes de empezar." /> : list.map((message) => <div key={message.id} className={`flex ${message.emisor.id === currentJob.clientId ? 'justify-end' : 'justify-start'}`} data-testid={`message-${message.id}`}><div className={`max-w-[82%] rounded-2xl px-4 py-3 text-sm leading-relaxed ${message.emisor.id === currentJob.clientId ? 'rounded-br-md bg-[hsl(var(--secondary))] text-white' : 'rounded-bl-md border border-[hsl(var(--border))] bg-[hsl(var(--card))]'}`}><p>{message.texto}</p>{message.adjuntos.map((attachment) => <ChatAttachment key={attachment.objectPath} attachment={attachment} outgoing={message.emisor.id === currentJob.clientId} />)}<p className={`mt-1.5 text-[10px] ${message.emisor.id === currentJob.clientId ? 'text-white/45' : 'text-[hsl(var(--muted-foreground))]'}`}>{message.emisor.nombre} · {dateLabel(message.createdAt)}</p></div></div>)}</div><form onSubmit={send} className="border-t border-[hsl(var(--border))] p-4"><div className="mb-3 flex flex-wrap gap-2">{chatFiles.map((item, index) => <div key={`${item.file.name}-${index}`} className="relative"><img src={item.preview} alt={item.file.name} className="h-14 w-14 rounded-lg object-cover" /><button type="button" onClick={() => removeChatFile(index)} className="absolute -right-1.5 -top-1.5 rounded-full bg-[hsl(var(--secondary))] p-1 text-white" aria-label={`Quitar ${item.file.name}`}><X size={12} /></button></div>)}</div>{chatError && <p className="mb-2 text-xs font-semibold text-[hsl(var(--destructive))]" role="alert">{chatError}</p>}<div className="flex items-end gap-2"><label className="flex h-[46px] w-[46px] shrink-0 cursor-pointer items-center justify-center rounded-xl border border-[hsl(var(--border))] text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--muted))]" aria-label="Adjuntar imágenes"><Paperclip size={18} /><input type="file" accept="image/*" multiple className="hidden" onChange={(event) => { selectChatFiles(event.target.files); event.currentTarget.value = ''; }} data-testid="input-chat-images" /></label><textarea value={body} onChange={(event) => setBody(event.target.value)} className="field min-h-[46px] max-h-32 resize-none" rows={1} placeholder="Escribí un mensaje..." maxLength={1000} data-testid="textarea-message" /><Button type="submit" disabled={sendingMessage || createMessage.isPending || (!body.trim() && !chatFiles.length)} className="h-[46px] w-[46px] shrink-0 p-0" testId="button-send-message">{sendingMessage || createMessage.isPending ? <LoaderCircle className="animate-spin" size={17} /> : <Send size={17} />}</Button></div></form></section></div>;
 }
 
-function ChatPage() {
-  return <ChatPageLegacy />;
+function ChatPage({ role }: { role: Role }) {
+  return <ChatPageLegacy role={role} />;
 }
 
 function ClientProfilePage() {
@@ -1337,8 +1506,10 @@ function RouterContent({ role, setRole }: { role: Role; setRole: (role: Role) =>
   if (auth.isLoading) return <div className="flex min-h-[100dvh] items-center justify-center bg-[hsl(var(--background))]"><LoadingBlock label="Recuperando tu sesión..." /></div>;
   if (!auth.isAuthenticated) return <RoutedErrorBoundary><AuthPage setRole={setRole} /></RoutedErrorBoundary>;
   const effectiveRole: Role = auth.user?.rol === 'admin' ? 'admin' : auth.user?.rol === 'profesional' ? 'professional' : role === 'professional' ? 'professional' : 'client';
-  if (location === '/services') return <AppShell role="professional" setRole={setRole}><PartnerProfilePage /></AppShell>;
-  return <RoutedErrorBoundary><Switch><Route path="/" component={() => { window.history.replaceState({}, '', `${basePath}home`); return null; }} /><Route path="/home"><AppShell role={effectiveRole} setRole={setRole}><HomePage /></AppShell></Route><Route path="/professional/:id"><AppShell role={effectiveRole} setRole={setRole}><ProfessionalPage /></AppShell></Route><Route path="/admin/verificaciones">{effectiveRole === 'admin' ? <AppShell role="admin" setRole={setRole}><AdminVerificationsPage /></AppShell> : <NotFound />}</Route><Route path="/partner/dashboard"><AppShell role="professional" setRole={setRole}><PartnerDashboard /></AppShell></Route><Route path="/jobs/new"><AppShell role={effectiveRole} setRole={setRole}><NewJobPage /></AppShell></Route><Route path="/jobs"><AppShell role={effectiveRole} setRole={setRole}><JobsPage role={effectiveRole === 'professional' ? 'professional' : 'client'} /></AppShell></Route><Route path="/conversations"><AppShell role={effectiveRole} setRole={setRole}><ConversationsPage /></AppShell></Route><Route path="/chat/:id"><AppShell role={effectiveRole} setRole={setRole}><ChatPage /></AppShell></Route><Route path="/partner"><AppShell role={effectiveRole} setRole={setRole}><PartnerPage /></AppShell></Route><Route path="/profile"><AppShell role={effectiveRole} setRole={setRole}><ProfilePage role={effectiveRole === 'professional' ? 'professional' : 'client'} /></AppShell></Route><Route component={NotFound} /></Switch></RoutedErrorBoundary>;
+  const content = location === '/services'
+    ? <AppShell role="professional" setRole={setRole}><PartnerProfilePage /></AppShell>
+    : <RoutedErrorBoundary><Switch><Route path="/" component={() => { window.history.replaceState({}, '', `${basePath}home`); return null; }} /><Route path="/home"><AppShell role={effectiveRole} setRole={setRole}><HomePage /></AppShell></Route><Route path="/professional/:id"><AppShell role={effectiveRole} setRole={setRole}><ProfessionalPage /></AppShell></Route><Route path="/admin/verificaciones">{effectiveRole === 'admin' ? <AppShell role="admin" setRole={setRole}><AdminVerificationsPage /></AppShell> : <NotFound />}</Route><Route path="/partner/dashboard"><AppShell role="professional" setRole={setRole}><PartnerDashboard /></AppShell></Route><Route path="/jobs/new"><AppShell role={effectiveRole} setRole={setRole}><NewJobPage /></AppShell></Route><Route path="/jobs"><AppShell role={effectiveRole} setRole={setRole}><JobsPage role={effectiveRole === 'professional' ? 'professional' : 'client'} /></AppShell></Route><Route path="/conversations"><AppShell role={effectiveRole} setRole={setRole}><ConversationsPage role={effectiveRole} /></AppShell></Route><Route path="/chat/:id"><AppShell role={effectiveRole} setRole={setRole}><ChatPage role={effectiveRole} /></AppShell></Route><Route path="/partner"><AppShell role={effectiveRole} setRole={setRole}><PartnerPage /></AppShell></Route><Route path="/profile"><AppShell role={effectiveRole} setRole={setRole}><ProfilePage role={effectiveRole === 'professional' ? 'professional' : 'client'} /></AppShell></Route><Route path="/settings"><AppShell role={effectiveRole} setRole={setRole}><SettingsPage /></AppShell></Route><Route component={NotFound} /></Switch></RoutedErrorBoundary>;
+  return <><ProfessionalLocationTracker enabled={effectiveRole === 'professional'} />{content}</>;
 }
 
 function App() {

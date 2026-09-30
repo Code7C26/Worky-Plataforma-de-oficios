@@ -132,6 +132,22 @@ export async function login(email: string, password: string) {
   return data.usuario;
 }
 
+export async function requestPasswordRecovery(email: string) {
+  const request = configureApiAuth();
+  return request<{ message: string }>("/auth/password-recovery/request", {
+    method: "POST",
+    body: JSON.stringify({ email }),
+  });
+}
+
+export async function resetPassword(token: string, newPassword: string) {
+  const request = configureApiAuth();
+  return request<{ success: boolean }>("/auth/password-recovery/reset", {
+    method: "POST",
+    body: JSON.stringify({ token, newPassword }),
+  });
+}
+
 export async function register(payload: { nombre: string; email: string; password: string; telefono?: string; ubicacion?: unknown; edad?: number; fotoObjectPath?: string | null; rol?: "cliente" | "profesional"; onboardingRespuestas?: Record<string, string> }) {
   const request = configureApiAuth();
   const data = await request<{ token: string; usuario: AuthUser }>("/auth/register", { method: "POST", body: JSON.stringify(payload) });
