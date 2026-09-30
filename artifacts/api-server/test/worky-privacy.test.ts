@@ -444,6 +444,19 @@ async function run() {
     assert.equal(partnerConversation.unread, 1);
     let clientConversations = await request(server, `${baseUrl}/conversaciones`, { token: client.token });
     assert.equal(clientConversations.body.find((item: any) => item.changaId === changaId).unread, 0);
+    const partnerRoleConversations = await request(server, `${baseUrl}/conversaciones?rol=profesional`, { token: partner.token });
+    assert.equal(partnerRoleConversations.status, 200);
+    assert.equal(partnerRoleConversations.body.some((item: any) => item.changaId === changaId), true);
+    const partnerClientView = await request(server, `${baseUrl}/conversaciones?rol=cliente`, { token: partner.token });
+    assert.equal(partnerClientView.status, 200);
+    assert.equal(partnerClientView.body.some((item: any) => item.changaId === changaId), false);
+    const clientRoleConversations = await request(server, `${baseUrl}/conversaciones?rol=cliente`, { token: client.token });
+    assert.equal(clientRoleConversations.status, 200);
+    assert.equal(clientRoleConversations.body.some((item: any) => item.changaId === changaId), true);
+    const clientProfessionalView = await request(server, `${baseUrl}/conversaciones?rol=profesional`, { token: client.token });
+    assert.equal(clientProfessionalView.status, 200);
+    assert.equal(clientProfessionalView.body.some((item: any) => item.changaId === changaId), false);
+    assert.equal((await request(server, `${baseUrl}/conversaciones?rol=admin`, { token: client.token })).status, 400);
 
     const partnerSent = await request(server, `${baseUrl}/chats/${changaId}/mensajes`, {
       method: "POST", token: partner.token, body: { texto: partnerMessage },

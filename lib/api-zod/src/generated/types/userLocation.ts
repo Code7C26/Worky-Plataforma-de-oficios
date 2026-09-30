@@ -11,5 +11,7 @@ export interface UserLocation {
   ciudad?: string;
   provincia?: string;
   zona?: string;
+  /** @nullable */
+  capturedAt?: Date | null;
   coordinates?: number[];
 }

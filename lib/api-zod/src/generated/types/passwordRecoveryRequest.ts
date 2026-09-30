@@ -6,7 +6,7 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type PublicUserUbicacion = {
-  ciudad?: string;
-  zona?: string;
-} | null;
+export interface PasswordRecoveryRequest {
+  /** @maxLength 320 */
+  email: string;
+}

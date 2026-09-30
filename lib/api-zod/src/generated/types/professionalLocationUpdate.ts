@@ -6,7 +6,10 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type PublicUserUbicacion = {
-  ciudad?: string;
-  zona?: string;
-} | null;
+export interface ProfessionalLocationUpdate {
+  /**
+     * @minItems 2
+     * @maxItems 2
+     */
+  coordinates: number[];
+}

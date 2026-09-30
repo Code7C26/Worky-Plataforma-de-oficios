@@ -9,12 +9,202 @@ export interface HealthStatus {
   status: string;
 }
 
+export interface AuthCredentials {
+  /** @maxLength 320 */
+  email: string;
+  /**
+     * @minLength 1
+     * @maxLength 200
+     */
+  password: string;
+}
+
+export type AuthRegisterInputRol = typeof AuthRegisterInputRol[keyof typeof AuthRegisterInputRol];
+
+
+export const AuthRegisterInputRol = {
+  cliente: 'cliente',
+  profesional: 'profesional',
+} as const;
+
+export type AuthRegisterInputOnboardingRespuestas = {[key: string]: string};
+
 export interface UserLocation {
   direccionTexto?: string;
   ciudad?: string;
   provincia?: string;
   zona?: string;
+  /** @nullable */
+  capturedAt?: string | null;
   coordinates?: number[];
+}
+
+export interface AuthRegisterInput {
+  /**
+     * @minLength 2
+     * @maxLength 100
+     */
+  nombre: string;
+  /** @maxLength 320 */
+  email: string;
+  /**
+     * @minLength 6
+     * @maxLength 200
+     */
+  password: string;
+  /** @maxLength 40 */
+  telefono?: string;
+  /**
+     * @minimum 13
+     * @maximum 120
+     */
+  edad?: number;
+  rol?: AuthRegisterInputRol;
+  ubicacion?: UserLocation;
+  onboardingRespuestas?: AuthRegisterInputOnboardingRespuestas;
+}
+
+export type AccountRol = typeof AccountRol[keyof typeof AccountRol];
+
+
+export const AccountRol = {
+  cliente: 'cliente',
+  profesional: 'profesional',
+  admin: 'admin',
+} as const;
+
+export interface Account {
+  id: number;
+  nombre: string;
+  email: string;
+  /** @nullable */
+  telefono?: string | null;
+  /** @nullable */
+  edad?: number | null;
+  /** @nullable */
+  fotoObjectPath?: string | null;
+  rol: AccountRol;
+  ubicacion?: UserLocation | null;
+  onboardingEstado?: string;
+  onboardingPaso?: number;
+}
+
+export interface AuthSession {
+  token: string;
+  usuario: Account;
+}
+
+export interface ProfessionalLocationUpdate {
+  /**
+     * @minItems 2
+     * @maxItems 2
+     */
+  coordinates: number[];
+}
+
+export interface ProfessionalLocation {
+  /**
+     * @minItems 2
+     * @maxItems 2
+     */
+  coordinates: number[];
+  capturedAt: string;
+}
+
+export type AccountUpdateUbicacion = {
+  /**
+     * @maxLength 200
+     * @nullable
+     */
+  direccionTexto?: string | null;
+  /**
+     * @maxLength 100
+     * @nullable
+     */
+  ciudad?: string | null;
+  /**
+     * @maxLength 100
+     * @nullable
+     */
+  provincia?: string | null;
+} | null;
+
+export interface AccountUpdate {
+  /**
+     * @minLength 2
+     * @maxLength 100
+     */
+  nombre?: string;
+  /** @maxLength 200 */
+  email?: string;
+  /**
+     * @maxLength 40
+     * @nullable
+     */
+  telefono?: string | null;
+  /**
+     * @minimum 13
+     * @maximum 120
+     * @nullable
+     */
+  edad?: number | null;
+  ubicacion?: AccountUpdateUbicacion;
+  /**
+     * @maxLength 200
+     * @nullable
+     */
+  currentPassword?: string | null;
+}
+
+export type AccountRoleUpdateRol = typeof AccountRoleUpdateRol[keyof typeof AccountRoleUpdateRol];
+
+
+export const AccountRoleUpdateRol = {
+  cliente: 'cliente',
+  profesional: 'profesional',
+} as const;
+
+export interface AccountRoleUpdate {
+  rol: AccountRoleUpdateRol;
+}
+
+export interface PasswordChange {
+  /**
+     * @minLength 1
+     * @maxLength 200
+     */
+  currentPassword: string;
+  /**
+     * @minLength 8
+     * @maxLength 200
+     */
+  newPassword: string;
+}
+
+export interface PasswordRecoveryRequest {
+  /** @maxLength 320 */
+  email: string;
+}
+
+export interface PasswordRecoveryReset {
+  /**
+     * @minLength 32
+     * @maxLength 200
+     */
+  token: string;
+  /**
+     * @minLength 8
+     * @maxLength 200
+     */
+  newPassword: string;
+}
+
+export interface PasswordRecoveryResponse {
+  message: string;
+}
+
+export interface OperationResult {
+  success: boolean;
 }
 
 export type PublicUserRol = typeof PublicUserRol[keyof typeof PublicUserRol];
@@ -27,12 +217,15 @@ export const PublicUserRol = {
 } as const;
 
 export type PublicUserUbicacion = {
+  ciudad?: string;
   zona?: string;
 } | null;
 
 export interface PublicUser {
   id: number;
   nombre: string;
+  /** @nullable */
+  fotoObjectPath?: string | null;
   rol: PublicUserRol;
   ubicacion?: PublicUserUbicacion;
 }
@@ -52,6 +245,8 @@ export interface ParticipantUser {
   email: string;
   /** @nullable */
   telefono?: string | null;
+  /** @nullable */
+  fotoObjectPath?: string | null;
   rol: ParticipantUserRol;
   ubicacion?: UserLocation | null;
 }
@@ -88,7 +283,10 @@ export interface ProfessionalProfile {
   reviewsCount: number;
   completedJobs: number;
   recommendationsCount: number;
-  /** @nullable */
+  /**
+     * Distancia aproximada en kilómetros; es null cuando la ubicación del profesional no tiene un heartbeat vigente (máximo 5 minutos).
+     * @nullable
+     */
   distanceKm?: number | null;
 }
 
@@ -374,4 +572,16 @@ latitud?: number;
  */
 longitud?: number;
 };
+
+export type ListConversationsParams = {
+rol?: ListConversationsRol;
+};
+
+export type ListConversationsRol = typeof ListConversationsRol[keyof typeof ListConversationsRol];
+
+
+export const ListConversationsRol = {
+  cliente: 'cliente',
+  profesional: 'profesional',
+} as const;
 

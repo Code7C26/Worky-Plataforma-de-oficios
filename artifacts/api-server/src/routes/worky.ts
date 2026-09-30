@@ -1,11 +1,13 @@
 import { Router, type IRouter, type Request, type Response } from "express";
 import bcrypt from "bcryptjs";
 import rateLimit from "express-rate-limit";
-import { and, asc, desc, eq, ilike, inArray, or, sql, type SQL } from "drizzle-orm";
-import { chatUploads, db, jobs, messages, professionalProfiles, profilePhotoUploads, users, serviceCatalog, professionalAvailability, professionalAssets, bookings, payments, settlements, workyNotifications, workyAuditEvents, reviews, recommendations, professionalServices, professionalVerificationDocuments } from "@workspace/db";
+import { and, asc, desc, eq, gt, ilike, inArray, isNull, ne, or, sql, type SQL } from "drizzle-orm";
+import { chatUploads, db, jobs, messages, passwordRecoveryTokens, professionalProfiles, profilePhotoUploads, users, serviceCatalog, professionalAvailability, professionalAssets, bookings, payments, settlements, workyNotifications, workyAuditEvents, reviews, recommendations, professionalServices, professionalVerificationDocuments } from "@workspace/db";
+import { ChangeMyPasswordBody, RequestPasswordRecoveryBody, ResetPasswordRecoveryBody, SwitchAccountRoleBody, SwitchAccountRoleResponse, UpdateMyAccountBody, UpdateProfessionalLocationBody, UpdateProfessionalLocationResponse } from "@workspace/api-zod";
 import { requireAuth, signToken, verifyToken } from "../middlewares/auth";
 import { deleteObject, isProfilePhotoSourcePath, isValidImageObject, processProfilePhoto } from "../lib/storage";
 import { cleanupRejectedChatAttachment } from "./storage";
+import { createPasswordRecovery, isPasswordRecoveryTokenValid, passwordRecoveryTokenHash } from "../lib/password-recovery";
 
 const router: IRouter = Router();
 type NotificationSubscriber = { res: Response; heartbeat: ReturnType<typeof setInterval> };
@@ -20,9 +22,20 @@ function removeNotificationSubscriber(usuarioId: number, subscribers: Set<Notifi
   if (subscribers.size === 0 && notificationSubscribers.get(usuarioId) === subscribers) notificationSubscribers.delete(usuarioId);
 }
 const authLimit = rateLimit({ windowMs: 15 * 60 * 1000, limit: 30, standardHeaders: true, legacyHeaders: false });
+const passwordRecoveryLimiter = rateLimit({ windowMs: 15 * 60 * 1000, limit: 5, standardHeaders: true, legacyHeaders: false });
 const categories = ["Plomería", "Electricidad", "Gas", "Albañilería", "Otro"] as const;
 const statuses = ["publicada", "aceptada", "en_curso", "finalizada", "cancelada"] as const;
+export const LIVE_LOCATION_MAX_AGE_MS = 5 * 60 * 1000;
+export const PROFESSIONAL_LOCATION_MAX_AGE_MS = LIVE_LOCATION_MAX_AGE_MS;
 const userId = (req: Request) => req.usuarioId as number;
+const reauthenticationLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => String(userId(req)),
+  message: { error: "Demasiados intentos. Esperá unos minutos antes de volver a intentar." },
+});
 async function requireAdmin(req: Request, res: Response) {
   const [user] = await db.select({ rol: users.rol }).from(users).where(and(eq(users.id, userId(req)), eq(users.activo, true))).limit(1);
   if (user?.rol !== "admin") {
@@ -64,6 +77,14 @@ function coordinatesOf(value: unknown): [number, number] | null {
   const latitude = Number(coordinates[1]);
   return Number.isFinite(longitude) && Number.isFinite(latitude) && Math.abs(longitude) <= 180 && Math.abs(latitude) <= 90
     ? [longitude, latitude]
+    : null;
+}
+function freshCoordinatesOf(value: unknown, now = Date.now()): [number, number] | null {
+  const coordinates = coordinatesOf(value);
+  if (!coordinates) return null;
+  const capturedAt = new Date(String((value as { capturedAt?: unknown } | null)?.capturedAt ?? ""));
+  return Number.isFinite(capturedAt.getTime()) && now - capturedAt.getTime() <= PROFESSIONAL_LOCATION_MAX_AGE_MS
+    ? coordinates
     : null;
 }
 function distanceInKm(from: [number, number], to: [number, number]) {
@@ -125,6 +146,12 @@ async function conversationJob(changaId: number, usuarioId: number) {
   if (!job || (job.clienteId !== usuarioId && job.profesionalId !== usuarioId)) return null;
   return job;
 }
+function requestedConversationRole(req: Request): "cliente" | "profesional" | null | "invalid" {
+  const value = req.query.rol;
+  if (value === undefined) return null;
+  if (typeof value !== "string" || !["cliente", "profesional"].includes(value)) return "invalid";
+  return value as "cliente" | "profesional";
+}
 
 router.post("/auth/register", authLimit, async (req, res) => {
   const { nombre, email, password, telefono, ubicacion, edad, fotoObjectPath, rol, onboardingRespuestas } = req.body ?? {};
@@ -151,11 +178,213 @@ router.post("/auth/login", authLimit, async (req, res) => {
   return res.json({ token: signToken(found.id), usuario: safeUser(found) });
 });
 
+router.post("/auth/password-recovery/request", passwordRecoveryLimiter, async (req, res) => {
+  const parsed = RequestPasswordRecoveryBody.safeParse(req.body);
+  if (!parsed.success || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(parsed.data?.email.trim() ?? "")) return res.status(400).json({ error: "Ingresá un email válido." });
+
+  const email = parsed.data.email.trim().toLowerCase();
+  try {
+    await createPasswordRecovery(email, `${req.protocol}://${req.get("host")}`);
+  } catch (error) {
+    console.error("No se pudo enviar el correo de recuperación.", error);
+    return res.status(503).json({ error: "No pudimos enviar el correo de recuperación. Intentá nuevamente en unos minutos." });
+  }
+
+  return res.status(202).json({
+    message: "Si existe una cuenta con ese email, vas a recibir un enlace para recuperar tu contraseña.",
+  });
+});
+
+router.post("/auth/password-recovery/reset", passwordRecoveryLimiter, async (req, res) => {
+  const parsed = ResetPasswordRecoveryBody.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: "El enlace no es válido o la contraseña no cumple los requisitos." });
+
+  const now = new Date();
+  const tokenHash = passwordRecoveryTokenHash(parsed.data.token);
+  const [recovery] = await db.select().from(passwordRecoveryTokens).where(eq(passwordRecoveryTokens.tokenHash, tokenHash)).limit(1);
+  if (!recovery || !isPasswordRecoveryTokenValid(recovery.expiresAt, recovery.usedAt, now)) {
+    return res.status(400).json({ error: "El enlace de recuperación venció o ya fue utilizado." });
+  }
+
+  const [user] = await db.select().from(users).where(and(eq(users.id, recovery.usuarioId), eq(users.activo, true))).limit(1);
+  if (!user) return res.status(400).json({ error: "El enlace de recuperación ya no es válido." });
+  if (await bcrypt.compare(parsed.data.newPassword, user.passwordHash)) {
+    return res.status(400).json({ error: "Elegí una contraseña diferente a la actual." });
+  }
+
+  const claimed = await db.transaction(async (tx) => {
+    const [claimedToken] = await tx.update(passwordRecoveryTokens)
+      .set({ usedAt: now })
+      .where(and(
+        eq(passwordRecoveryTokens.id, recovery.id),
+        isNull(passwordRecoveryTokens.usedAt),
+        gt(passwordRecoveryTokens.expiresAt, now),
+      ))
+      .returning({ id: passwordRecoveryTokens.id });
+    if (!claimedToken) return false;
+
+    await tx.update(users)
+      .set({ passwordHash: await bcrypt.hash(parsed.data.newPassword, 12), updatedAt: now })
+      .where(eq(users.id, user.id));
+    await tx.update(passwordRecoveryTokens)
+      .set({ usedAt: now })
+      .where(and(eq(passwordRecoveryTokens.usuarioId, user.id), isNull(passwordRecoveryTokens.usedAt)));
+    return true;
+  });
+
+  if (!claimed) return res.status(400).json({ error: "El enlace de recuperación venció o ya fue utilizado." });
+  return res.json({ success: true });
+});
+
 router.get("/auth/me", requireAuth, async (req, res) => {
   const [user] = await db.select().from(users).where(and(eq(users.id, userId(req)), eq(users.activo, true))).limit(1);
   return user ? res.json(safeUser(user)) : res.status(401).json({ error: "Tu sesión ya no es válida." });
 });
+router.patch("/auth/me", requireAuth, (req, res, next) => {
+  if (typeof req.body?.currentPassword !== "string") return next();
+  return reauthenticationLimiter(req, res, next);
+}, async (req, res) => {
+  const parsed = UpdateMyAccountBody.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: "Revisá los datos ingresados y volvé a intentar." });
+  if (Object.keys(parsed.data).every((key) => key === "currentPassword")) {
+    return res.status(400).json({ error: "No hay cambios para guardar." });
+  }
+
+  const [current] = await db.select().from(users).where(and(eq(users.id, userId(req)), eq(users.activo, true))).limit(1);
+  if (!current) return res.status(401).json({ error: "Tu sesión ya no es válida." });
+
+  const nombre = parsed.data.nombre?.trim();
+  const email = parsed.data.email?.trim().toLowerCase();
+  if (nombre !== undefined && nombre.length < 2) return res.status(400).json({ error: "Ingresá tu nombre completo." });
+  if (email !== undefined && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return res.status(400).json({ error: "Ingresá un email válido." });
+
+  if (email !== undefined && email !== current.email) {
+    if (!parsed.data.currentPassword || !(await bcrypt.compare(parsed.data.currentPassword, current.passwordHash))) {
+      return res.status(401).json({ error: "Ingresá tu contraseña actual para cambiar el email." });
+    }
+    const [emailOwner] = await db.select({ id: users.id }).from(users).where(and(eq(users.email, email), ne(users.id, current.id))).limit(1);
+    if (emailOwner) return res.status(409).json({ error: "Ese email ya está asociado a otra cuenta." });
+  }
+
+  const requestedLocation = parsed.data.ubicacion;
+  const cleanLocationValue = (value: string | null | undefined) => {
+    const clean = typeof value === "string" ? value.trim() : "";
+    return clean || null;
+  };
+  const updates: Partial<typeof users.$inferInsert> = { updatedAt: new Date() };
+  if (nombre !== undefined) updates.nombre = nombre;
+  if (email !== undefined) updates.email = email;
+  if (parsed.data.telefono !== undefined) updates.telefono = cleanLocationValue(parsed.data.telefono);
+  if (parsed.data.edad !== undefined) updates.edad = parsed.data.edad;
+  if (requestedLocation !== undefined) {
+    const addressPatch = {
+      direccionTexto: cleanLocationValue(requestedLocation?.direccionTexto),
+      ciudad: cleanLocationValue(requestedLocation?.ciudad),
+      provincia: cleanLocationValue(requestedLocation?.provincia),
+    };
+    updates.ubicacion = sql`coalesce(${users.ubicacion}, '{}'::jsonb) || ${JSON.stringify(addressPatch)}::jsonb`;
+  }
+
+  try {
+    const [updated] = await db.update(users).set(updates).where(eq(users.id, current.id)).returning();
+    return res.json(safeUser(updated));
+  } catch (error) {
+    const code = (error as { code?: string; cause?: { code?: string } }).code
+      ?? (error as { cause?: { code?: string } }).cause?.code;
+    if (code === "23505") return res.status(409).json({ error: "Ese email ya está asociado a otra cuenta." });
+    throw error;
+  }
+});
+router.patch("/auth/role", requireAuth, async (req, res): Promise<void> => {
+  const parsed = SwitchAccountRoleBody.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: "Elegí un perfil válido para continuar." });
+    return;
+  }
+
+  const [current] = await db.select().from(users)
+    .where(and(eq(users.id, userId(req)), eq(users.activo, true))).limit(1);
+  if (!current) {
+    res.status(401).json({ error: "Tu sesión ya no es válida." });
+    return;
+  }
+  if (current.rol === "admin") {
+    res.status(403).json({ error: "Las cuentas administradoras no pueden cambiar de perfil." });
+    return;
+  }
+  if (current.rol === parsed.data.rol) {
+    res.json(SwitchAccountRoleResponse.parse(safeUser(current)));
+    return;
+  }
+
+  const [updated] = await db.update(users)
+    .set({ rol: parsed.data.rol, updatedAt: new Date() })
+    .where(and(eq(users.id, current.id), eq(users.activo, true)))
+    .returning();
+  if (!updated) {
+    res.status(401).json({ error: "Tu sesión ya no es válida." });
+    return;
+  }
+
+  res.json(SwitchAccountRoleResponse.parse(safeUser(updated)));
+});
+router.patch("/auth/password", requireAuth, reauthenticationLimiter, async (req, res) => {
+  const parsed = ChangeMyPasswordBody.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: "La nueva contraseña debe tener al menos 8 caracteres." });
+  const [current] = await db.select().from(users).where(and(eq(users.id, userId(req)), eq(users.activo, true))).limit(1);
+  if (!current) return res.status(401).json({ error: "Tu sesión ya no es válida." });
+  if (!(await bcrypt.compare(parsed.data.currentPassword, current.passwordHash))) {
+    return res.status(401).json({ error: "La contraseña actual no es correcta." });
+  }
+  if (await bcrypt.compare(parsed.data.newPassword, current.passwordHash)) {
+    return res.status(400).json({ error: "Elegí una contraseña diferente a la actual." });
+  }
+  await db.update(users).set({ passwordHash: await bcrypt.hash(parsed.data.newPassword, 12), updatedAt: new Date() }).where(eq(users.id, current.id));
+  return res.json({ success: true });
+});
 router.post("/auth/logout", requireAuth, (_req, res) => res.status(204).send());
+
+router.patch("/auth/location", requireAuth, async (req, res): Promise<void> => {
+  const parsed = UpdateProfessionalLocationBody.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: "Las coordenadas deben incluir longitud y latitud válidas." });
+    return;
+  }
+
+  const coordinates = coordinatesOf(parsed.data);
+  if (!coordinates) {
+    res.status(400).json({ error: "Las coordenadas deben incluir longitud y latitud válidas." });
+    return;
+  }
+
+  const [current] = await db.select({ rol: users.rol, ubicacion: users.ubicacion })
+    .from(users)
+    .where(and(eq(users.id, userId(req)), eq(users.activo, true)))
+    .limit(1);
+  if (!current) {
+    res.status(401).json({ error: "Tu sesión ya no es válida." });
+    return;
+  }
+  const hasProfessionalProfile = current.rol === "profesional" || Boolean((await db.select({ id: professionalProfiles.id })
+    .from(professionalProfiles)
+    .where(eq(professionalProfiles.usuarioId, userId(req)))
+    .limit(1))[0]);
+  if (!hasProfessionalProfile) {
+    res.status(403).json({ error: "Solo los profesionales pueden actualizar su ubicación." });
+    return;
+  }
+
+  const capturedAt = new Date();
+  const locationPatch = { coordinates, capturedAt: capturedAt.toISOString() };
+  await db.update(users)
+    .set({
+      ubicacion: sql`coalesce(${users.ubicacion}, '{}'::jsonb) || ${JSON.stringify(locationPatch)}::jsonb`,
+      updatedAt: capturedAt,
+    })
+    .where(eq(users.id, userId(req)));
+
+  res.json(UpdateProfessionalLocationResponse.parse({ coordinates, capturedAt }));
+});
 
 router.patch("/auth/onboarding", requireAuth, async (req, res) => {
   const body = req.body ?? {};
@@ -385,12 +614,16 @@ router.get("/profesionales", async (req, res) => {
     && Math.abs(viewerLongitude) <= 180 && Math.abs(viewerLatitude) <= 90
     ? [viewerLongitude, viewerLatitude] as [number, number]
     : null;
-  return res.json(await Promise.all(rows.map(async (row) => ({
-    ...(await publicProfileView(row)),
-    distanceKm: viewerCoordinates && coordinatesOf(row.user.ubicacion)
-      ? distanceInKm(viewerCoordinates, coordinatesOf(row.user.ubicacion) as [number, number])
-      : null,
-  }))));
+  const now = Date.now();
+  return res.json(await Promise.all(rows.map(async (row) => {
+    const professionalCoordinates = freshCoordinatesOf(row.user.ubicacion, now);
+    return {
+      ...(await publicProfileView(row)),
+      distanceKm: viewerCoordinates && professionalCoordinates
+        ? distanceInKm(viewerCoordinates, professionalCoordinates)
+        : null,
+    };
+  })));
 });
 
 // Catálogo único para altas, filtros y oportunidades.
@@ -700,8 +933,15 @@ router.get("/trabajos/:id", requireAuth, async (req, res) => {
 });
 
 router.get("/conversaciones", requireAuth, async (req, res) => {
+  const role = requestedConversationRole(req);
+  if (role === "invalid") return res.status(400).json({ error: "El rol de la bandeja no es válido." });
+  const participantFilter = role === "cliente"
+    ? eq(jobs.clienteId, userId(req))
+    : role === "profesional"
+      ? eq(jobs.profesionalId, userId(req))
+      : sql`${jobs.clienteId} = ${userId(req)} OR ${jobs.profesionalId} = ${userId(req)}`;
   const owned = await db.select({ job: jobs, client: users }).from(jobs).innerJoin(users, eq(users.id, jobs.clienteId))
-    .where(sql`${jobs.clienteId} = ${userId(req)} OR ${jobs.profesionalId} = ${userId(req)}`).orderBy(desc(jobs.updatedAt));
+    .where(participantFilter).orderBy(desc(jobs.updatedAt));
   const items = await Promise.all(owned.map(async ({ job, client }) => {
     const [last] = await db.select({ message: messages, sender: users }).from(messages).innerJoin(users, eq(users.id, messages.emisorId))
       .where(eq(messages.changaId, job.id)).orderBy(desc(messages.createdAt)).limit(1);

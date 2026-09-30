@@ -6,6 +6,12 @@
  * OpenAPI spec version: 0.1.0
  */
 
+export * from './account';
+export * from './accountRol';
+export * from './accountRoleUpdate';
+export * from './accountRoleUpdateRol';
+export * from './accountUpdate';
+export * from './accountUpdateUbicacion';
 export * from './appointment';
 export * from './appointmentAttempt';
 export * from './appointmentAttemptAccion';
@@ -15,6 +21,11 @@ export * from './appointmentAttemptInputResultado';
 export * from './appointmentAttemptResultado';
 export * from './appointmentEstado';
 export * from './appointmentInput';
+export * from './authCredentials';
+export * from './authRegisterInput';
+export * from './authRegisterInputOnboardingRespuestas';
+export * from './authRegisterInputRol';
+export * from './authSession';
 export * from './chatMessage';
 export * from './conversation';
 export * from './conversationEstado';
@@ -25,11 +36,20 @@ export * from './jobEstado';
 export * from './jobInput';
 export * from './jobUpdate';
 export * from './jobUpdateEstado';
+export * from './listConversationsParams';
+export * from './listConversationsRol';
 export * from './listProfessionalsParams';
 export * from './messageAttachment';
 export * from './messageInput';
+export * from './operationResult';
 export * from './participantUser';
 export * from './participantUserRol';
+export * from './passwordChange';
+export * from './passwordRecoveryRequest';
+export * from './passwordRecoveryReset';
+export * from './passwordRecoveryResponse';
+export * from './professionalLocation';
+export * from './professionalLocationUpdate';
 export * from './professionalProfile';
 export * from './professionalProfileEstadoVerificacion';
 export * from './professionalProfileInput';

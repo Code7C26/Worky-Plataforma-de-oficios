@@ -11,6 +11,8 @@ import type { PublicUserUbicacion } from './publicUserUbicacion';
 export interface PublicUser {
   id: number;
   nombre: string;
+  /** @nullable */
+  fotoObjectPath?: string | null;
   rol: PublicUserRol;
   ubicacion?: PublicUserUbicacion;
 }

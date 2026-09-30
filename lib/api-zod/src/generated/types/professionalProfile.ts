@@ -31,6 +31,9 @@ export interface ProfessionalProfile {
   reviewsCount: number;
   completedJobs: number;
   recommendationsCount: number;
-  /** @nullable */
+  /**
+     * Distancia aproximada en kilómetros; es null cuando la ubicación del profesional no tiene un heartbeat vigente (máximo 5 minutos).
+     * @nullable
+     */
   distanceKm?: number | null;
 }

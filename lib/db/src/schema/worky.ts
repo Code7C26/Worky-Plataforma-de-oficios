@@ -35,6 +35,18 @@ export const users = pgTable("worky_users", {
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 }, (table) => [uniqueIndex("worky_users_email_idx").on(table.email)]);
 
+export const passwordRecoveryTokens = pgTable("worky_password_recovery_tokens", {
+  id: serial("id").primaryKey(),
+  usuarioId: integer("usuario_id").notNull().references(() => users.id),
+  tokenHash: text("token_hash").notNull(),
+  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+  usedAt: timestamp("used_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+}, (table) => [
+  uniqueIndex("worky_password_recovery_token_hash_idx").on(table.tokenHash),
+  index("worky_password_recovery_user_idx").on(table.usuarioId),
+]);
+
 export const professionalProfiles = pgTable("worky_professional_profiles", {
   id: serial("id").primaryKey(),
   usuarioId: integer("usuario_id").notNull().unique().references(() => users.id),

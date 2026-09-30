@@ -5,17 +5,21 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
-import type { ParticipantUserRol } from './participantUserRol';
+import type { AccountRol } from './accountRol';
 import type { UserLocation } from './userLocation';
 
-export interface ParticipantUser {
+export interface Account {
   id: number;
   nombre: string;
   email: string;
   /** @nullable */
   telefono?: string | null;
   /** @nullable */
+  edad?: number | null;
+  /** @nullable */
   fotoObjectPath?: string | null;
-  rol: ParticipantUserRol;
+  rol: AccountRol;
   ubicacion?: UserLocation | null;
+  onboardingEstado?: string;
+  onboardingPaso?: number;
 }

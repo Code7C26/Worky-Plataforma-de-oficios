@@ -14,6 +14,7 @@ tags:
   - name: jobs
   - name: messages
   - name: appointments
+  - name: auth
 paths:
   /healthz:
     get:
@@ -28,6 +29,169 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+  /auth/register:
+    post:
+      operationId: registerAccount
+      tags: [auth]
+      summary: Create an account
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AuthRegisterInput" }
+      responses:
+        "201":
+          description: Created account and session
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AuthSession" }
+        "400": { description: Invalid registration data }
+        "409": { description: Email already in use }
+  /auth/login:
+    post:
+      operationId: loginAccount
+      tags: [auth]
+      summary: Sign in to an account
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AuthCredentials" }
+      responses:
+        "200":
+          description: Account session
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AuthSession" }
+        "401": { description: Invalid email or password }
+  /auth/logout:
+    post:
+      operationId: logoutAccount
+      tags: [auth]
+      summary: End the current session
+      responses:
+        "204": { description: Session ended }
+        "401": { description: Invalid session }
+  /auth/location:
+    patch:
+      operationId: updateProfessionalLocation
+      tags: [professionals]
+      summary: Update the current professional's live location
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ProfessionalLocationUpdate" }
+      responses:
+        "200":
+          description: Updated live location
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ProfessionalLocation" }
+        "400": { description: Invalid coordinates }
+        "403": { description: Only professionals can update a live location }
+  /auth/me:
+    get:
+      operationId: getMyAccount
+      tags: [professionals]
+      summary: Get the current account
+      responses:
+        "200":
+          description: Current account
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Account" }
+        "401": { description: Invalid session }
+    patch:
+      operationId: updateMyAccount
+      tags: [professionals]
+      summary: Update the current account
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AccountUpdate" }
+      responses:
+        "200":
+          description: Updated account
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Account" }
+        "400": { description: Invalid account data }
+        "401": { description: Current password required or invalid session }
+        "409": { description: Email already in use }
+  /auth/role:
+    patch:
+      operationId: switchAccountRole
+      tags: [professionals]
+      summary: Switch the current account between client and professional modes
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AccountRoleUpdate" }
+      responses:
+        "200":
+          description: Updated account role
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Account" }
+        "400": { description: Invalid account role }
+        "401": { description: Invalid session }
+        "403": { description: Administrator accounts cannot switch roles }
+  /auth/password:
+    patch:
+      operationId: changeMyPassword
+      tags: [professionals]
+      summary: Change the current account password
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/PasswordChange" }
+      responses:
+        "200":
+          description: Password changed
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/OperationResult" }
+        "400": { description: Invalid password }
+        "401": { description: Current password is incorrect }
+  /auth/password-recovery/request:
+    post:
+      operationId: requestPasswordRecovery
+      tags: [professionals]
+      summary: Request a password recovery link
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/PasswordRecoveryRequest" }
+      responses:
+        "202":
+          description: Recovery request accepted without revealing whether the email exists
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PasswordRecoveryResponse" }
+        "400": { description: Invalid email }
+        "503": { description: Email delivery unavailable }
+  /auth/password-recovery/reset:
+    post:
+      operationId: resetPasswordRecovery
+      tags: [professionals]
+      summary: Set a new password with a recovery token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/PasswordRecoveryReset" }
+      responses:
+        "200":
+          description: Password reset
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/OperationResult" }
+        "400": { description: "Invalid, expired, or already used token" }
   /profesionales:
     get:
       operationId: listProfessionals
@@ -253,6 +417,10 @@ paths:
       operationId: listConversations
       tags: [messages]
       summary: List the current user's conversations
+      parameters:
+        - name: rol
+          in: query
+          schema: { type: string, enum: [cliente, profesional] }
       responses:
         "200":
           description: Conversations
@@ -439,6 +607,117 @@ components:
           type: string
       required:
         - status
+    AuthCredentials:
+      type: object
+      required: [email, password]
+      properties:
+        email: { type: string, maxLength: 320 }
+        password: { type: string, minLength: 1, maxLength: 200 }
+    AuthRegisterInput:
+      type: object
+      required: [nombre, email, password]
+      properties:
+        nombre: { type: string, minLength: 2, maxLength: 100 }
+        email: { type: string, maxLength: 320 }
+        password: { type: string, minLength: 6, maxLength: 200 }
+        telefono: { type: string, maxLength: 40 }
+        edad: { type: number, minimum: 13, maximum: 120 }
+        rol: { type: string, enum: [cliente, profesional] }
+        ubicacion: { $ref: "#/components/schemas/UserLocation" }
+        onboardingRespuestas:
+          type: object
+          additionalProperties: { type: string }
+    AuthSession:
+      type: object
+      required: [token, usuario]
+      properties:
+        token: { type: string }
+        usuario: { $ref: "#/components/schemas/Account" }
+    ProfessionalLocationUpdate:
+      type: object
+      required: [coordinates]
+      properties:
+        coordinates:
+          type: array
+          minItems: 2
+          maxItems: 2
+          items: { type: number }
+    ProfessionalLocation:
+      type: object
+      required: [coordinates, capturedAt]
+      properties:
+        coordinates:
+          type: array
+          minItems: 2
+          maxItems: 2
+          items: { type: number }
+        capturedAt: { type: string, format: date-time }
+    Account:
+      type: object
+      required: [id, nombre, email, rol]
+      properties:
+        id: { type: number }
+        nombre: { type: string }
+        email: { type: string }
+        telefono: { type: ["string", "null"] }
+        edad: { type: ["number", "null"] }
+        fotoObjectPath: { type: ["string", "null"] }
+        rol: { type: string, enum: [cliente, profesional, admin] }
+        ubicacion:
+          oneOf:
+            - $ref: "#/components/schemas/UserLocation"
+            - type: "null"
+        onboardingEstado: { type: string }
+        onboardingPaso: { type: number }
+    AccountUpdate:
+      type: object
+      properties:
+        nombre: { type: string, minLength: 2, maxLength: 100 }
+        email: { type: string, maxLength: 200 }
+        telefono: { type: ["string", "null"], maxLength: 40 }
+        edad: { type: ["number", "null"], minimum: 13, maximum: 120 }
+        ubicacion:
+          oneOf:
+            - type: object
+              properties:
+                direccionTexto: { type: ["string", "null"], maxLength: 200 }
+                ciudad: { type: ["string", "null"], maxLength: 100 }
+                provincia: { type: ["string", "null"], maxLength: 100 }
+            - type: "null"
+        currentPassword: { type: ["string", "null"], maxLength: 200 }
+    AccountRoleUpdate:
+      type: object
+      required: [rol]
+      additionalProperties: false
+      properties:
+        rol: { type: string, enum: [cliente, profesional] }
+    PasswordChange:
+      type: object
+      required: [currentPassword, newPassword]
+      properties:
+        currentPassword: { type: string, minLength: 1, maxLength: 200 }
+        newPassword: { type: string, minLength: 8, maxLength: 200 }
+    PasswordRecoveryRequest:
+      type: object
+      properties:
+        email: { type: string, maxLength: 320 }
+      required: [email]
+    PasswordRecoveryReset:
+      type: object
+      properties:
+        token: { type: string, minLength: 32, maxLength: 200 }
+        newPassword: { type: string, minLength: 8, maxLength: 200 }
+      required: [token, newPassword]
+    PasswordRecoveryResponse:
+      type: object
+      properties:
+        message: { type: string }
+      required: [message]
+    OperationResult:
+      type: object
+      required: [success]
+      properties:
+        success: { type: boolean }
     UserLocation:
       type: object
       properties:
@@ -446,6 +725,7 @@ components:
         ciudad: { type: string }
         provincia: { type: string }
         zona: { type: string }
+        capturedAt: { type: ["string", "null"], format: date-time }
         coordinates:
           type: array
           items: { type: number }
@@ -455,11 +735,14 @@ components:
       properties:
         id: { type: number }
         nombre: { type: string }
+        fotoObjectPath: { type: ["string", "null"] }
         rol: { type: string, enum: [cliente, profesional, admin] }
         ubicacion:
           oneOf:
             - type: object
+              additionalProperties: false
               properties:
+                ciudad: { type: string }
                 zona: { type: string }
             - type: "null"
     ParticipantUser:
@@ -470,6 +753,7 @@ components:
         nombre: { type: string }
         email: { type: string }
         telefono: { type: ["string", "null"] }
+        fotoObjectPath: { type: ["string", "null"] }
         rol: { type: string, enum: [cliente, profesional, admin] }
         ubicacion:
           oneOf:
@@ -501,7 +785,9 @@ components:
         reviewsCount: { type: number }
         completedJobs: { type: number }
         recommendationsCount: { type: number }
-        distanceKm: { type: ["number", "null"] }
+        distanceKm:
+          type: ["number", "null"]
+          description: "Distancia aproximada en kilómetros; es null cuando la ubicación del profesional no tiene un heartbeat vigente (máximo 5 minutos)."
     ProfessionalProfileInput:
       type: object
       required: [oficio, categoria, precioReferencia]
@@ -694,4 +980,3 @@ components:
           oneOf:
             - $ref: "#/components/schemas/ConversationLastMessage"
             - type: "null"
-

@@ -18,6 +18,299 @@ export const HealthCheckResponse = zod.object({
 
 
 /**
+ * @summary Create an account
+ */
+export const registerAccountBodyNombreMin = 2;
+export const registerAccountBodyNombreMax = 100;
+
+export const registerAccountBodyEmailMax = 320;
+
+export const registerAccountBodyPasswordMin = 6;
+export const registerAccountBodyPasswordMax = 200;
+
+export const registerAccountBodyTelefonoMax = 40;
+
+export const registerAccountBodyEdadMin = 13;
+export const registerAccountBodyEdadMax = 120;
+
+
+
+export const RegisterAccountBody = zod.object({
+  "nombre": zod.string().min(registerAccountBodyNombreMin).max(registerAccountBodyNombreMax),
+  "email": zod.string().max(registerAccountBodyEmailMax),
+  "password": zod.string().min(registerAccountBodyPasswordMin).max(registerAccountBodyPasswordMax),
+  "telefono": zod.string().max(registerAccountBodyTelefonoMax).optional(),
+  "edad": zod.number().min(registerAccountBodyEdadMin).max(registerAccountBodyEdadMax).optional(),
+  "rol": zod.enum(['cliente', 'profesional']).optional(),
+  "ubicacion": zod.object({
+  "direccionTexto": zod.string().optional(),
+  "ciudad": zod.string().optional(),
+  "provincia": zod.string().optional(),
+  "zona": zod.string().optional(),
+  "capturedAt": zod.coerce.date().nullish(),
+  "coordinates": zod.array(zod.number()).optional()
+}).optional(),
+  "onboardingRespuestas": zod.record(zod.string(), zod.string()).optional()
+})
+
+export const RegisterAccountResponse = zod.object({
+  "token": zod.string(),
+  "usuario": zod.object({
+  "id": zod.number(),
+  "nombre": zod.string(),
+  "email": zod.string(),
+  "telefono": zod.string().nullish(),
+  "edad": zod.number().nullish(),
+  "fotoObjectPath": zod.string().nullish(),
+  "rol": zod.enum(['cliente', 'profesional', 'admin']),
+  "ubicacion": zod.union([zod.object({
+  "direccionTexto": zod.string().optional(),
+  "ciudad": zod.string().optional(),
+  "provincia": zod.string().optional(),
+  "zona": zod.string().optional(),
+  "capturedAt": zod.coerce.date().nullish(),
+  "coordinates": zod.array(zod.number()).optional()
+}),zod.null()]).optional(),
+  "onboardingEstado": zod.string().optional(),
+  "onboardingPaso": zod.number().optional()
+})
+})
+
+
+/**
+ * @summary Sign in to an account
+ */
+export const loginAccountBodyEmailMax = 320;
+
+export const loginAccountBodyPasswordMax = 200;
+
+
+
+export const LoginAccountBody = zod.object({
+  "email": zod.string().max(loginAccountBodyEmailMax),
+  "password": zod.string().min(1).max(loginAccountBodyPasswordMax)
+})
+
+export const LoginAccountResponse = zod.object({
+  "token": zod.string(),
+  "usuario": zod.object({
+  "id": zod.number(),
+  "nombre": zod.string(),
+  "email": zod.string(),
+  "telefono": zod.string().nullish(),
+  "edad": zod.number().nullish(),
+  "fotoObjectPath": zod.string().nullish(),
+  "rol": zod.enum(['cliente', 'profesional', 'admin']),
+  "ubicacion": zod.union([zod.object({
+  "direccionTexto": zod.string().optional(),
+  "ciudad": zod.string().optional(),
+  "provincia": zod.string().optional(),
+  "zona": zod.string().optional(),
+  "capturedAt": zod.coerce.date().nullish(),
+  "coordinates": zod.array(zod.number()).optional()
+}),zod.null()]).optional(),
+  "onboardingEstado": zod.string().optional(),
+  "onboardingPaso": zod.number().optional()
+})
+})
+
+
+/**
+ * @summary End the current session
+ */
+export const LogoutAccountResponse = zod.void()
+
+
+/**
+ * @summary Update the current professional's live location
+ */
+export const updateProfessionalLocationBodyCoordinatesMin = 2;
+export const updateProfessionalLocationBodyCoordinatesMax = 2;
+
+
+
+export const UpdateProfessionalLocationBody = zod.object({
+  "coordinates": zod.array(zod.number()).min(updateProfessionalLocationBodyCoordinatesMin).max(updateProfessionalLocationBodyCoordinatesMax)
+})
+
+export const updateProfessionalLocationResponseCoordinatesMin = 2;
+export const updateProfessionalLocationResponseCoordinatesMax = 2;
+
+
+
+export const UpdateProfessionalLocationResponse = zod.object({
+  "coordinates": zod.array(zod.number()).min(updateProfessionalLocationResponseCoordinatesMin).max(updateProfessionalLocationResponseCoordinatesMax),
+  "capturedAt": zod.coerce.date()
+})
+
+
+/**
+ * @summary Get the current account
+ */
+export const GetMyAccountResponse = zod.object({
+  "id": zod.number(),
+  "nombre": zod.string(),
+  "email": zod.string(),
+  "telefono": zod.string().nullish(),
+  "edad": zod.number().nullish(),
+  "fotoObjectPath": zod.string().nullish(),
+  "rol": zod.enum(['cliente', 'profesional', 'admin']),
+  "ubicacion": zod.union([zod.object({
+  "direccionTexto": zod.string().optional(),
+  "ciudad": zod.string().optional(),
+  "provincia": zod.string().optional(),
+  "zona": zod.string().optional(),
+  "capturedAt": zod.coerce.date().nullish(),
+  "coordinates": zod.array(zod.number()).optional()
+}),zod.null()]).optional(),
+  "onboardingEstado": zod.string().optional(),
+  "onboardingPaso": zod.number().optional()
+})
+
+
+/**
+ * @summary Update the current account
+ */
+export const updateMyAccountBodyNombreMin = 2;
+export const updateMyAccountBodyNombreMax = 100;
+
+export const updateMyAccountBodyEmailMax = 200;
+
+export const updateMyAccountBodyTelefonoMax = 40;
+
+export const updateMyAccountBodyEdadMin = 13;
+export const updateMyAccountBodyEdadMax = 120;
+
+export const updateMyAccountBodyUbicacionOneDireccionTextoMax = 200;
+
+export const updateMyAccountBodyUbicacionOneCiudadMax = 100;
+
+export const updateMyAccountBodyUbicacionOneProvinciaMax = 100;
+
+export const updateMyAccountBodyCurrentPasswordMax = 200;
+
+
+
+export const UpdateMyAccountBody = zod.object({
+  "nombre": zod.string().min(updateMyAccountBodyNombreMin).max(updateMyAccountBodyNombreMax).optional(),
+  "email": zod.string().max(updateMyAccountBodyEmailMax).optional(),
+  "telefono": zod.string().max(updateMyAccountBodyTelefonoMax).nullish(),
+  "edad": zod.number().min(updateMyAccountBodyEdadMin).max(updateMyAccountBodyEdadMax).nullish(),
+  "ubicacion": zod.union([zod.object({
+  "direccionTexto": zod.string().max(updateMyAccountBodyUbicacionOneDireccionTextoMax).nullish(),
+  "ciudad": zod.string().max(updateMyAccountBodyUbicacionOneCiudadMax).nullish(),
+  "provincia": zod.string().max(updateMyAccountBodyUbicacionOneProvinciaMax).nullish()
+}),zod.null()]).optional(),
+  "currentPassword": zod.string().max(updateMyAccountBodyCurrentPasswordMax).nullish()
+})
+
+export const UpdateMyAccountResponse = zod.object({
+  "id": zod.number(),
+  "nombre": zod.string(),
+  "email": zod.string(),
+  "telefono": zod.string().nullish(),
+  "edad": zod.number().nullish(),
+  "fotoObjectPath": zod.string().nullish(),
+  "rol": zod.enum(['cliente', 'profesional', 'admin']),
+  "ubicacion": zod.union([zod.object({
+  "direccionTexto": zod.string().optional(),
+  "ciudad": zod.string().optional(),
+  "provincia": zod.string().optional(),
+  "zona": zod.string().optional(),
+  "capturedAt": zod.coerce.date().nullish(),
+  "coordinates": zod.array(zod.number()).optional()
+}),zod.null()]).optional(),
+  "onboardingEstado": zod.string().optional(),
+  "onboardingPaso": zod.number().optional()
+})
+
+
+/**
+ * @summary Switch the current account between client and professional modes
+ */
+export const SwitchAccountRoleBody = zod.object({
+  "rol": zod.enum(['cliente', 'profesional'])
+})
+
+export const SwitchAccountRoleResponse = zod.object({
+  "id": zod.number(),
+  "nombre": zod.string(),
+  "email": zod.string(),
+  "telefono": zod.string().nullish(),
+  "edad": zod.number().nullish(),
+  "fotoObjectPath": zod.string().nullish(),
+  "rol": zod.enum(['cliente', 'profesional', 'admin']),
+  "ubicacion": zod.union([zod.object({
+  "direccionTexto": zod.string().optional(),
+  "ciudad": zod.string().optional(),
+  "provincia": zod.string().optional(),
+  "zona": zod.string().optional(),
+  "capturedAt": zod.coerce.date().nullish(),
+  "coordinates": zod.array(zod.number()).optional()
+}),zod.null()]).optional(),
+  "onboardingEstado": zod.string().optional(),
+  "onboardingPaso": zod.number().optional()
+})
+
+
+/**
+ * @summary Change the current account password
+ */
+export const changeMyPasswordBodyCurrentPasswordMax = 200;
+
+export const changeMyPasswordBodyNewPasswordMin = 8;
+export const changeMyPasswordBodyNewPasswordMax = 200;
+
+
+
+export const ChangeMyPasswordBody = zod.object({
+  "currentPassword": zod.string().min(1).max(changeMyPasswordBodyCurrentPasswordMax),
+  "newPassword": zod.string().min(changeMyPasswordBodyNewPasswordMin).max(changeMyPasswordBodyNewPasswordMax)
+})
+
+export const ChangeMyPasswordResponse = zod.object({
+  "success": zod.boolean()
+})
+
+
+/**
+ * @summary Request a password recovery link
+ */
+export const requestPasswordRecoveryBodyEmailMax = 320;
+
+
+
+export const RequestPasswordRecoveryBody = zod.object({
+  "email": zod.string().max(requestPasswordRecoveryBodyEmailMax)
+})
+
+export const RequestPasswordRecoveryResponse = zod.object({
+  "message": zod.string()
+})
+
+
+/**
+ * @summary Set a new password with a recovery token
+ */
+export const resetPasswordRecoveryBodyTokenMin = 32;
+export const resetPasswordRecoveryBodyTokenMax = 200;
+
+export const resetPasswordRecoveryBodyNewPasswordMin = 8;
+export const resetPasswordRecoveryBodyNewPasswordMax = 200;
+
+
+
+export const ResetPasswordRecoveryBody = zod.object({
+  "token": zod.string().min(resetPasswordRecoveryBodyTokenMin).max(resetPasswordRecoveryBodyTokenMax),
+  "newPassword": zod.string().min(resetPasswordRecoveryBodyNewPasswordMin).max(resetPasswordRecoveryBodyNewPasswordMax)
+})
+
+export const ResetPasswordRecoveryResponse = zod.object({
+  "success": zod.boolean()
+})
+
+
+/**
  * @summary List professionals
  */
 export const listProfessionalsQueryLimitMax = 50;
@@ -58,15 +351,17 @@ export const ListProfessionalsResponseItem = zod.object({
   "usuario": zod.object({
   "id": zod.number(),
   "nombre": zod.string(),
+  "fotoObjectPath": zod.string().nullish(),
   "rol": zod.enum(['cliente', 'profesional', 'admin']),
   "ubicacion": zod.union([zod.object({
+  "ciudad": zod.string().optional(),
   "zona": zod.string().optional()
 }),zod.null()]).optional()
 }),
   "reviewsCount": zod.number(),
   "completedJobs": zod.number(),
   "recommendationsCount": zod.number(),
-  "distanceKm": zod.number().nullish()
+  "distanceKm": zod.number().nullish().describe('Distancia aproximada en kilómetros; es null cuando la ubicación del profesional no tiene un heartbeat vigente (máximo 5 minutos).')
 })
 export const ListProfessionalsResponse = zod.array(ListProfessionalsResponseItem)
 
@@ -98,15 +393,17 @@ export const GetProfessionalResponse = zod.object({
   "usuario": zod.object({
   "id": zod.number(),
   "nombre": zod.string(),
+  "fotoObjectPath": zod.string().nullish(),
   "rol": zod.enum(['cliente', 'profesional', 'admin']),
   "ubicacion": zod.union([zod.object({
+  "ciudad": zod.string().optional(),
   "zona": zod.string().optional()
 }),zod.null()]).optional()
 }),
   "reviewsCount": zod.number(),
   "completedJobs": zod.number(),
   "recommendationsCount": zod.number(),
-  "distanceKm": zod.number().nullish()
+  "distanceKm": zod.number().nullish().describe('Distancia aproximada en kilómetros; es null cuando la ubicación del profesional no tiene un heartbeat vigente (máximo 5 minutos).')
 })
 
 
@@ -190,15 +487,17 @@ export const CreateMyProfessionalProfileResponse = zod.object({
   "usuario": zod.object({
   "id": zod.number(),
   "nombre": zod.string(),
+  "fotoObjectPath": zod.string().nullish(),
   "rol": zod.enum(['cliente', 'profesional', 'admin']),
   "ubicacion": zod.union([zod.object({
+  "ciudad": zod.string().optional(),
   "zona": zod.string().optional()
 }),zod.null()]).optional()
 }),
   "reviewsCount": zod.number(),
   "completedJobs": zod.number(),
   "recommendationsCount": zod.number(),
-  "distanceKm": zod.number().nullish()
+  "distanceKm": zod.number().nullish().describe('Distancia aproximada en kilómetros; es null cuando la ubicación del profesional no tiene un heartbeat vigente (máximo 5 minutos).')
 })
 
 
@@ -225,15 +524,17 @@ export const GetMyProfessionalProfileResponse = zod.union([zod.object({
   "usuario": zod.object({
   "id": zod.number(),
   "nombre": zod.string(),
+  "fotoObjectPath": zod.string().nullish(),
   "rol": zod.enum(['cliente', 'profesional', 'admin']),
   "ubicacion": zod.union([zod.object({
+  "ciudad": zod.string().optional(),
   "zona": zod.string().optional()
 }),zod.null()]).optional()
 }),
   "reviewsCount": zod.number(),
   "completedJobs": zod.number(),
   "recommendationsCount": zod.number(),
-  "distanceKm": zod.number().nullish()
+  "distanceKm": zod.number().nullish().describe('Distancia aproximada en kilómetros; es null cuando la ubicación del profesional no tiene un heartbeat vigente (máximo 5 minutos).')
 }),zod.null()])
 
 
@@ -279,15 +580,17 @@ export const UpdateMyProfessionalProfileResponse = zod.object({
   "usuario": zod.object({
   "id": zod.number(),
   "nombre": zod.string(),
+  "fotoObjectPath": zod.string().nullish(),
   "rol": zod.enum(['cliente', 'profesional', 'admin']),
   "ubicacion": zod.union([zod.object({
+  "ciudad": zod.string().optional(),
   "zona": zod.string().optional()
 }),zod.null()]).optional()
 }),
   "reviewsCount": zod.number(),
   "completedJobs": zod.number(),
   "recommendationsCount": zod.number(),
-  "distanceKm": zod.number().nullish()
+  "distanceKm": zod.number().nullish().describe('Distancia aproximada en kilómetros; es null cuando la ubicación del profesional no tiene un heartbeat vigente (máximo 5 minutos).')
 })
 
 
@@ -308,6 +611,7 @@ export const CreateJobBody = zod.object({
   "ciudad": zod.string().optional(),
   "provincia": zod.string().optional(),
   "zona": zod.string().optional(),
+  "capturedAt": zod.coerce.date().nullish(),
   "coordinates": zod.array(zod.number()).optional()
 }),
   "categoria": zod.string().min(createJobBodyCategoriaMin),
@@ -325,6 +629,7 @@ export const CreateJobResponse = zod.object({
   "ciudad": zod.string().optional(),
   "provincia": zod.string().optional(),
   "zona": zod.string().optional(),
+  "capturedAt": zod.coerce.date().nullish(),
   "coordinates": zod.array(zod.number()).optional()
 }),
   "categoria": zod.string(),
@@ -338,12 +643,14 @@ export const CreateJobResponse = zod.object({
   "nombre": zod.string(),
   "email": zod.string(),
   "telefono": zod.string().nullish(),
+  "fotoObjectPath": zod.string().nullish(),
   "rol": zod.enum(['cliente', 'profesional', 'admin']),
   "ubicacion": zod.union([zod.object({
   "direccionTexto": zod.string().optional(),
   "ciudad": zod.string().optional(),
   "provincia": zod.string().optional(),
   "zona": zod.string().optional(),
+  "capturedAt": zod.coerce.date().nullish(),
   "coordinates": zod.array(zod.number()).optional()
 }),zod.null()]).optional()
 }),
@@ -352,12 +659,14 @@ export const CreateJobResponse = zod.object({
   "nombre": zod.string(),
   "email": zod.string(),
   "telefono": zod.string().nullish(),
+  "fotoObjectPath": zod.string().nullish(),
   "rol": zod.enum(['cliente', 'profesional', 'admin']),
   "ubicacion": zod.union([zod.object({
   "direccionTexto": zod.string().optional(),
   "ciudad": zod.string().optional(),
   "provincia": zod.string().optional(),
   "zona": zod.string().optional(),
+  "capturedAt": zod.coerce.date().nullish(),
   "coordinates": zod.array(zod.number()).optional()
 }),zod.null()]).optional()
 }),zod.null()]),
@@ -377,6 +686,7 @@ export const ListMyJobsResponseItem = zod.object({
   "ciudad": zod.string().optional(),
   "provincia": zod.string().optional(),
   "zona": zod.string().optional(),
+  "capturedAt": zod.coerce.date().nullish(),
   "coordinates": zod.array(zod.number()).optional()
 }),
   "categoria": zod.string(),
@@ -390,12 +700,14 @@ export const ListMyJobsResponseItem = zod.object({
   "nombre": zod.string(),
   "email": zod.string(),
   "telefono": zod.string().nullish(),
+  "fotoObjectPath": zod.string().nullish(),
   "rol": zod.enum(['cliente', 'profesional', 'admin']),
   "ubicacion": zod.union([zod.object({
   "direccionTexto": zod.string().optional(),
   "ciudad": zod.string().optional(),
   "provincia": zod.string().optional(),
   "zona": zod.string().optional(),
+  "capturedAt": zod.coerce.date().nullish(),
   "coordinates": zod.array(zod.number()).optional()
 }),zod.null()]).optional()
 }),
@@ -404,12 +716,14 @@ export const ListMyJobsResponseItem = zod.object({
   "nombre": zod.string(),
   "email": zod.string(),
   "telefono": zod.string().nullish(),
+  "fotoObjectPath": zod.string().nullish(),
   "rol": zod.enum(['cliente', 'profesional', 'admin']),
   "ubicacion": zod.union([zod.object({
   "direccionTexto": zod.string().optional(),
   "ciudad": zod.string().optional(),
   "provincia": zod.string().optional(),
   "zona": zod.string().optional(),
+  "capturedAt": zod.coerce.date().nullish(),
   "coordinates": zod.array(zod.number()).optional()
 }),zod.null()]).optional()
 }),zod.null()]),
@@ -430,6 +744,7 @@ export const ListAvailableJobsResponseItem = zod.object({
   "ciudad": zod.string().optional(),
   "provincia": zod.string().optional(),
   "zona": zod.string().optional(),
+  "capturedAt": zod.coerce.date().nullish(),
   "coordinates": zod.array(zod.number()).optional()
 }),
   "categoria": zod.string(),
@@ -443,12 +758,14 @@ export const ListAvailableJobsResponseItem = zod.object({
   "nombre": zod.string(),
   "email": zod.string(),
   "telefono": zod.string().nullish(),
+  "fotoObjectPath": zod.string().nullish(),
   "rol": zod.enum(['cliente', 'profesional', 'admin']),
   "ubicacion": zod.union([zod.object({
   "direccionTexto": zod.string().optional(),
   "ciudad": zod.string().optional(),
   "provincia": zod.string().optional(),
   "zona": zod.string().optional(),
+  "capturedAt": zod.coerce.date().nullish(),
   "coordinates": zod.array(zod.number()).optional()
 }),zod.null()]).optional()
 }),
@@ -457,12 +774,14 @@ export const ListAvailableJobsResponseItem = zod.object({
   "nombre": zod.string(),
   "email": zod.string(),
   "telefono": zod.string().nullish(),
+  "fotoObjectPath": zod.string().nullish(),
   "rol": zod.enum(['cliente', 'profesional', 'admin']),
   "ubicacion": zod.union([zod.object({
   "direccionTexto": zod.string().optional(),
   "ciudad": zod.string().optional(),
   "provincia": zod.string().optional(),
   "zona": zod.string().optional(),
+  "capturedAt": zod.coerce.date().nullish(),
   "coordinates": zod.array(zod.number()).optional()
 }),zod.null()]).optional()
 }),zod.null()]),
@@ -483,6 +802,7 @@ export const ListAssignedJobsResponseItem = zod.object({
   "ciudad": zod.string().optional(),
   "provincia": zod.string().optional(),
   "zona": zod.string().optional(),
+  "capturedAt": zod.coerce.date().nullish(),
   "coordinates": zod.array(zod.number()).optional()
 }),
   "categoria": zod.string(),
@@ -496,12 +816,14 @@ export const ListAssignedJobsResponseItem = zod.object({
   "nombre": zod.string(),
   "email": zod.string(),
   "telefono": zod.string().nullish(),
+  "fotoObjectPath": zod.string().nullish(),
   "rol": zod.enum(['cliente', 'profesional', 'admin']),
   "ubicacion": zod.union([zod.object({
   "direccionTexto": zod.string().optional(),
   "ciudad": zod.string().optional(),
   "provincia": zod.string().optional(),
   "zona": zod.string().optional(),
+  "capturedAt": zod.coerce.date().nullish(),
   "coordinates": zod.array(zod.number()).optional()
 }),zod.null()]).optional()
 }),
@@ -510,12 +832,14 @@ export const ListAssignedJobsResponseItem = zod.object({
   "nombre": zod.string(),
   "email": zod.string(),
   "telefono": zod.string().nullish(),
+  "fotoObjectPath": zod.string().nullish(),
   "rol": zod.enum(['cliente', 'profesional', 'admin']),
   "ubicacion": zod.union([zod.object({
   "direccionTexto": zod.string().optional(),
   "ciudad": zod.string().optional(),
   "provincia": zod.string().optional(),
   "zona": zod.string().optional(),
+  "capturedAt": zod.coerce.date().nullish(),
   "coordinates": zod.array(zod.number()).optional()
 }),zod.null()]).optional()
 }),zod.null()]),
@@ -540,6 +864,7 @@ export const GetJobResponse = zod.object({
   "ciudad": zod.string().optional(),
   "provincia": zod.string().optional(),
   "zona": zod.string().optional(),
+  "capturedAt": zod.coerce.date().nullish(),
   "coordinates": zod.array(zod.number()).optional()
 }),
   "categoria": zod.string(),
@@ -553,12 +878,14 @@ export const GetJobResponse = zod.object({
   "nombre": zod.string(),
   "email": zod.string(),
   "telefono": zod.string().nullish(),
+  "fotoObjectPath": zod.string().nullish(),
   "rol": zod.enum(['cliente', 'profesional', 'admin']),
   "ubicacion": zod.union([zod.object({
   "direccionTexto": zod.string().optional(),
   "ciudad": zod.string().optional(),
   "provincia": zod.string().optional(),
   "zona": zod.string().optional(),
+  "capturedAt": zod.coerce.date().nullish(),
   "coordinates": zod.array(zod.number()).optional()
 }),zod.null()]).optional()
 }),
@@ -567,12 +894,14 @@ export const GetJobResponse = zod.object({
   "nombre": zod.string(),
   "email": zod.string(),
   "telefono": zod.string().nullish(),
+  "fotoObjectPath": zod.string().nullish(),
   "rol": zod.enum(['cliente', 'profesional', 'admin']),
   "ubicacion": zod.union([zod.object({
   "direccionTexto": zod.string().optional(),
   "ciudad": zod.string().optional(),
   "provincia": zod.string().optional(),
   "zona": zod.string().optional(),
+  "capturedAt": zod.coerce.date().nullish(),
   "coordinates": zod.array(zod.number()).optional()
 }),zod.null()]).optional()
 }),zod.null()]),
@@ -600,6 +929,7 @@ export const UpdateJobResponse = zod.object({
   "ciudad": zod.string().optional(),
   "provincia": zod.string().optional(),
   "zona": zod.string().optional(),
+  "capturedAt": zod.coerce.date().nullish(),
   "coordinates": zod.array(zod.number()).optional()
 }),
   "categoria": zod.string(),
@@ -613,12 +943,14 @@ export const UpdateJobResponse = zod.object({
   "nombre": zod.string(),
   "email": zod.string(),
   "telefono": zod.string().nullish(),
+  "fotoObjectPath": zod.string().nullish(),
   "rol": zod.enum(['cliente', 'profesional', 'admin']),
   "ubicacion": zod.union([zod.object({
   "direccionTexto": zod.string().optional(),
   "ciudad": zod.string().optional(),
   "provincia": zod.string().optional(),
   "zona": zod.string().optional(),
+  "capturedAt": zod.coerce.date().nullish(),
   "coordinates": zod.array(zod.number()).optional()
 }),zod.null()]).optional()
 }),
@@ -627,12 +959,14 @@ export const UpdateJobResponse = zod.object({
   "nombre": zod.string(),
   "email": zod.string(),
   "telefono": zod.string().nullish(),
+  "fotoObjectPath": zod.string().nullish(),
   "rol": zod.enum(['cliente', 'profesional', 'admin']),
   "ubicacion": zod.union([zod.object({
   "direccionTexto": zod.string().optional(),
   "ciudad": zod.string().optional(),
   "provincia": zod.string().optional(),
   "zona": zod.string().optional(),
+  "capturedAt": zod.coerce.date().nullish(),
   "coordinates": zod.array(zod.number()).optional()
 }),zod.null()]).optional()
 }),zod.null()]),
@@ -656,6 +990,7 @@ export const AcceptJobResponse = zod.object({
   "ciudad": zod.string().optional(),
   "provincia": zod.string().optional(),
   "zona": zod.string().optional(),
+  "capturedAt": zod.coerce.date().nullish(),
   "coordinates": zod.array(zod.number()).optional()
 }),
   "categoria": zod.string(),
@@ -669,12 +1004,14 @@ export const AcceptJobResponse = zod.object({
   "nombre": zod.string(),
   "email": zod.string(),
   "telefono": zod.string().nullish(),
+  "fotoObjectPath": zod.string().nullish(),
   "rol": zod.enum(['cliente', 'profesional', 'admin']),
   "ubicacion": zod.union([zod.object({
   "direccionTexto": zod.string().optional(),
   "ciudad": zod.string().optional(),
   "provincia": zod.string().optional(),
   "zona": zod.string().optional(),
+  "capturedAt": zod.coerce.date().nullish(),
   "coordinates": zod.array(zod.number()).optional()
 }),zod.null()]).optional()
 }),
@@ -683,12 +1020,14 @@ export const AcceptJobResponse = zod.object({
   "nombre": zod.string(),
   "email": zod.string(),
   "telefono": zod.string().nullish(),
+  "fotoObjectPath": zod.string().nullish(),
   "rol": zod.enum(['cliente', 'profesional', 'admin']),
   "ubicacion": zod.union([zod.object({
   "direccionTexto": zod.string().optional(),
   "ciudad": zod.string().optional(),
   "provincia": zod.string().optional(),
   "zona": zod.string().optional(),
+  "capturedAt": zod.coerce.date().nullish(),
   "coordinates": zod.array(zod.number()).optional()
 }),zod.null()]).optional()
 }),zod.null()]),
@@ -699,6 +1038,10 @@ export const AcceptJobResponse = zod.object({
 /**
  * @summary List the current user's conversations
  */
+export const ListConversationsQueryParams = zod.object({
+  "rol": zod.enum(['cliente', 'profesional']).optional()
+})
+
 export const ListConversationsResponseItem = zod.object({
   "changaId": zod.number(),
   "estado": zod.enum(['publicada', 'aceptada', 'en_curso', 'finalizada', 'cancelada']),
@@ -711,12 +1054,14 @@ export const ListConversationsResponseItem = zod.object({
   "nombre": zod.string(),
   "email": zod.string(),
   "telefono": zod.string().nullish(),
+  "fotoObjectPath": zod.string().nullish(),
   "rol": zod.enum(['cliente', 'profesional', 'admin']),
   "ubicacion": zod.union([zod.object({
   "direccionTexto": zod.string().optional(),
   "ciudad": zod.string().optional(),
   "provincia": zod.string().optional(),
   "zona": zod.string().optional(),
+  "capturedAt": zod.coerce.date().nullish(),
   "coordinates": zod.array(zod.number()).optional()
 }),zod.null()]).optional()
 }),zod.null()]),
@@ -736,12 +1081,14 @@ export const ListConversationsResponseItem = zod.object({
   "nombre": zod.string(),
   "email": zod.string(),
   "telefono": zod.string().nullish(),
+  "fotoObjectPath": zod.string().nullish(),
   "rol": zod.enum(['cliente', 'profesional', 'admin']),
   "ubicacion": zod.union([zod.object({
   "direccionTexto": zod.string().optional(),
   "ciudad": zod.string().optional(),
   "provincia": zod.string().optional(),
   "zona": zod.string().optional(),
+  "capturedAt": zod.coerce.date().nullish(),
   "coordinates": zod.array(zod.number()).optional()
 }),zod.null()]).optional()
 })
@@ -773,12 +1120,14 @@ export const ListMessagesResponseItem = zod.object({
   "nombre": zod.string(),
   "email": zod.string(),
   "telefono": zod.string().nullish(),
+  "fotoObjectPath": zod.string().nullish(),
   "rol": zod.enum(['cliente', 'profesional', 'admin']),
   "ubicacion": zod.union([zod.object({
   "direccionTexto": zod.string().optional(),
   "ciudad": zod.string().optional(),
   "provincia": zod.string().optional(),
   "zona": zod.string().optional(),
+  "capturedAt": zod.coerce.date().nullish(),
   "coordinates": zod.array(zod.number()).optional()
 }),zod.null()]).optional()
 })
@@ -823,12 +1172,14 @@ export const CreateMessageResponse = zod.object({
   "nombre": zod.string(),
   "email": zod.string(),
   "telefono": zod.string().nullish(),
+  "fotoObjectPath": zod.string().nullish(),
   "rol": zod.enum(['cliente', 'profesional', 'admin']),
   "ubicacion": zod.union([zod.object({
   "direccionTexto": zod.string().optional(),
   "ciudad": zod.string().optional(),
   "provincia": zod.string().optional(),
   "zona": zod.string().optional(),
+  "capturedAt": zod.coerce.date().nullish(),
   "coordinates": zod.array(zod.number()).optional()
 }),zod.null()]).optional()
 })
