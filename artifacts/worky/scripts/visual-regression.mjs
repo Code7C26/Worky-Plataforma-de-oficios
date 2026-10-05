@@ -16,9 +16,9 @@ const authenticatedRoutes = [
 ];
 const scenarios = [
   { route: '/', name: 'login', auth: 'anonymous' },
-  { route: '/', name: 'register', auth: 'anonymous', prepare: async (page) => {
-    await page.getByTestId('button-toggle-auth').click();
+  { route: '/registro', name: 'register', auth: 'anonymous', prepare: async (page) => {
     await page.getByTestId('input-auth-name').waitFor({ state: 'visible' });
+    await page.getByText('¿Cómo querés usar Worky?').waitFor({ state: 'visible' });
   } },
   ...authenticatedRoutes.map(([route, name]) => ({ route, name, auth: 'authenticated' })),
   { route: '/home', name: 'home-loading', auth: 'authenticated', state: 'loading', waitFor: '[aria-label="Cargando"]' },
