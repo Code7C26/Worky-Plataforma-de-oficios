@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
+import { isRegistrationEntryPath } from "../src/lib/auth-entry.js";
 
 test("el wizard guarda y recupera los tres pasos para cliente y Partner", async () => {
   const source = await readFile(new URL("../src/App.tsx", import.meta.url), "utf8");
@@ -32,4 +33,12 @@ test("la carga conserva el error para reintentar y los documentos se actualizan 
   assert.match(api, /onConflictDoUpdate\(\{ target: \[professionalVerificationDocuments\.profesionalId, professionalVerificationDocuments\.tipo\]/);
   assert.match(storage, /No se pudo preparar la carga/);
   assert.match(storage, /createUploadUrl/);
+});
+
+test("la ruta pública de registro abre el alta y las demás rutas conservan el acceso", () => {
+  assert.equal(isRegistrationEntryPath("/registro"), true);
+  assert.equal(isRegistrationEntryPath("/registro/"), true);
+  assert.equal(isRegistrationEntryPath("/worky/registro"), true);
+  assert.equal(isRegistrationEntryPath("/"), false);
+  assert.equal(isRegistrationEntryPath("/home"), false);
 });
