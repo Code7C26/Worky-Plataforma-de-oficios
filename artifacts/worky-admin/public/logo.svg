@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 40" role="img" aria-label="Worky">
+  <rect x="1" y="3" width="34" height="34" rx="11" fill="#efad50"/>
+  <path d="m10 13 4 13h4l3-8 3 8h4l4-13h-4l-2 8-3-8h-4l-3 8-2-8z" fill="#153e36"/>
+  <text x="44" y="27" fill="#24483e" font-family="Manrope,Arial,sans-serif" font-size="23" font-weight="800" letter-spacing="-1.4">worky</text>
+</svg>
