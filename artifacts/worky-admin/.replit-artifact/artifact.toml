@@ -1,0 +1,28 @@
+kind = "web"
+previewPath = "/worky-admin/"
+title = "Worky — Administración"
+description = "Panel interno protegido para administrar hogares, profesionales, habilitaciones, solicitudes de trabajo y categorías. Usa la API y los datos compartidos de Worky."
+version = "1.0.0"
+id = "artifacts/worky-admin"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/worky-admin/" ]
+localPort = 18533
+
+[services.development]
+run = "pnpm --filter @workspace/worky-admin run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/worky-admin", "run", "build" ]
+serve = "static"
+publicDir = "artifacts/worky-admin/dist/public"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "18533"
+BASE_PATH = "/worky-admin/"
