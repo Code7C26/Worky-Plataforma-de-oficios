@@ -510,6 +510,52 @@ router.put("/auth/verification-documents/:tipo", requireAuth, async (req, res) =
   return res.json(saved);
 });
 
+router.patch("/admin/cuentas/rol", requireAuth, async (req, res): Promise<void> => {
+  if (!(await requireAdmin(req, res))) return;
+  const body = req.body && typeof req.body === "object" && !Array.isArray(req.body) ? req.body as Record<string, unknown> : {};
+  const emailInput = typeof body.email === "string" ? body.email : "";
+  const email = emailInput.trim().toLowerCase();
+  const motivoInput = typeof body.motivo === "string" ? body.motivo : "";
+  const motivo = motivoInput.trim();
+  const hasUnexpectedFields = Object.keys(body).some((key) => key !== "email" && key !== "motivo");
+  if (hasUnexpectedFields || emailInput.length > 320 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || motivoInput.length > 500 || motivo.length < 5) {
+    res.status(400).json({ error: "Indicá un correo válido y un motivo de al menos 5 caracteres." });
+    return;
+  }
+
+  const result = await db.transaction(async (tx) => {
+    const [actor] = await tx.select({ id: users.id }).from(users)
+      .where(and(eq(users.id, userId(req)), eq(users.rol, "admin"), eq(users.activo, true)))
+      .for("update").limit(1);
+    if (!actor) return { kind: "forbidden" as const };
+
+    const [target] = await tx.select({ id: users.id, rol: users.rol, activo: users.activo }).from(users)
+      .where(sql`lower(${users.email}) = ${email}`).for("update").limit(1);
+    if (!target) return { kind: "not_found" as const };
+    if (!target.activo) return { kind: "inactive" as const };
+    if (target.rol === "admin") return { kind: "unchanged" as const };
+
+    await tx.update(users).set({ rol: "admin", updatedAt: new Date() }).where(eq(users.id, target.id));
+    await tx.insert(workyAuditEvents).values({
+      usuarioId: userId(req), entidad: "account", entidadId: target.id, accion: "role_granted",
+      estadoAnterior: target.rol, estadoNuevo: "admin", metadata: { motivo },
+    });
+    return { kind: "updated" as const };
+  });
+  if (result.kind === "forbidden") {
+    res.status(403).json({ error: "Solo una persona administradora puede asignar este rol." });
+    return;
+  }
+  if (result.kind === "not_found") {
+    res.status(404).json({ error: "No existe una cuenta Worky con ese correo." });
+    return;
+  }
+  if (result.kind === "inactive") {
+    res.status(409).json({ error: "La cuenta está desactivada. Reactivala antes de asignar el rol admin." });
+    return;
+  }
+  res.json({ rol: "admin", changed: result.kind === "updated" });
+});
 router.get("/admin/verificaciones", requireAuth, async (req, res) => {
   if (!(await requireAdmin(req, res))) return;
   const requestedStatus = String(req.query.estado || "pending_verification");
