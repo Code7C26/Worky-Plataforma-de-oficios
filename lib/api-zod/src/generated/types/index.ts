@@ -44,6 +44,8 @@ export * from './messageInput';
 export * from './operationResult';
 export * from './participantUser';
 export * from './participantUserRol';
+export * from './partnerStatusResult';
+export * from './partnerStatusUpdate';
 export * from './passwordChange';
 export * from './passwordRecoveryRequest';
 export * from './passwordRecoveryReset';
