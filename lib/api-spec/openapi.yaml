@@ -598,8 +598,52 @@ paths:
               schema: { $ref: "#/components/schemas/Appointment" }
         "403": { description: Only the client can reject }
         "404": { description: Appointment not found }
+  /admin/cuentas/rol:
+    patch:
+      operationId: grantAdminRole
+      tags: [admin]
+      summary: Assign the administrator role to an existing active account
+      description: Requires an authenticated administrator. Does not create or activate accounts.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AdminRoleGrantInput" }
+      responses:
+        "200":
+          description: Role assigned, or unchanged if the account was already an administrator
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AdminRoleGrantResult" }
+        "400": { description: Invalid email, reason, or fields }
+        "401": { description: Authentication required }
+        "403": { description: Administrator role required }
+        "404": { description: Account not found }
+        "409": { description: Account is disabled }
+
 components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
   schemas:
+    AdminRoleGrantInput:
+      type: object
+      additionalProperties: false
+      required: [email, motivo]
+      properties:
+        email: { type: string, format: email, maxLength: 320 }
+        motivo: { type: string, minLength: 5, maxLength: 500 }
+    AdminRoleGrantResult:
+      type: object
+      additionalProperties: false
+      required: [rol, changed]
+      properties:
+        rol: { type: string, enum: [admin] }
+        changed: { type: boolean }
     HealthStatus:
       type: object
       properties:
