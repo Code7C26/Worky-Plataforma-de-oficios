@@ -1,8 +1,10 @@
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import { Image as ExpoImage } from 'expo-image';
 import {
+  AccessibilityInfo,
   ActivityIndicator,
   Image,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -17,10 +19,16 @@ import {
   type ViewStyle,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
+import Animated, { useAnimatedStyle, useReducedMotion, useSharedValue, withSpring, withTiming } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors } from '@/hooks/useColors';
 
+const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
+type PressableStyleCallback = Extract<PressableProps['style'], (...args: any[]) => any>;
+type PressableState = Parameters<PressableStyleCallback>[0];
+
 type TextVariant = 'body' | 'label' | 'caption' | 'title' | 'heading';
+type AppTextProps = TextProps & { variant?: TextVariant; onDark?: boolean };
 
 const typeStyles = StyleSheet.create({
   body: { fontFamily: 'DMSans_400Regular', fontSize: 15, lineHeight: 22 },
@@ -35,13 +43,60 @@ export function AppText({
   style,
   onDark = false,
   ...props
-}: TextProps & { variant?: TextVariant; onDark?: boolean }) {
+}: AppTextProps) {
   const colors = useColors();
   return (
     <Text
       {...props}
       style={[typeStyles[variant], { color: onDark ? colors.secondaryForeground : colors.foreground }, style]}
     />
+  );
+}
+
+export function LiveStatusText({
+  role = 'status',
+  ...props
+}: AppTextProps) {
+  const isAlert = role === 'alert';
+  const liveRegionProps = Platform.OS === 'web'
+    ? { 'aria-live': isAlert ? 'assertive' as const : 'polite' as const }
+    : { accessibilityLiveRegion: isAlert ? 'assertive' as const : 'polite' as const };
+
+  return <AppText {...props} role={role} {...liveRegionProps} />;
+}
+
+export function ErrorNotice({
+  message,
+  testID,
+}: {
+  message: string;
+  testID?: string;
+}) {
+  const colors = useColors();
+  const announcedMessage = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (Platform.OS === 'ios' && message && announcedMessage.current !== message) {
+      announcedMessage.current = message;
+      AccessibilityInfo.announceForAccessibility(message);
+    }
+  }, [message]);
+
+  if (!message) return null;
+
+  return (
+    <AppText
+      variant="caption"
+      {...(Platform.OS === 'web'
+        ? { role: 'alert' as const }
+        : Platform.OS === 'android'
+          ? { accessibilityLiveRegion: 'polite' as const }
+          : {})}
+      testID={testID}
+      style={{ color: colors.destructive }}
+    >
+      {message}
+    </AppText>
   );
 }
 
@@ -108,6 +163,7 @@ type ButtonProps = PressableProps & {
   tone?: 'primary' | 'secondary' | 'quiet' | 'danger';
   icon?: React.ComponentProps<typeof Feather>['name'];
   loading?: boolean;
+  feedback?: boolean;
 };
 
 export function Button({
@@ -115,6 +171,7 @@ export function Button({
   tone = 'primary',
   icon,
   loading = false,
+  feedback = false,
   disabled,
   style,
   ...props
@@ -128,26 +185,124 @@ export function Button({
   }[tone];
   const unavailable = Boolean(disabled || loading);
 
-  return (
-    <Pressable
-      {...props}
-      accessibilityRole="button"
-      disabled={unavailable}
-      style={({ pressed }) => [
-        StyleSheet.flatten([
-          styles.button,
-          { backgroundColor: palette[0], opacity: unavailable ? 0.52 : pressed ? 0.78 : 1 },
-          typeof style === 'function' ? style({ pressed } as Parameters<NonNullable<typeof style>>[0]) : style,
-        ]) as ViewStyle,
-      ]}
-    >
+  const buttonStyle: PressableProps['style'] = ({ pressed }) => StyleSheet.flatten([
+    styles.button,
+    { backgroundColor: palette[0], opacity: unavailable ? 0.52 : pressed ? 0.78 : 1 },
+    typeof style === 'function' ? style({ pressed } as Parameters<NonNullable<typeof style>>[0]) : style,
+  ]) as ViewStyle;
+  const content = (
+    <>
       {loading ? (
         <ActivityIndicator size="small" color={palette[1]} />
       ) : icon ? (
         <Feather name={icon} size={17} color={palette[1]} />
       ) : null}
       <AppText variant="label" style={{ color: palette[1] }}>{label}</AppText>
-    </Pressable>
+    </>
+  );
+  const pressableProps = {
+    ...props,
+    accessibilityRole: 'button' as const,
+    disabled: unavailable,
+    style: buttonStyle,
+  };
+
+  return feedback ? (
+    <FeedbackPressable {...pressableProps}>{content}</FeedbackPressable>
+  ) : (
+    <Pressable {...pressableProps}>{content}</Pressable>
+  );
+}
+
+export function FeedbackPressable({ style, onPressIn, onPressOut, children, ...props }: PressableProps) {
+  const reduceMotion = useReducedMotion();
+  const scale = useSharedValue(1);
+  const scaleStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: reduceMotion ? 1 : scale.value }],
+  }), [reduceMotion]);
+
+  return (
+    <AnimatedPressable
+      {...props}
+      onPressIn={(event) => {
+        if (!reduceMotion) scale.value = withSpring(0.965, { damping: 17, stiffness: 280 });
+        onPressIn?.(event);
+      }}
+      onPressOut={(event) => {
+        if (!reduceMotion) scale.value = withSpring(1, { damping: 17, stiffness: 280 });
+        onPressOut?.(event);
+      }}
+      style={(state: PressableState) => [
+        typeof style === 'function' ? style(state) : style,
+        scaleStyle,
+      ]}
+    >
+      {children}
+    </AnimatedPressable>
+  );
+}
+
+export function SuccessNotice({
+  message,
+  onDismiss,
+  testID,
+}: {
+  message: string;
+  onDismiss: () => void;
+  testID?: string;
+}) {
+  const colors = useColors();
+  const reduceMotion = useReducedMotion();
+  const progress = useSharedValue(0);
+  const dismissRef = useRef(onDismiss);
+
+  useEffect(() => {
+    dismissRef.current = onDismiss;
+  }, [onDismiss]);
+
+  useEffect(() => {
+    if (!message) return;
+
+    progress.value = reduceMotion ? 1 : withSpring(1, { damping: 17, stiffness: 240 });
+    let dismissTimer: ReturnType<typeof setTimeout> | undefined;
+    const hideTimer = setTimeout(() => {
+      progress.value = reduceMotion ? 0 : withTiming(0, { duration: 160 });
+      dismissTimer = setTimeout(() => dismissRef.current(), reduceMotion ? 0 : 180);
+    }, 1400);
+
+    return () => {
+      clearTimeout(hideTimer);
+      if (dismissTimer) clearTimeout(dismissTimer);
+      progress.value = 0;
+    };
+  }, [message, progress, reduceMotion]);
+
+  const noticeStyle = useAnimatedStyle(() => ({
+    opacity: reduceMotion ? (message ? 1 : 0) : progress.value,
+    transform: [
+      { translateY: reduceMotion ? 0 : (1 - progress.value) * 5 },
+      { scale: reduceMotion ? 1 : 0.98 + progress.value * 0.02 },
+    ],
+  }), [message, reduceMotion]);
+
+  if (!message) return null;
+
+  return (
+    <Animated.View
+      testID={testID}
+      role="status"
+      {...(Platform.OS === 'web'
+        ? { 'aria-live': 'polite' as const }
+        : { accessibilityLiveRegion: 'polite' as const })}
+      style={[
+        styles.successNotice,
+        { backgroundColor: colors.muted, borderColor: colors.border },
+        noticeStyle,
+      ]}
+    >
+      <Feather name="check-circle" size={16} color={colors.secondary} />
+      <AppText variant="caption" style={{ color: colors.foreground, flex: 1 }}>{message}</AppText>
+    </Animated.View>
   );
 }
 
@@ -223,7 +378,7 @@ export function StateMessage({
   icon: React.ComponentProps<typeof Feather>['name'];
   title: string;
   message: string;
-  action?: { label: string; onPress: () => void; loading?: boolean };
+  action?: { label: string; onPress: () => void; loading?: boolean; feedback?: boolean };
 }) {
   const colors = useColors();
   return (
@@ -234,7 +389,7 @@ export function StateMessage({
       <AppText variant="heading" style={{ textAlign: 'center' }}>{title}</AppText>
       <AppText style={{ color: colors.mutedForeground, textAlign: 'center' }}>{message}</AppText>
       {action ? (
-        <Button label={action.label} onPress={action.onPress} loading={action.loading} style={{ marginTop: 8 }} />
+        <Button label={action.label} onPress={action.onPress} loading={action.loading} feedback={action.feedback} style={{ marginTop: 8 }} />
       ) : null}
     </View>
   );
@@ -342,6 +497,16 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     flexDirection: 'row',
     gap: 8,
+  },
+  successNotice: {
+    minHeight: 34,
+    borderWidth: 1,
+    borderRadius: 12,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 7,
   },
   fieldWrap: { gap: 7 },
   fieldLabel: { marginLeft: 2 },

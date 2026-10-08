@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import http from "node:http";
+import bcrypt from "bcryptjs";
 import app from "../src/app";
 import { PROFESSIONAL_LOCATION_MAX_AGE_MS } from "../src/routes/worky";
 import { eq } from "drizzle-orm";
@@ -25,12 +26,21 @@ async function request(server: http.Server, path: string, options: { method?: st
 }
 
 async function register(server: http.Server, name: string, rol: "cliente" | "profesional") {
-  const response = await request(server, `${baseUrl}/auth/register`, {
+  const email = `${unique}-${name}@example.test`;
+  const [user] = await db.insert(users).values({
+    nombre: name,
+    email,
+    emailVerifiedAt: new Date(),
+    passwordHash: await bcrypt.hash(password, 12),
+    rol,
+    ...(rol === "profesional" ? { onboardingEstado: "professional_verification_pending" as const } : {}),
+  }).returning({ id: users.id });
+  const response = await request(server, `${baseUrl}/auth/login`, {
     method: "POST",
-    body: { nombre: name, email: `${unique}-${name}@example.test`, password, rol },
+    body: { email, password },
   });
-  assert.equal(response.status, 201);
-  return response.body as { token: string; usuario: { id: number } };
+  assert.equal(response.status, 200);
+  return { ...(response.body as { token: string }), usuario: { id: user.id } };
 }
 
 async function run() {
@@ -50,6 +60,11 @@ async function run() {
       body: { oficio: "Plomero de ubicación", categoria: "Plomería", precioReferencia: 15000 },
     });
     assert.equal(profile.status, 201);
+    await db.update(professionalProfiles).set({
+      verificado: true,
+      estadoVerificacion: "verified",
+      habilitado: true,
+    }).where(eq(professionalProfiles.usuarioId, professional.usuario.id));
 
     const firstUpdate = await request(server, `${baseUrl}/auth/location`, {
       method: "PATCH",

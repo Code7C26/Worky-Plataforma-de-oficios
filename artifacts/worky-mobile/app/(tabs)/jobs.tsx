@@ -9,7 +9,7 @@ import {
   useListMyJobs,
   type Job,
 } from '@workspace/api-client-react';
-import { AppText, Button, Screen, StateMessage, Surface, formatCurrency, formatShortDate } from '@/components/WorkyUI';
+import { AppText, Button, Screen, StateMessage, SuccessNotice, Surface, formatCurrency, formatShortDate } from '@/components/WorkyUI';
 import { useAuth } from '@/context/AuthContext';
 import { useColors } from '@/hooks/useColors';
 
@@ -68,6 +68,7 @@ export default function JobsScreen() {
   const { account } = useAuth();
   const isProfessional = account?.rol === 'profesional';
   const [view, setView] = useState<'mine' | 'available'>('mine');
+  const [actionFeedback, setActionFeedback] = useState('');
   const mine = useListMyJobs({ query: { queryKey: ['/api/v1/trabajos/mias'], enabled: Boolean(account) && !isProfessional, staleTime: 15_000 } });
   const assigned = useListAssignedJobs({ query: { queryKey: ['/api/v1/trabajos/asignadas'], enabled: Boolean(account) && isProfessional, staleTime: 15_000 } });
   const available = useListAvailableJobs({ query: { queryKey: ['/api/v1/trabajos/disponibles'], enabled: Boolean(account) && isProfessional && view === 'available', staleTime: 15_000 } });
@@ -79,6 +80,7 @@ export default function JobsScreen() {
     try {
       await acceptJob.mutateAsync({ id: jobId });
       await Promise.all([mine.refetch(), assigned.refetch(), available.refetch()]);
+      setActionFeedback('Trabajo aceptado.');
     } catch {
       Alert.alert('No se pudo aceptar', 'El trabajo pudo haber sido tomado por otra persona. Actualizá la lista e intentá de nuevo.');
     }
@@ -88,11 +90,16 @@ export default function JobsScreen() {
     <Screen>
       <View style={{ gap: 7 }}>
         <AppText variant="caption" style={{ color: colors.primary, letterSpacing: 1.3, textTransform: 'uppercase' }}>Tu actividad</AppText>
-        <AppText variant="title">Trabajos</AppText>
+        <AppText variant="title">{isProfessional ? 'Mis trabajos' : 'Trabajos'}</AppText>
         <AppText style={{ color: colors.mutedForeground }}>
           {isProfessional ? 'Seguí tus trabajos y encontrá nuevas oportunidades.' : 'Consultá el estado de los trabajos que publicaste.'}
         </AppText>
       </View>
+      <SuccessNotice
+        message={actionFeedback}
+        onDismiss={() => setActionFeedback('')}
+        testID="notice-job-accepted"
+      />
       {isProfessional ? (
         <View style={{ flexDirection: 'row', gap: 8 }}>
           {([
@@ -114,7 +121,7 @@ export default function JobsScreen() {
           })}
         </View>
       ) : (
-        <Button label="Publicar un trabajo" icon="plus" onPress={() => router.push('/job/new')} testID="button-new-job" />
+          <Button label="Publicar un trabajo" icon="plus" feedback onPress={() => router.push('/job/new')} testID="button-new-job" />
       )}
       {activeQuery.isLoading ? (
         <StateMessage icon="briefcase" title="Cargando trabajos" message="Enseguida vas a ver las novedades." />
@@ -125,7 +132,7 @@ export default function JobsScreen() {
           icon={isProfessional && view === 'available' ? 'search' : 'briefcase'}
           title={isProfessional && view === 'available' ? 'No hay trabajos disponibles' : 'Todavía no hay trabajos'}
           message={isProfessional && view === 'available' ? 'Cuando aparezcan trabajos para tu perfil, los vas a encontrar acá.' : isProfessional ? 'Los trabajos que aceptes van a aparecer en esta lista.' : 'Publicá tu primer trabajo y empezá a recibir respuestas.'}
-          action={!isProfessional ? { label: 'Publicar un trabajo', onPress: () => router.push('/job/new') } : undefined}
+          action={!isProfessional ? { label: 'Publicar un trabajo', onPress: () => router.push('/job/new'), feedback: true } : undefined}
         />
       ) : (
         <View style={{ gap: 12 }}>

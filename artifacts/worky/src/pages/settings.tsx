@@ -1,7 +1,7 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useGetMyAccount, useUpdateMyAccount, useChangeMyPassword, getGetMyAccountQueryKey } from '@workspace/api-client-react';
 import { queryClient, useAuth } from '@/App';
-import { uploadWorkyFile, apiRequest } from '@/lib/api';
+import { uploadWorkyFile, apiRequest, confirmAccountEmailVerification, requestAccountEmailVerification } from '@/lib/api';
 import { ShieldCheck, MapPin, LoaderCircle, Check, ImageIcon, Info, ChevronRight, UserRound } from 'lucide-react';
 import { Link } from 'wouter';
 
@@ -17,7 +17,8 @@ function Button({ children, onClick, type = 'button', variant = 'primary', class
 }
 
 function requestErrorMessage(error: any, fallback: string) {
-  return typeof error?.data?.error === 'string' ? error.data.error : fallback;
+  if (typeof error?.data?.error === 'string') return error.data.error;
+  return typeof error?.message === 'string' && error.message ? error.message : fallback;
 }
 
 export default function SettingsPage() {
@@ -47,7 +48,7 @@ export default function SettingsPage() {
 
       <AccountProfileForm account={account} />
       <AccountLocationForm account={account} />
-      <AccountPasswordForm />
+      <AccountPasswordForm account={account} />
       
       {auth.user?.rol === 'profesional' && (
         <div className="rounded-2xl border border-[hsl(var(--border))] bg-[hsl(var(--card))] p-6 sm:p-8">
@@ -381,11 +382,65 @@ function AccountLocationForm({ account }: { account: any }) {
   );
 }
 
-function AccountPasswordForm() {
+function AccountPasswordForm({ account }: { account: any }) {
   const changePassword = useChangeMyPassword();
+  const auth = useAuth();
   const [formData, setFormData] = useState({ currentPassword: '', newPassword: '', confirmPassword: '' });
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
+  const [emailCodeSent, setEmailCodeSent] = useState(false);
+  const [emailCode, setEmailCode] = useState('');
+  const [emailMessage, setEmailMessage] = useState('');
+  const [emailError, setEmailError] = useState('');
+  const [emailBusy, setEmailBusy] = useState(false);
+  const [verifiedLocally, setVerifiedLocally] = useState(false);
+  const emailIsVerified = verifiedLocally || Boolean(account.emailVerifiedAt);
+
+  useEffect(() => {
+    setEmailCodeSent(false);
+    setEmailCode('');
+    setEmailMessage('');
+    setEmailError('');
+    setVerifiedLocally(false);
+  }, [account.email]);
+
+  const sendEmailCode = async () => {
+    setEmailBusy(true);
+    setEmailError('');
+    setEmailMessage('');
+    try {
+      const result = await requestAccountEmailVerification();
+      setEmailCodeSent(true);
+      setEmailMessage(result.message);
+    } catch (cause) {
+      setEmailError(requestErrorMessage(cause, 'No pudimos enviar el código.'));
+    } finally {
+      setEmailBusy(false);
+    }
+  };
+
+  const confirmEmailCode = async (event: React.FormEvent) => {
+    event.preventDefault();
+    setEmailError('');
+    if (!/^\d{6}$/.test(emailCode)) {
+      setEmailError('Ingresá el código de 6 dígitos.');
+      return;
+    }
+    setEmailBusy(true);
+    try {
+      await confirmAccountEmailVerification(emailCode);
+      setVerifiedLocally(true);
+      setEmailCodeSent(false);
+      setEmailCode('');
+      setEmailMessage('Tu email quedó verificado.');
+      void auth.refreshUser();
+      void queryClient.invalidateQueries({ queryKey: getGetMyAccountQueryKey() });
+    } catch (cause) {
+      setEmailError(requestErrorMessage(cause, 'No pudimos verificar el código.'));
+    } finally {
+      setEmailBusy(false);
+    }
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -430,6 +485,52 @@ function AccountPasswordForm() {
       </div>
       
       <div className="p-6 sm:p-8">
+        <div className="mb-7 rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--muted)/.25)] p-4" data-testid="email-verification-settings">
+          <div className="flex items-start gap-3">
+            <ShieldCheck size={19} className={`mt-0.5 shrink-0 ${emailIsVerified ? 'text-[#31825a]' : 'text-[hsl(var(--primary))]'}`} />
+            <div className="min-w-0 flex-1">
+              <h3 className="text-sm font-bold">Verificación de email</h3>
+              <p className="mt-1 break-all text-xs text-[hsl(var(--muted-foreground))]">{account.email}</p>
+              <p className="mt-2 text-sm font-semibold" role="status" aria-live="polite">
+                {emailIsVerified ? 'Email verificado' : 'Tu email todavía no está verificado.'}
+              </p>
+              {emailMessage && <p className="mt-1 text-xs text-[hsl(var(--muted-foreground))]" role="status">{emailMessage}</p>}
+              {emailError && <p className="mt-2 text-xs font-semibold text-[hsl(var(--destructive))]" role="alert" data-testid="settings-email-verification-error">{emailError}</p>}
+              {!emailIsVerified && !emailCodeSent && (
+                <Button onClick={() => void sendEmailCode()} disabled={emailBusy} className="mt-3" testId="button-send-email-verification">
+                  {emailBusy ? 'Enviando código…' : 'Enviar código de verificación'}
+                </Button>
+              )}
+              {!emailIsVerified && emailCodeSent && (
+                <form onSubmit={confirmEmailCode} className="mt-4 max-w-sm space-y-3">
+                  <label className="block space-y-1.5">
+                    <span className="text-[13px] font-bold">Código de 6 dígitos</span>
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      autoComplete="one-time-code"
+                      pattern="[0-9]{6}"
+                      maxLength={6}
+                      required
+                      className="field"
+                      value={emailCode}
+                      onChange={(event) => { setEmailCode(event.target.value.replace(/\D/g, '').slice(0, 6)); setEmailError(''); }}
+                      data-testid="input-settings-email-code"
+                    />
+                  </label>
+                  <div className="flex flex-wrap gap-2">
+                    <Button type="submit" disabled={emailBusy} testId="button-confirm-settings-email">
+                      {emailBusy ? 'Verificando…' : 'Verificar email'}
+                    </Button>
+                    <Button type="button" variant="ghost" onClick={() => void sendEmailCode()} disabled={emailBusy} testId="button-resend-settings-email-code">
+                      Reenviar código
+                    </Button>
+                  </div>
+                </form>
+              )}
+            </div>
+          </div>
+        </div>
         <form onSubmit={handleSubmit} className="space-y-5" noValidate>
           <label className="block space-y-1.5 max-w-sm">
             <span className="text-[13px] font-bold">Contraseña actual</span>

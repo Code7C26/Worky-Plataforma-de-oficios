@@ -3,11 +3,12 @@ import bcrypt from "bcryptjs";
 import rateLimit from "express-rate-limit";
 import { and, asc, desc, eq, gt, ilike, inArray, isNull, ne, or, sql, type SQL } from "drizzle-orm";
 import { chatUploads, db, jobs, messages, passwordRecoveryTokens, professionalProfiles, profilePhotoUploads, users, serviceCatalog, professionalAvailability, professionalAssets, bookings, payments, settlements, workyNotifications, workyAuditEvents, reviews, recommendations, professionalServices, professionalVerificationDocuments } from "@workspace/db";
-import { ChangeMyPasswordBody, RequestPasswordRecoveryBody, ResetPasswordRecoveryBody, SwitchAccountRoleBody, SwitchAccountRoleResponse, UpdateMyAccountBody, UpdateProfessionalLocationBody, UpdateProfessionalLocationResponse } from "@workspace/api-zod";
+import { ChangeMyPasswordBody, ConfirmAccountEmailVerificationBody, RequestPasswordRecoveryBody, ResetPasswordRecoveryBody, SwitchAccountRoleBody, SwitchAccountRoleResponse, UpdateMyAccountBody, UpdateProfessionalLocationBody, UpdateProfessionalLocationResponse } from "@workspace/api-zod";
 import { requireAuth, signToken, verifyToken } from "../middlewares/auth";
 import { deleteObject, isProfilePhotoSourcePath, isValidImageObject, processProfilePhoto } from "../lib/storage";
 import { cleanupRejectedChatAttachment } from "./storage";
 import { createPasswordRecovery, isPasswordRecoveryTokenValid, passwordRecoveryTokenHash } from "../lib/password-recovery";
+import { confirmEmailVerificationCode, createEmailVerificationChallenge, emailVerificationFailureDetails } from "../lib/email-verification";
 
 const router: IRouter = Router();
 type NotificationSubscriber = { res: Response; heartbeat: ReturnType<typeof setInterval> };
@@ -23,10 +24,12 @@ function removeNotificationSubscriber(usuarioId: number, subscribers: Set<Notifi
 }
 const authLimit = rateLimit({ windowMs: 15 * 60 * 1000, limit: 30, standardHeaders: true, legacyHeaders: false });
 const passwordRecoveryLimiter = rateLimit({ windowMs: 15 * 60 * 1000, limit: 5, standardHeaders: true, legacyHeaders: false });
+const emailVerificationLimiter = rateLimit({ windowMs: 15 * 60 * 1000, limit: 5, standardHeaders: true, legacyHeaders: false });
 const categories = ["Plomería", "Electricidad", "Gas", "Albañilería", "Otro"] as const;
 const statuses = ["publicada", "aceptada", "en_curso", "finalizada", "cancelada"] as const;
 export const LIVE_LOCATION_MAX_AGE_MS = 5 * 60 * 1000;
 export const PROFESSIONAL_LOCATION_MAX_AGE_MS = LIVE_LOCATION_MAX_AGE_MS;
+const MAX_CHAT_ATTACHMENTS = 5;
 const userId = (req: Request) => req.usuarioId as number;
 const reauthenticationLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
@@ -48,6 +51,10 @@ const missing = (values: Record<string, unknown>) => Object.keys(values).filter(
 const safeUser = (user: typeof users.$inferSelect) => ({
   id: user.id, nombre: user.nombre, email: user.email, telefono: user.telefono, rol: user.rol, ubicacion: user.ubicacion,
   edad: user.edad, fotoObjectPath: user.fotoObjectPath, onboardingEstado: user.onboardingEstado, onboardingPaso: user.onboardingPaso,
+});
+const safeAuthenticatedUser = (user: typeof users.$inferSelect) => ({
+  ...safeUser(user),
+  emailVerifiedAt: user.emailVerifiedAt,
 });
 const publicUser = (user: typeof users.$inferSelect) => {
   const location = user.ubicacion as { ciudad?: unknown; zona?: unknown; direccionTexto?: unknown; coordinates?: unknown } | null;
@@ -153,29 +160,117 @@ function requestedConversationRole(req: Request): "cliente" | "profesional" | nu
   return value as "cliente" | "profesional";
 }
 
+router.post("/auth/email-verification/account/request", emailVerificationLimiter, requireAuth, async (req, res): Promise<void> => {
+  const [user] = await db.select({
+    id: users.id,
+    nombre: users.nombre,
+    email: users.email,
+    emailVerifiedAt: users.emailVerifiedAt,
+  }).from(users).where(and(eq(users.id, userId(req)), eq(users.activo, true))).limit(1);
+  if (!user) {
+    res.status(401).json({ error: "Tu sesión ya no es válida." });
+    return;
+  }
+  if (user.emailVerifiedAt) {
+    res.status(409).json({ error: "Tu email ya está verificado." });
+    return;
+  }
+
+  try {
+    const result = await createEmailVerificationChallenge({
+      email: user.email,
+      name: user.nombre,
+      purpose: "account",
+      usuarioId: user.id,
+    });
+    if (result.throttled) {
+      res.status(429).json({ error: "Esperá un minuto antes de pedir otro código." });
+      return;
+    }
+  } catch (error) {
+    req.log.error({ purpose: "account", ...emailVerificationFailureDetails(error) }, "No se pudo enviar el código de verificación");
+    res.status(503).json({ error: "No pudimos enviar el código. Intentá nuevamente en unos minutos." });
+    return;
+  }
+
+  res.status(202).json({ message: "Te enviamos un código de verificación a tu email." });
+});
+
+router.post("/auth/email-verification/account/confirm", emailVerificationLimiter, requireAuth, async (req, res): Promise<void> => {
+  const parsed = ConfirmAccountEmailVerificationBody.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: "Ingresá el código de 6 dígitos." });
+    return;
+  }
+  const [user] = await db.select({
+    id: users.id,
+    email: users.email,
+    emailVerifiedAt: users.emailVerifiedAt,
+  }).from(users).where(and(eq(users.id, userId(req)), eq(users.activo, true))).limit(1);
+  if (!user) {
+    res.status(401).json({ error: "Tu sesión ya no es válida." });
+    return;
+  }
+  if (user.emailVerifiedAt) {
+    res.status(409).json({ error: "Tu email ya está verificado." });
+    return;
+  }
+
+  const confirmed = await confirmEmailVerificationCode({
+    email: user.email,
+    purpose: "account",
+    code: parsed.data.code,
+    usuarioId: user.id,
+    consume: true,
+  });
+  if (!confirmed) {
+    res.status(400).json({ error: "El código no es válido o venció. Revisalo o pedí uno nuevo." });
+    return;
+  }
+
+  const verifiedAt = new Date();
+  await db.update(users)
+    .set({ emailVerifiedAt: verifiedAt, updatedAt: verifiedAt })
+    .where(and(eq(users.id, user.id), eq(users.email, user.email), isNull(users.emailVerifiedAt)));
+  res.json({ verified: true });
+});
+
 router.post("/auth/register", authLimit, async (req, res) => {
   const { nombre, email, password, telefono, ubicacion, edad, fotoObjectPath, rol, onboardingRespuestas } = req.body ?? {};
   const fields = missing({ nombre, email, password });
-  if (fields.length || typeof password !== "string" || password.length < 6) return res.status(400).json({ error: "Nombre, email y contraseña de al menos 6 caracteres son obligatorios.", campos_faltantes: fields });
+  if (fields.length || typeof password !== "string" || password.length < 6 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(email ?? "").trim())) {
+    return res.status(400).json({ error: "Ingresá un nombre, un email válido y una contraseña de al menos 6 caracteres.", campos_faltantes: fields });
+  }
   const normalized = String(email).trim().toLowerCase();
-  const existing = await db.select().from(users).where(eq(users.email, normalized)).limit(1);
+  const existing = await db.select({ id: users.id }).from(users).where(eq(users.email, normalized)).limit(1);
   if (existing[0]) return res.status(409).json({ error: "Ya existe una cuenta con ese email." });
   const requestedRole = rol === "profesional" ? "profesional" : "cliente";
-  const [created] = await db.insert(users).values({
-    nombre: String(nombre).trim(), email: normalized, passwordHash: await bcrypt.hash(password, 12),
-    telefono: telefono ? String(telefono).trim() : null, ubicacion: ubicacion ?? null,
-    edad: Number.isFinite(Number(edad)) ? Number(edad) : null, fotoObjectPath: fotoObjectPath || null,
-    rol: requestedRole, onboardingEstado: requestedRole === "profesional" ? "professional_verification_pending" : "registration_started",
-    onboardingRespuestas: onboardingRespuestas && typeof onboardingRespuestas === "object" ? onboardingRespuestas : {},
-  }).returning();
-  return res.status(201).json({ token: signToken(created.id), usuario: safeUser(created) });
+  let created: typeof users.$inferSelect | undefined;
+  try {
+    const [account] = await db.insert(users).values({
+      nombre: String(nombre).trim(), email: normalized, emailVerifiedAt: null, passwordHash: await bcrypt.hash(password, 12),
+      telefono: telefono ? String(telefono).trim() : null, ubicacion: ubicacion ?? null,
+      edad: Number.isFinite(Number(edad)) ? Number(edad) : null, fotoObjectPath: fotoObjectPath || null,
+      rol: requestedRole, onboardingEstado: requestedRole === "profesional" ? "professional_verification_pending" : "registration_started",
+      onboardingRespuestas: onboardingRespuestas && typeof onboardingRespuestas === "object" ? onboardingRespuestas : {},
+    }).returning();
+    created = account;
+  } catch (error) {
+    const code = (error as { code?: string; cause?: { code?: string } }).code
+      ?? (error as { cause?: { code?: string } }).cause?.code;
+    if (code === "23505") return res.status(409).json({ error: "Ya existe una cuenta con ese email." });
+    throw error;
+  }
+
+  if (!created) return res.status(500).json({ error: "No pudimos crear tu cuenta." });
+  return res.status(201).json({ token: signToken(created.id), usuario: safeAuthenticatedUser(created) });
 });
 
 router.post("/auth/login", authLimit, async (req, res) => {
   const { email, password } = req.body ?? {};
   const [found] = await db.select().from(users).where(and(eq(users.email, String(email ?? "").trim().toLowerCase()), eq(users.activo, true))).limit(1);
   if (!found || typeof password !== "string" || !(await bcrypt.compare(password, found.passwordHash))) return res.status(401).json({ error: "Email o contraseña incorrectos." });
-  return res.json({ token: signToken(found.id), usuario: safeUser(found) });
+  return res.json({ token: signToken(found.id), usuario: safeAuthenticatedUser(found) });
 });
 
 router.post("/auth/password-recovery/request", passwordRecoveryLimiter, async (req, res) => {
@@ -238,7 +333,7 @@ router.post("/auth/password-recovery/reset", passwordRecoveryLimiter, async (req
 
 router.get("/auth/me", requireAuth, async (req, res) => {
   const [user] = await db.select().from(users).where(and(eq(users.id, userId(req)), eq(users.activo, true))).limit(1);
-  return user ? res.json(safeUser(user)) : res.status(401).json({ error: "Tu sesión ya no es válida." });
+  return user ? res.json(safeAuthenticatedUser(user)) : res.status(401).json({ error: "Tu sesión ya no es válida." });
 });
 router.patch("/auth/me", requireAuth, (req, res, next) => {
   if (typeof req.body?.currentPassword !== "string") return next();
@@ -273,7 +368,10 @@ router.patch("/auth/me", requireAuth, (req, res, next) => {
   };
   const updates: Partial<typeof users.$inferInsert> = { updatedAt: new Date() };
   if (nombre !== undefined) updates.nombre = nombre;
-  if (email !== undefined) updates.email = email;
+  if (email !== undefined) {
+    updates.email = email;
+    if (email !== current.email) updates.emailVerifiedAt = null;
+  }
   if (parsed.data.telefono !== undefined) updates.telefono = cleanLocationValue(parsed.data.telefono);
   if (parsed.data.edad !== undefined) updates.edad = parsed.data.edad;
   if (requestedLocation !== undefined) {
@@ -287,7 +385,7 @@ router.patch("/auth/me", requireAuth, (req, res, next) => {
 
   try {
     const [updated] = await db.update(users).set(updates).where(eq(users.id, current.id)).returning();
-    return res.json(safeUser(updated));
+    return res.json(safeAuthenticatedUser(updated));
   } catch (error) {
     const code = (error as { code?: string; cause?: { code?: string } }).code
       ?? (error as { cause?: { code?: string } }).cause?.code;
@@ -313,7 +411,7 @@ router.patch("/auth/role", requireAuth, async (req, res): Promise<void> => {
     return;
   }
   if (current.rol === parsed.data.rol) {
-    res.json(SwitchAccountRoleResponse.parse(safeUser(current)));
+    res.json(SwitchAccountRoleResponse.parse(safeAuthenticatedUser(current)));
     return;
   }
 
@@ -326,7 +424,7 @@ router.patch("/auth/role", requireAuth, async (req, res): Promise<void> => {
     return;
   }
 
-  res.json(SwitchAccountRoleResponse.parse(safeUser(updated)));
+  res.json(SwitchAccountRoleResponse.parse(safeAuthenticatedUser(updated)));
 });
 router.patch("/auth/password", requireAuth, reauthenticationLimiter, async (req, res) => {
   const parsed = ChangeMyPasswordBody.safeParse(req.body);
@@ -506,56 +604,16 @@ router.put("/auth/verification-documents/:tipo", requireAuth, async (req, res) =
   }).onConflictDoUpdate({ target: [professionalVerificationDocuments.profesionalId, professionalVerificationDocuments.tipo], set: {
     objectPath, nombre, contentType, sizeBytes: Number(sizeBytes), estado: "pending_verification", updatedAt: new Date(),
   }}).returning();
+  await db.update(professionalProfiles).set({
+    estadoVerificacion: "pending_verification",
+    verificado: false,
+    habilitado: false,
+    updatedAt: new Date(),
+  }).where(eq(professionalProfiles.usuarioId, userId(req)));
   await db.update(users).set({ onboardingEstado: "professional_verification_pending", updatedAt: new Date() }).where(eq(users.id, userId(req)));
   return res.json(saved);
 });
 
-router.patch("/admin/cuentas/rol", requireAuth, async (req, res): Promise<void> => {
-  if (!(await requireAdmin(req, res))) return;
-  const body = req.body && typeof req.body === "object" && !Array.isArray(req.body) ? req.body as Record<string, unknown> : {};
-  const emailInput = typeof body.email === "string" ? body.email : "";
-  const email = emailInput.trim().toLowerCase();
-  const motivoInput = typeof body.motivo === "string" ? body.motivo : "";
-  const motivo = motivoInput.trim();
-  const hasUnexpectedFields = Object.keys(body).some((key) => key !== "email" && key !== "motivo");
-  if (hasUnexpectedFields || emailInput.length > 320 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || motivoInput.length > 500 || motivo.length < 5) {
-    res.status(400).json({ error: "Indicá un correo válido y un motivo de al menos 5 caracteres." });
-    return;
-  }
-
-  const result = await db.transaction(async (tx) => {
-    const [actor] = await tx.select({ id: users.id }).from(users)
-      .where(and(eq(users.id, userId(req)), eq(users.rol, "admin"), eq(users.activo, true)))
-      .for("update").limit(1);
-    if (!actor) return { kind: "forbidden" as const };
-
-    const [target] = await tx.select({ id: users.id, rol: users.rol, activo: users.activo }).from(users)
-      .where(sql`lower(${users.email}) = ${email}`).for("update").limit(1);
-    if (!target) return { kind: "not_found" as const };
-    if (!target.activo) return { kind: "inactive" as const };
-    if (target.rol === "admin") return { kind: "unchanged" as const };
-
-    await tx.update(users).set({ rol: "admin", updatedAt: new Date() }).where(eq(users.id, target.id));
-    await tx.insert(workyAuditEvents).values({
-      usuarioId: userId(req), entidad: "account", entidadId: target.id, accion: "role_granted",
-      estadoAnterior: target.rol, estadoNuevo: "admin", metadata: { motivo },
-    });
-    return { kind: "updated" as const };
-  });
-  if (result.kind === "forbidden") {
-    res.status(403).json({ error: "Solo una persona administradora puede asignar este rol." });
-    return;
-  }
-  if (result.kind === "not_found") {
-    res.status(404).json({ error: "No existe una cuenta Worky con ese correo." });
-    return;
-  }
-  if (result.kind === "inactive") {
-    res.status(409).json({ error: "La cuenta está desactivada. Reactivala antes de asignar el rol admin." });
-    return;
-  }
-  res.json({ rol: "admin", changed: result.kind === "updated" });
-});
 router.get("/admin/verificaciones", requireAuth, async (req, res) => {
   if (!(await requireAdmin(req, res))) return;
   const requestedStatus = String(req.query.estado || "pending_verification");
@@ -593,7 +651,10 @@ router.patch("/admin/verificaciones/:id", requireAuth, async (req, res) => {
   if (!updated) return res.status(409).json({ error: "Este documento ya fue resuelto." });
   const documents = await db.select({ estado: professionalVerificationDocuments.estado }).from(professionalVerificationDocuments).where(eq(professionalVerificationDocuments.profesionalId, current.profesionalId));
   const profileStatus = documents.some((item) => item.estado === "rejected") ? "rejected" : documents.length >= 3 && documents.every((item) => item.estado === "verified") ? "verified" : "pending_verification";
-  await db.update(professionalProfiles).set({ estadoVerificacion: profileStatus, verificado: profileStatus === "verified", updatedAt: new Date() }).where(eq(professionalProfiles.usuarioId, current.profesionalId));
+  await db.update(professionalProfiles).set(profileStatus === "verified"
+    ? { estadoVerificacion: profileStatus, verificado: true, updatedAt: new Date() }
+    : { estadoVerificacion: profileStatus, verificado: false, habilitado: false, updatedAt: new Date() })
+    .where(eq(professionalProfiles.usuarioId, current.profesionalId));
   await db.insert(workyAuditEvents).values({
     usuarioId: userId(req), entidad: "verification_document", entidadId: updated.id, accion: nextStatus === "verified" ? "approved" : "rejected",
     estadoAnterior: current.estado, estadoNuevo: nextStatus, metadata: { motivo, partnerId: current.profesionalId },
@@ -651,6 +712,8 @@ router.get("/profesionales", async (req, res) => {
   const search = String(req.query.search ?? "").trim();
   const rows = await db.select({ profile: professionalProfiles, user: users }).from(professionalProfiles).innerJoin(users, eq(users.id, professionalProfiles.usuarioId)).where(and(
     eq(users.activo, true),
+    eq(professionalProfiles.verificado, true),
+    eq(professionalProfiles.habilitado, true),
     category && categories.includes(category as typeof categories[number]) ? eq(professionalProfiles.categoria, category as typeof categories[number]) : undefined,
     search ? or(ilike(users.nombre, `%${search}%`), ilike(professionalProfiles.oficio, `%${search}%`), ilike(sql<string>`${professionalProfiles.categoria}::text`, `%${search}%`)) : undefined,
   )).orderBy(desc(professionalProfiles.verificado), desc(sql`coalesce((select avg(r.rating) from worky_reviews r where r.profesional_id = ${professionalProfiles.usuarioId}), 0)`), desc(sql`(select count(*) from worky_jobs j where j.profesional_id = ${professionalProfiles.usuarioId} and j.estado = 'finalizada')`)).limit(limit).offset((page - 1) * limit);
@@ -721,12 +784,17 @@ router.get("/notificaciones", requireAuth, async (req, res) => {
   return res.json({ items: rows, unread: rows.filter((item) => !item.leida).length });
 });
 
-router.get("/notificaciones/stream", (req, res) => {
+router.get("/notificaciones/stream", async (req, res) => {
   const token = typeof req.query.token === "string" ? req.query.token : "";
   let usuarioId: number;
   try {
     usuarioId = verifyToken(token);
   } catch {
+    res.status(401).end();
+    return;
+  }
+  const [account] = await db.select({ active: users.activo }).from(users).where(eq(users.id, usuarioId)).limit(1);
+  if (!account?.active) {
     res.status(401).end();
     return;
   }
@@ -809,8 +877,13 @@ router.post("/reservas", requireAuth, async (req, res) => {
 });
 router.get("/profesionales/:id", async (req, res) => {
   const requestedId = numberValue(req.params.id);
-  const [rowByProfileId] = await db.select({ profile: professionalProfiles, user: users }).from(professionalProfiles).innerJoin(users, eq(users.id, professionalProfiles.usuarioId)).where(eq(professionalProfiles.id, requestedId)).limit(1);
-  const [rowByUserId] = rowByProfileId ? [] : await db.select({ profile: professionalProfiles, user: users }).from(professionalProfiles).innerJoin(users, eq(users.id, professionalProfiles.usuarioId)).where(eq(professionalProfiles.usuarioId, requestedId)).limit(1);
+  const publicProfileConditions = and(
+    eq(users.activo, true),
+    eq(professionalProfiles.verificado, true),
+    eq(professionalProfiles.habilitado, true),
+  );
+  const [rowByProfileId] = await db.select({ profile: professionalProfiles, user: users }).from(professionalProfiles).innerJoin(users, eq(users.id, professionalProfiles.usuarioId)).where(and(eq(professionalProfiles.id, requestedId), publicProfileConditions)).limit(1);
+  const [rowByUserId] = rowByProfileId ? [] : await db.select({ profile: professionalProfiles, user: users }).from(professionalProfiles).innerJoin(users, eq(users.id, professionalProfiles.usuarioId)).where(and(eq(professionalProfiles.usuarioId, requestedId), publicProfileConditions)).limit(1);
   const row = rowByProfileId || rowByUserId;
   if (!row) return res.status(404).json({ error: "Profesional no encontrado." });
   return res.json(await publicProfileView(row));
@@ -829,7 +902,7 @@ router.post("/partner-profile", requireAuth, async (req, res) => {
   const body = req.body ?? {};
   if (!body.oficio || !body.categoria) return res.status(400).json({ error: "Indicá el oficio y la categoría para ofrecer tus servicios." });
   if (!categories.includes(body.categoria)) return res.status(400).json({ error: "La categoría seleccionada no es válida." });
-  const [created] = await db.insert(professionalProfiles).values({ usuarioId: userId(req), oficio: String(body.oficio), categoria: body.categoria, precioReferencia: String(numberValue(body.precioReferencia) || 0), skills: Array.isArray(body.skills) ? body.skills.map(String) : [], about: body.about || null, experienciaAnios: Math.max(0, numberValue(body.experienciaAnios) || 0), disponible: true }).returning();
+  const [created] = await db.insert(professionalProfiles).values({ usuarioId: userId(req), oficio: String(body.oficio), categoria: body.categoria, precioReferencia: String(numberValue(body.precioReferencia) || 0), skills: Array.isArray(body.skills) ? body.skills.map(String) : [], about: body.about || null, experienciaAnios: Math.max(0, numberValue(body.experienciaAnios) || 0), disponible: true, habilitado: false }).returning();
   const [owner] = await db.select().from(users).where(eq(users.id, userId(req))).limit(1);
   return res.status(201).json(await publicProfileView({ profile: created, user: owner }));
 });
@@ -839,17 +912,23 @@ router.put(["/perfil-profesional/mio", "/partner-profile/me"], requireAuth, asyn
   if (fields.length) return res.status(400).json({ error: "Completá los datos obligatorios del perfil.", campos_faltantes: fields });
   if (!categories.includes(body.categoria)) return res.status(400).json({ error: "La categoría seleccionada no es válida." });
   const values = { usuarioId: userId(req), oficio: String(body.oficio), categoria: body.categoria, matriculaHabilitante: body.matriculaHabilitante || null, skills: Array.isArray(body.skills) ? body.skills.map(String) : [], about: body.about || null, experienciaAnios: Math.max(0, numberValue(body.experienciaAnios) || 0), precioReferencia: String(numberValue(body.precioReferencia)), disponible: body.disponible !== false, updatedAt: new Date() };
-  const [saved] = await db.insert(professionalProfiles).values(values).onConflictDoUpdate({ target: professionalProfiles.usuarioId, set: values }).returning();
+  const [saved] = await db.insert(professionalProfiles).values({ ...values, habilitado: false }).onConflictDoUpdate({ target: professionalProfiles.usuarioId, set: values }).returning();
   const [owner] = await db.select().from(users).where(eq(users.id, userId(req))).limit(1);
   return res.json(await publicProfileView({ profile: saved, user: owner }));
 });
 
 router.get("/profesionales/:id/reputacion", async (req, res) => {
   const professionalId = numberValue(req.params.id);
-  const [profileById] = await db.select().from(professionalProfiles).where(eq(professionalProfiles.id, professionalId)).limit(1);
-  const [profileByUserId] = profileById ? [] : await db.select().from(professionalProfiles).where(eq(professionalProfiles.usuarioId, professionalId)).limit(1);
+  const visibleProfile = and(
+    eq(professionalProfiles.verificado, true),
+    eq(professionalProfiles.habilitado, true),
+  );
+  const [profileById] = await db.select().from(professionalProfiles).where(and(eq(professionalProfiles.id, professionalId), visibleProfile)).limit(1);
+  const [profileByUserId] = profileById ? [] : await db.select().from(professionalProfiles).where(and(eq(professionalProfiles.usuarioId, professionalId), visibleProfile)).limit(1);
   const profile = profileById || profileByUserId;
   if (!profile) return res.status(404).json({ error: "Profesional no encontrado." });
+  const [owner] = await db.select({ active: users.activo }).from(users).where(eq(users.id, profile.usuarioId)).limit(1);
+  if (!owner?.active) return res.status(404).json({ error: "Profesional no encontrado." });
   const reputation = await reputationView(profile.usuarioId);
   const rows = await db.select({ review: reviews, author: users }).from(reviews).innerJoin(users, eq(users.id, reviews.clienteId)).where(eq(reviews.profesionalId, profile.usuarioId)).orderBy(desc(reviews.createdAt));
   const publicRecommendations = await db.select({ recommendation: recommendations, author: users }).from(recommendations).innerJoin(users, eq(users.id, recommendations.clienteId)).where(and(eq(recommendations.profesionalId, profile.usuarioId), eq(recommendations.visibilidad, "publica"))).orderBy(desc(recommendations.createdAt));
@@ -1023,7 +1102,11 @@ router.post("/chats/:changaId/mensajes", requireAuth, async (req, res) => {
   const job = await conversationJob(changaId, userId(req));
   if (!job) return res.status(403).json({ error: "No participás en esta conversación." });
   const texto = String(req.body?.texto ?? "").trim();
-  const attachments = Array.isArray(req.body?.adjuntos) ? req.body.adjuntos.filter((item: unknown) => item && typeof item === "object" && typeof (item as { objectPath?: unknown }).objectPath === "string").slice(0, 5) : [];
+  const rawAttachments = Array.isArray(req.body?.adjuntos) ? req.body.adjuntos : [];
+  if (rawAttachments.length > MAX_CHAT_ATTACHMENTS) {
+    return res.status(400).json({ error: "Podés adjuntar hasta 5 imágenes por mensaje." });
+  }
+  const attachments = rawAttachments.filter((item: unknown) => item && typeof item === "object" && typeof (item as { objectPath?: unknown }).objectPath === "string");
   if (!texto && !attachments.length) return res.status(400).json({ error: "El mensaje no puede estar vacío." });
   for (const attachment of attachments) {
     const objectPath = String((attachment as { objectPath: string }).objectPath);

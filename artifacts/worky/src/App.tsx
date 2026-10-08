@@ -23,10 +23,16 @@ import { ErrorBoundary } from '@/components/error-boundary';
 import NotFound from '@/pages/not-found';
 import { Route, Switch, Link, Router as WouterRouter, useLocation, useParams } from 'wouter';
 import { AuthUser, WorkyApiError, addPendingAppointmentAttempt, apiRequest, clearToken, configureApiAuth, currentUser, fetchWorkyObject, getPendingAppointmentAttempts, getToken, login, logout, markNotificationRead, register, requestPasswordRecovery, resetPassword, savePendingAppointmentAttempts, syncPendingAppointmentAttempts, uploadWorkyFile, type PendingAppointmentAttempt } from '@/lib/api';
-import { isRegistrationEntryPath } from '@/lib/auth-entry';
 import { appointmentErrorMessage, type AppointmentAction } from '@/appointment-errors';
 import { sortProfessionalsByDistance } from '@/lib/professionals';
+import {
+  getRoleSwitcherLabel,
+  getRoleSwitcherTarget,
+  hasDualRoleAccount,
+  resolveEffectiveRole,
+} from '@/lib/role-view';
 import SettingsPage from '@/pages/settings';
+import { AdminConsolePage } from '@/pages/admin-console';
 
 export const queryClient = new QueryClient();
 type Role = 'client' | 'professional' | 'admin';
@@ -192,7 +198,7 @@ function AuthProvider({ children }: { children: ReactNode }) {
   const refreshUser = async () => { if (!getToken()) { setSessionUser(null); return; } try { setUser(await currentUser()); } catch { clearToken(); setSessionUser(null); } };
   useEffect(() => { void refreshUser().finally(() => setLoading(false)); }, []);
   useEffect(() => { configureApiAuth(() => setSessionUser(null)); }, []);
-  const value: AuthContextValue = { user, isAuthenticated: Boolean(user), isLoading, login: async (email, password) => setSessionUser(await login(email, password)), register: async (payload) => setSessionUser(await register(payload)), logout: async () => { await logout(); setSessionUser(null); }, refreshUser };
+  const value: AuthContextValue = { user, isAuthenticated: Boolean(user), isLoading, login: async (email, password) => setSessionUser(await login(email, password)), register: async (payload) => setSessionUser(await register(payload)), logout: async () => { const pendingLogout = logout(); setSessionUser(null); await pendingLogout; }, refreshUser };
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 
@@ -429,14 +435,38 @@ function AppShell({ children, role, setRole }: { children: ReactNode; role: Role
   const auth = useAuth();
   const profileQuery = useGetMyProfessionalProfile({ query: { queryKey: getGetMyProfessionalProfileQueryKey(), retry: false, enabled: Boolean(auth.user) } });
   const profile = profileQuery.data ? toProfessional(profileQuery.data) : null;
+  const switchTargetRole = role === 'client' || role === 'professional' ? getRoleSwitcherTarget(role) : null;
+  const switchLabel = role === 'client' || role === 'professional' ? getRoleSwitcherLabel(role) : '';
+  const canSwitchRole = switchTargetRole !== null && hasDualRoleAccount(auth.user?.rol, profile);
   const accountName = profile?.name || auth.user?.nombre || 'Tu cuenta';
   const accountInitials = accountName.split(' ').map((part) => part[0]).join('').slice(0, 2);
   const accountPhotoPath = auth.user?.fotoObjectPath;
   if (accountPhotoPath) profilePhotosByInitials.set(accountInitials, `/api/v1/storage/public-objects${accountPhotoPath}`);
   const notifications = useQuery({ queryKey: ['worky-notifications'], queryFn: () => apiRequest<NotificationsResponse>('/notificaciones'), enabled: Boolean(auth.user), refetchInterval: 10000, refetchIntervalInBackground: true, refetchOnWindowFocus: true });
   const [showNotifications, setShowNotifications] = useState(false);
+  const notificationButtonRef = useRef<HTMLButtonElement>(null);
+  const notificationPanelRef = useRef<HTMLDivElement>(null);
   const [notificationReadFailures, setNotificationReadFailures] = useState<Map<number, { id: number; title: string }>>(new Map());
   const [retryingNotificationId, setRetryingNotificationId] = useState<number | null>(null);
+  useEffect(() => {
+    if (!showNotifications) return;
+    const handleOutsidePointer = (event: PointerEvent) => {
+      const target = event.target as Node | null;
+      if (target && (notificationButtonRef.current?.contains(target) || notificationPanelRef.current?.contains(target))) return;
+      setShowNotifications(false);
+    };
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return;
+      setShowNotifications(false);
+      notificationButtonRef.current?.focus();
+    };
+    document.addEventListener('pointerdown', handleOutsidePointer);
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('pointerdown', handleOutsidePointer);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [showNotifications]);
   useEffect(() => {
     if (!auth.user) return;
     const token = getToken();
@@ -560,12 +590,12 @@ function AppShell({ children, role, setRole }: { children: ReactNode; role: Role
       { href: '/profile', label: 'Mi perfil', icon: UserRound },
       { href: '/services', label: 'Mis servicios', icon: BriefcaseBusiness },
     ] : []),
-    ...(role === 'admin' ? [{ href: '/admin/verificaciones', label: 'Verificaciones', icon: ShieldCheck }] : []),
+    ...(role === 'admin' ? [{ href: '/admin', label: 'Administración', icon: LayoutDashboard }] : []),
   ];
   return <div className="app-shell grain flex bg-[hsl(var(--background))]">
       <aside className={`fixed inset-y-0 left-0 z-30 flex w-[258px] flex-col bg-[hsl(var(--sidebar))] px-5 py-6 text-[hsl(var(--sidebar-foreground))] transition-transform duration-300 md:fixed md:translate-x-0 ${mobileOpen ? 'translate-x-0' : '-translate-x-full'}`}>
       <div className="mb-9 flex items-center justify-between"><Brand light /><button onClick={() => setMobileOpen(false)} className="text-white/60 md:hidden" data-testid="button-close-menu"><X size={20} /></button></div>
-       <div className="mb-7 rounded-2xl border border-white/10 bg-white/[.06] p-3.5"><div className="flex items-center gap-3"><Avatar name={accountName} initials={profile?.initials} size="sm" warm /><div className="min-w-0"><p className="truncate text-xs font-bold">{accountName}</p><p className="mt-0.5 text-[11px] text-white/55">{role === 'professional' ? 'Profesional' : role === 'admin' ? 'Administración' : 'Cliente'}</p></div></div>{role === 'professional' || (role === 'client' && profile) ? <button onClick={() => { setRole(role === 'client' ? 'professional' : 'client'); setMobileOpen(false); }} className="focus-ring mt-3 flex w-full items-center justify-between rounded-xl border border-white/10 bg-white/[.04] px-2.5 py-2 text-[11px] font-bold text-[hsl(var(--accent))] transition-colors hover:border-[hsl(var(--accent)/.35)] hover:bg-white/[.08]" data-testid="button-switch-role">Cambiar vista <ChevronRight size={13} /></button> : null}</div>
+        <div className="mb-7 rounded-2xl border border-white/10 bg-white/[.06] p-3.5"><div className="flex items-center gap-3"><Avatar name={accountName} initials={profile?.initials} size="sm" warm /><div className="min-w-0"><p className="truncate text-xs font-bold">{accountName}</p><p className="mt-0.5 text-[11px] text-white/55">{role === 'professional' ? 'Profesional' : role === 'admin' ? 'Administración' : 'Cliente'}</p></div></div>{canSwitchRole && switchTargetRole ? <button onClick={() => { setRole(switchTargetRole); setMobileOpen(false); }} className="focus-ring mt-3 flex w-full items-center justify-between rounded-xl border border-white/10 bg-white/[.04] px-2.5 py-2 text-[11px] font-bold text-[hsl(var(--accent))] transition-colors hover:border-[hsl(var(--accent)/.35)] hover:bg-white/[.08]" data-testid="button-switch-role">{switchLabel} <ChevronRight size={13} /></button> : null}</div>
       <p className="mb-3 px-3 text-[10px] font-bold uppercase tracking-[.17em] text-white/35">Tu espacio</p>
        <nav className="space-y-1.5">{navItems.map(({ href, label, icon: Icon }) => <Link key={href} href={href} onClick={() => setMobileOpen(false)} className={`nav-link focus-ring flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold ${location === href ? 'bg-[hsl(var(--sidebar-accent))] text-white' : 'text-white/65 hover:bg-white/[.07] hover:text-white'}`} data-testid={`link-nav-${href.slice(1).replace('/', '-')}`}><Icon size={18} strokeWidth={location === href ? 2.5 : 2} /><span>{label}</span>{href === '/jobs' && <span className="ml-auto h-1.5 w-1.5 rounded-full bg-[hsl(var(--primary))]" />}</Link>)}{role === 'professional' && <Link href="/partner/dashboard" onClick={() => setMobileOpen(false)} className={`nav-link focus-ring flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold ${location === '/partner/dashboard' ? 'bg-[hsl(var(--sidebar-accent))] text-white' : 'text-white/65 hover:bg-white/[.07] hover:text-white'}`} data-testid="link-nav-partner-dashboard"><LayoutDashboard size={18} /> <span>Panel Partner</span></Link>}</nav>
         {role === 'client' && <div className="mt-auto pt-5"><div className="rounded-2xl bg-[hsl(var(--primary))] p-4 text-[hsl(var(--primary-foreground))]"><Sparkles size={18} /><p className="mt-3 text-sm font-bold leading-snug">La changa justa, con gente de confianza.</p><p className="mt-1 text-[11px] leading-relaxed opacity-75">Todo empieza cerca de casa.</p><Link href="/partner" onClick={() => setMobileOpen(false)} className="focus-ring mt-3 flex items-center justify-between rounded-xl bg-black/10 px-3 py-2 text-xs font-bold transition-colors hover:bg-black/20" data-testid="link-offer-services"><span>Ofrecer mis servicios</span><ChevronRight size={14} /></Link></div></div>}
@@ -579,7 +609,53 @@ function AppShell({ children, role, setRole }: { children: ReactNode; role: Role
         <button onClick={() => { void auth.logout(); setLocation('/'); }} className={`${role === 'admin' ? 'mt-auto' : ''} mt-1 flex items-center gap-2 px-3 pb-1 text-xs font-bold text-white/45 hover:text-white`} data-testid="button-logout"><LockKeyhole size={14} /> Salir de Worky</button>
     </aside>
     {mobileOpen && <button aria-label="Cerrar menú" onClick={() => setMobileOpen(false)} className="fixed inset-0 z-20 bg-[hsl(var(--secondary)/.45)] md:hidden" data-testid="button-menu-overlay" />}
-          <main className="min-w-0 flex-1 md:ml-[258px]"><header className="relative flex h-[76px] items-center justify-between border-b border-[hsl(var(--border))] bg-[hsl(var(--background)/.85)] px-5 backdrop-blur md:px-10"><button onClick={() => setMobileOpen(true)} className="rounded-lg p-2 md:hidden" data-testid="button-open-menu"><Menu size={22} /></button><div className="ml-auto flex items-center gap-3"><button onClick={() => setShowNotifications(!showNotifications)} className="relative rounded-xl p-2.5 text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--muted))]" data-testid="button-notifications"><Bell size={19} />{Boolean(notifications.data?.unread) && <span data-testid="notification-unread-count" className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-[hsl(var(--primary))] px-1 text-[9px] font-bold text-white">{notifications.data?.unread}</span>}</button><Link href="/profile" className="focus-ring flex items-center gap-2" data-testid="link-header-profile"><Avatar name={accountName} initials={profile?.initials} size="sm" warm /><span className="hidden text-xs font-bold sm:block">Mi perfil</span></Link></div>{showNotifications && <div className="absolute right-5 top-[66px] z-40 w-[min(360px,calc(100vw-2rem))] rounded-2xl border border-[hsl(var(--border))] bg-[hsl(var(--card))] p-3 shadow-2xl md:right-10"><div className="flex items-center justify-between border-b border-[hsl(var(--border))] px-2 pb-3"><p className="display-font font-bold">Notificaciones</p><button className="text-[10px] font-bold text-[hsl(var(--primary))]" onClick={() => { void apiRequest('/notificaciones/leidas', { method: 'POST' }).then(() => notifications.refetch()); }}>Marcar leídas</button></div>{!notifications.data?.items.length ? <p className="px-2 py-6 text-center text-xs text-[hsl(var(--muted-foreground))]">No tenés novedades.</p> : <div className="max-h-72 overflow-auto">{notifications.data.items.slice(0, 6).map((item) => { const className = `block border-b border-[hsl(var(--border))] px-2 py-3 last:border-0 ${item.leida ? 'opacity-55' : ''} ${item.href ? 'cursor-pointer hover:bg-[hsl(var(--muted)/.55)]' : ''}`; const content = <><p className="text-xs font-bold">{item.titulo}</p><p className="mt-1 text-[11px] leading-relaxed text-[hsl(var(--muted-foreground))]">{item.detalle}</p>{item.href && <p className="mt-2 text-[10px] font-bold text-[hsl(var(--primary))]">Abrir conversación <ChevronRight size={12} className="inline" /></p>}</>; return item.href ? <Link key={item.id} href={item.href} onClick={() => { setShowNotifications(false); if (!item.leida) void markNotificationAsRead(item); }} className={className} data-testid={`notification-${item.id}`}>{content}</Link> : <div key={item.id} className={className} data-testid={`notification-${item.id}`}>{content}</div>; })}</div>}</div>}{notificationReadFailures.size > 0 && <div className="absolute left-5 right-5 top-[82px] z-30 flex flex-col gap-2 md:left-auto md:right-10 md:max-w-[360px]">{Array.from(notificationReadFailures.values()).map((failure) => <div key={failure.id} className="flex items-center gap-3 rounded-xl border border-[hsl(var(--destructive)/.3)] bg-[hsl(var(--card))] px-4 py-3 text-xs shadow-lg" role="alert" data-testid={`notification-read-error-${failure.id}`}><CircleAlert size={16} className="shrink-0 text-[hsl(var(--destructive))]" /><p className="min-w-0 flex-1 text-[hsl(var(--muted-foreground))]">No pudimos marcar “{failure.title}” como leída. Revisá tu conexión.</p><button onClick={() => { void markNotificationAsRead({ id: failure.id, titulo: failure.title }); }} disabled={retryingNotificationId === failure.id} className="shrink-0 font-bold text-[hsl(var(--primary))] disabled:opacity-50" data-testid={`button-retry-notification-read-${failure.id}`}>{retryingNotificationId === failure.id ? <LoaderCircle size={15} className="animate-spin" aria-label="Reintentando" /> : <><RefreshCw size={14} className="mr-1 inline" />Reintentar</>}</button></div>)}</div>}</header><div className="page-enter mx-auto max-w-[1440px] px-5 py-7 md:px-10 md:py-10">{children}</div></main>
+          <main className="min-w-0 flex-1 md:ml-[258px]">
+            <header className="relative flex h-[76px] items-center justify-between border-b border-[hsl(var(--border))] bg-[hsl(var(--background)/.85)] px-5 backdrop-blur md:px-10">
+              <button onClick={() => setMobileOpen(true)} className="rounded-lg p-2 md:hidden" data-testid="button-open-menu"><Menu size={22} /></button>
+              <div className="ml-auto flex items-center gap-3">
+                <button
+                  ref={notificationButtonRef}
+                  aria-label="Notificaciones"
+                  aria-expanded={showNotifications}
+                  aria-controls="worky-notifications-panel"
+                  onClick={() => setShowNotifications((open) => !open)}
+                  className="relative rounded-xl p-2.5 text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--muted))]"
+                  data-testid="button-notifications"
+                >
+                  <Bell size={19} />
+                  {Boolean(notifications.data?.unread) && <span data-testid="notification-unread-count" className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-[hsl(var(--primary))] px-1 text-[9px] font-bold text-white">{notifications.data?.unread}</span>}
+                </button>
+                <Link href="/profile" className="focus-ring flex items-center gap-2" data-testid="link-header-profile"><Avatar name={accountName} initials={profile?.initials} size="sm" warm /><span className="hidden text-xs font-bold sm:block">Mi perfil</span></Link>
+              </div>
+              {showNotifications && (
+                <div
+                  ref={notificationPanelRef}
+                  id="worky-notifications-panel"
+                  role="region"
+                  aria-label="Notificaciones"
+                  className="absolute right-5 top-[66px] z-40 w-[min(360px,calc(100vw-2rem))] rounded-2xl border border-[hsl(var(--border))] bg-[hsl(var(--card))] p-3 shadow-2xl md:right-10"
+                >
+                  <div className="flex items-center justify-between border-b border-[hsl(var(--border))] px-2 pb-3">
+                    <p className="display-font font-bold">Notificaciones</p>
+                    <button className="text-[10px] font-bold text-[hsl(var(--primary))]" onClick={() => { void apiRequest('/notificaciones/leidas', { method: 'POST' }).then(() => notifications.refetch()); }}>Marcar leídas</button>
+                  </div>
+                  {!notifications.data?.items.length
+                    ? <p className="px-2 py-6 text-center text-xs text-[hsl(var(--muted-foreground))]">No tenés novedades.</p>
+                    : <div className="max-h-72 overflow-auto">
+                      {notifications.data.items.slice(0, 6).map((item) => {
+                        const className = `block border-b border-[hsl(var(--border))] px-2 py-3 last:border-0 ${item.leida ? 'opacity-55' : ''} ${item.href ? 'cursor-pointer hover:bg-[hsl(var(--muted)/.55)]' : ''}`;
+                        const content = <><p className="text-xs font-bold">{item.titulo}</p><p className="mt-1 text-[11px] leading-relaxed text-[hsl(var(--muted-foreground))]">{item.detalle}</p>{item.href && <p className="mt-2 text-[10px] font-bold text-[hsl(var(--primary))]">Abrir conversación <ChevronRight size={12} className="inline" /></p>}</>;
+                        return item.href
+                          ? <Link key={item.id} href={item.href} onClick={() => { setShowNotifications(false); if (!item.leida) void markNotificationAsRead(item); }} className={className} data-testid={`notification-${item.id}`}>{content}</Link>
+                          : <div key={item.id} className={className} data-testid={`notification-${item.id}`}>{content}</div>;
+                      })}
+                    </div>}
+                </div>
+              )}
+              {notificationReadFailures.size > 0 && <div className="absolute left-5 right-5 top-[82px] z-30 flex flex-col gap-2 md:left-auto md:right-10 md:max-w-[360px]">{Array.from(notificationReadFailures.values()).map((failure) => <div key={failure.id} className="flex items-center gap-3 rounded-xl border border-[hsl(var(--destructive)/.3)] bg-[hsl(var(--card))] px-4 py-3 text-xs shadow-lg" role="alert" data-testid={`notification-read-error-${failure.id}`}><CircleAlert size={16} className="shrink-0 text-[hsl(var(--destructive))]" /><p className="min-w-0 flex-1 text-[hsl(var(--muted-foreground))]">No pudimos marcar “{failure.title}” como leída. Revisá tu conexión.</p><button onClick={() => { void markNotificationAsRead({ id: failure.id, titulo: failure.title }); }} disabled={retryingNotificationId === failure.id} className="shrink-0 font-bold text-[hsl(var(--primary))] disabled:opacity-50" data-testid={`button-retry-notification-read-${failure.id}`}>{retryingNotificationId === failure.id ? <LoaderCircle size={15} className="animate-spin" aria-label="Reintentando" /> : <><RefreshCw size={14} className="mr-1 inline" />Reintentar</>}</button></div>)}</div>}
+            </header>
+            <div className="page-enter mx-auto max-w-[1440px] px-5 py-7 md:px-10 md:py-10">{children}</div>
+          </main>
   </div>;
 }
 
@@ -595,7 +671,10 @@ function AuthPageLegacy({ setRole }: { setRole: (role: Role) => void }) {
     const values = new FormData(event.currentTarget);
     try {
       if (mode === 'login') await auth.login(String(values.get('email')), String(values.get('password')));
-      else await auth.register({ nombre: String(values.get('name')), email: String(values.get('email')), password: String(values.get('password')) });
+      else {
+        setError('Usá el registro actualizado para crear tu cuenta.');
+        return;
+      }
       setRole('client');
       setLocation('/home');
     } catch (cause) {
@@ -607,9 +686,9 @@ function AuthPageLegacy({ setRole }: { setRole: (role: Role) => void }) {
 
 function AuthPage({ setRole }: { setRole: (role: Role) => void }) {
   const auth = useAuth();
-  const [location, navigate] = useLocation();
+  const [, navigate] = useLocation();
   const [resetToken, setResetToken] = useState(() => typeof window === 'undefined' ? null : new URLSearchParams(window.location.search).get('resetToken'));
-  const [mode, setMode] = useState<'login' | 'register' | 'forgot' | 'reset'>(() => resetToken ? 'reset' : isRegistrationEntryPath(location) ? 'register' : 'login');
+  const [mode, setMode] = useState<'login' | 'register' | 'forgot' | 'reset'>(() => resetToken ? 'reset' : 'login');
   const [draft] = useState(() => readRegistrationDraft());
   const [step, setStep] = useState(draft?.step ?? 1);
   const [role, setRoleLocal] = useState<Role>(draft?.role ?? 'client');
@@ -620,11 +699,6 @@ function AuthPage({ setRole }: { setRole: (role: Role) => void }) {
     if (next === '/') {
       setResetToken(null);
       setMode('login');
-      setStep(1);
-      setError('');
-      setSuccess('');
-    } else if (isRegistrationEntryPath(next)) {
-      setMode('register');
       setStep(1);
       setError('');
       setSuccess('');
@@ -646,7 +720,9 @@ function AuthPage({ setRole }: { setRole: (role: Role) => void }) {
       answers, services, docs, photo: photo?.objectPath ? { objectPath: photo.objectPath } : null,
     });
   }, [step, role, data, answers, services, docs, photo]);
-  const change = (key: string, value: string) => setData((current) => ({ ...current, [key]: value }));
+  const change = (key: string, value: string) => {
+    setData((current) => ({ ...current, [key]: value }));
+  };
   const file = async (key: string, picked?: File) => {
     if (!picked) return;
     setError('');
@@ -660,10 +736,12 @@ function AuthPage({ setRole }: { setRole: (role: Role) => void }) {
     if (picked) void file(key, picked);
   };
   const finish = async () => {
+    setError('');
     if (data.password.length < 6 || data.password !== data.confirm) { setError('La contraseña debe tener 6 caracteres y coincidir.'); return; }
     if (!photo?.file && !photo?.objectPath) { setError('Subí una foto de perfil para continuar.'); return; }
     const validServices = services.filter((item) => item.oficio.trim());
     if (role === 'professional' && !validServices.length) { setError('Agregá al menos un oficio.'); return; }
+
     try {
       await auth.register({ nombre: data.name, email: data.email, password: data.password, telefono: data.phone, edad: Number(data.age), rol: role === 'professional' ? 'profesional' : 'cliente', ubicacion: { direccion: data.address, ciudad: data.city, provincia: data.province } });
       if (photo?.file) {
@@ -738,17 +816,21 @@ function AuthPage({ setRole }: { setRole: (role: Role) => void }) {
     }
   };
   const input = (key: string, label: string, type = 'text', required = true) => <label className="block"><span className="label !text-white/75">{label}</span><input value={data[key as keyof typeof data]} onChange={(event) => change(key, event.target.value)} type={type} autoComplete={key === 'email' ? 'email' : key === 'password' ? (mode === 'login' ? 'current-password' : 'new-password') : key === 'confirm' ? 'new-password' : undefined} required={required} className="field border-white/15 bg-white/[.08] text-white placeholder:text-white/35" data-testid={`input-auth-${key}`} /></label>;
+  const altaGraciaZones = ['Norte', 'Carlos Pellegrini (Alto)', 'Barrio Cámara', 'Barrio Sur', 'Otra zona'];
   const onboardingOptions: Record<string, string[]> = {
-    zona: ['CABA', 'Zona Norte', 'Zona Oeste', 'Zona Sur', 'Otra zona'],
+    zona: altaGraciaZones,
     preferencia: ['Rapidez', 'Precio claro', 'Experiencia', 'Recomendaciones'],
     frecuencia: ['Una vez', 'Todas las semanas', 'Todos los meses', 'Cuando surge una urgencia'],
     tipoTrabajo: ['Mantenimiento', 'Reparaciones', 'Instalaciones', 'Urgencias', 'Otro tipo de trabajo'],
-    zonaTrabajo: ['CABA', 'Zona Norte', 'Zona Oeste', 'Zona Sur', 'Me muevo por varias zonas'],
+    zonaTrabajo: altaGraciaZones,
     objetivo: ['Conseguir más changas', 'Organizar mejor mi trabajo', 'Mostrar mi experiencia', 'Construir reputación en Worky'],
   };
   const question = (key: string, label: string) => {
     const options = onboardingOptions[key];
-    const selected = answers[key] || '';
+    const storedAnswer = answers[key] || '';
+    const selected = options && !options.includes(storedAnswer) && !storedAnswer.startsWith('Otro:')
+      ? ''
+      : storedAnswer;
     const isOther = selected.startsWith('Otro:') || /^(otra|otro)/i.test(selected);
     return options ? <fieldset className="block"><legend className="label !text-white/75">{label}</legend><div className="mt-2 grid gap-2 sm:grid-cols-2">{options.map((option) => { const active = option === selected || (isOther && /^(otra|otro)/i.test(option)); return <button type="button" key={option} onClick={() => setAnswers((current) => ({ ...current, [key]: active && isOther ? '' : option }))} className={`rounded-xl border px-3.5 py-3 text-left text-sm font-semibold transition-colors ${active ? 'border-[hsl(var(--accent))] bg-[hsl(var(--accent)/.18)] text-white' : 'border-white/15 bg-white/[.04] text-white/75 hover:bg-white/[.09]'}`}>{option}{active && <span className="float-right text-[hsl(var(--accent))]">✓</span>}</button>; })}</div>{isOther && <input autoFocus value={selected.startsWith('Otro:') ? selected.replace(/^Otro:\s*/, '') : ''} onChange={(event) => setAnswers((current) => ({ ...current, [key]: `Otro: ${event.target.value}` }))} placeholder="Contanos cuál" required className="field mt-3 border-white/15 bg-white/[.08] text-white placeholder:text-white/35" />}{!isOther && <input tabIndex={-1} aria-hidden="true" value={selected} onChange={() => undefined} required className="sr-only" />}</fieldset> : <label className="block"><span className="label !text-white/75">{label}</span><input value={selected} onChange={(event) => setAnswers((current) => ({ ...current, [key]: event.target.value }))} required className="field border-white/15 bg-white/[.08] text-white" /></label>;
   };
@@ -820,8 +902,8 @@ function AuthPage({ setRole }: { setRole: (role: Role) => void }) {
   const authLayout = (content: ReactNode) => <div className="grain flex min-h-[100dvh] flex-col bg-[hsl(var(--secondary))] text-white md:flex-row"><section className="relative hidden w-[46%] overflow-hidden p-12 md:flex md:flex-col"><Brand light /><div className="relative my-auto max-w-md"><p className="eyebrow !text-[hsl(var(--accent))]">La red que mueve tu barrio</p><h1 className="display-font mt-4 text-5xl font-bold leading-[.98] tracking-[-.06em]">Cuando hace falta,<br /><span className="text-[hsl(var(--accent))]">aparece alguien.</span></h1><p className="mt-6 max-w-sm text-base leading-relaxed text-white/65">Una cuenta para encontrar, contratar, ofrecer y recomendar.</p></div></section><section className="flex flex-1 items-center justify-center px-5 py-10"><div className="w-full max-w-[430px]"><div className="mb-8 md:hidden"><Brand light /></div>{content}</div></section></div>;
   if (mode === 'forgot') return authLayout(<><div className="mb-8"><p className="eyebrow !text-[hsl(var(--accent))]">Recuperá el acceso</p><h2 className="display-font mt-3 text-4xl font-bold tracking-[-.06em]">Verifiquemos tu email.</h2><p className="mt-3 text-sm text-white/60">Te vamos a enviar un enlace para crear una contraseña nueva.</p></div><form onSubmit={recoverySubmit} className="space-y-4">{input('email', 'Tu email', 'email')}{error && <p className="text-xs font-semibold text-[hsl(var(--accent))]" role="alert">{error}</p>}{success && <p className="rounded-xl border border-[hsl(var(--accent)/.35)] bg-[hsl(var(--accent)/.12)] p-3 text-xs font-semibold text-[hsl(var(--accent))]" role="status">{success}</p>}<Button type="submit" variant="soft" className="mt-3 w-full py-3.5" disabled={busy} testId="button-request-password-recovery">{busy ? <LoaderCircle className="animate-spin" size={17} /> : null} Enviar enlace <ChevronRight size={17} /></Button></form><p className="mt-7 text-center text-sm text-white/55"><button type="button" onClick={() => setLocation('/')} className="font-bold text-[hsl(var(--accent))]" data-testid="button-back-to-login">Volver a ingresar</button></p></>);
   if (mode === 'reset') return authLayout(<><div className="mb-8"><p className="eyebrow !text-[hsl(var(--accent))]">Enlace verificado</p><h2 className="display-font mt-3 text-4xl font-bold tracking-[-.06em]">Elegí una contraseña nueva.</h2><p className="mt-3 text-sm text-white/60">Usá al menos 8 caracteres y no repitas tu contraseña anterior.</p></div><form onSubmit={resetSubmit} className="space-y-4">{input('password', 'Nueva contraseña', 'password')}{input('confirm', 'Repetí la contraseña', 'password')}{error && <p className="text-xs font-semibold text-[hsl(var(--accent))]" role="alert">{error}</p>}<Button type="submit" variant="soft" className="mt-3 w-full py-3.5" disabled={busy} testId="button-reset-password">{busy ? <LoaderCircle className="animate-spin" size={17} /> : null} Guardar contraseña <ChevronRight size={17} /></Button></form><p className="mt-7 text-center text-sm text-white/55"><button type="button" onClick={() => setLocation('/')} className="font-bold text-[hsl(var(--accent))]">Volver a ingresar</button></p></>);
-  if (mode === 'login') return authLayout(<><div className="mb-8"><p className="eyebrow !text-[hsl(var(--accent))]">Volvé a tu red</p><h2 className="display-font mt-3 text-4xl font-bold tracking-[-.06em]">Hola de nuevo.</h2><p className="mt-3 text-sm text-white/60">Ingresá para seguir con tus changas.</p></div><form onSubmit={loginSubmit} className="space-y-4">{input('email', 'Tu email', 'email')}{input('password', 'Contraseña', 'password')}<div className="flex justify-end"><button type="button" onClick={() => { setMode('forgot'); setError(''); setSuccess(''); }} className="text-xs font-bold text-[hsl(var(--accent))]" data-testid="button-forgot-password">¿Olvidaste tu contraseña?</button></div>{error && <p className="text-xs font-semibold text-[hsl(var(--accent))]" role="alert">{error}</p>}{success && <p className="rounded-xl border border-[hsl(var(--accent)/.35)] bg-[hsl(var(--accent)/.12)] p-3 text-xs font-semibold text-[hsl(var(--accent))]" role="status">{success}</p>}<Button type="submit" variant="soft" className="mt-3 w-full py-3.5" disabled={auth.isLoading} testId="button-auth-submit">Entrar a Worky <ChevronRight size={17} /></Button></form><div className="my-7 flex items-center gap-3 text-[11px] text-white/35"><span className="h-px flex-1 bg-white/10" /> acceso simple y seguro <span className="h-px flex-1 bg-white/10" /></div><p className="text-center text-sm text-white/55">¿Todavía no tenés cuenta? <button type="button" onClick={() => setLocation('/registro')} className="font-bold text-[hsl(var(--accent))]" data-testid="button-toggle-auth">Registrate</button></p><p className="mt-7 text-center text-[11px] leading-relaxed text-white/35">Tu información queda protegida.</p></>);
-  return <div className="grain flex min-h-[100dvh] flex-col bg-[hsl(var(--secondary))] text-white md:flex-row"><section className="relative hidden w-[46%] overflow-hidden p-12 md:flex md:flex-col"><Brand light /><div className="relative my-auto max-w-md"><p className="eyebrow !text-[hsl(var(--accent))]">La red que mueve tu barrio</p><h1 className="display-font mt-4 text-5xl font-bold leading-[.98] tracking-[-.06em]">Cuando hace falta,<br /><span className="text-[hsl(var(--accent))]">aparece alguien.</span></h1><p className="mt-6 max-w-sm text-base leading-relaxed text-white/65">Una cuenta para encontrar, contratar, ofrecer y recomendar.</p></div></section><section className="flex flex-1 items-center justify-center px-5 py-10"><div className="w-full max-w-[600px]"><div className="mb-7 md:hidden"><Brand light /></div><div className="mb-5 flex items-center justify-between"><div><p className="eyebrow !text-[hsl(var(--accent))]">Unite a Worky</p><h2 className="display-font mt-2 text-4xl font-bold tracking-[-.06em]">Empecemos cerca.</h2></div><span className="rounded-full bg-white/10 px-3 py-1 text-xs font-bold">Paso {step} de 3</span></div><div className="mb-6 h-1.5 rounded-full bg-white/10"><div className="h-full rounded-full bg-[hsl(var(--accent))] transition-all" style={{ width: `${step * 33.33}%` }} /></div><form onSubmit={(event) => { event.preventDefault(); if (step < 3) setStep((current) => current + 1); else void finish(); }} className="space-y-4">{step === 1 && <><div className="grid gap-4 sm:grid-cols-2">{input('name', 'Nombre y apellido')}{input('email', 'Email', 'email')}{input('phone', 'Teléfono', 'tel')}{input('age', 'Edad', 'number')}{input('password', 'Contraseña', 'password')}{input('confirm', 'Confirmar contraseña', 'password')}</div><div className="grid gap-4 sm:grid-cols-3">{input('address', 'Dirección')}{input('city', 'Ciudad')}{input('province', 'Provincia')}</div><div><span className="label !text-white/75">Foto de perfil (opcional)</span><label className="inline-flex cursor-pointer items-center rounded-xl border border-dashed border-white/25 px-4 py-3 text-xs font-bold">{photo ? 'Reemplazar foto' : 'Subir foto'}<input type="file" accept="image/*" capture="user" className="hidden" onChange={(event) => void file('photo', event.target.files?.[0])} /></label>{photo && <span className="ml-3 inline-flex items-center gap-2"><img src={photo.preview} alt="Vista previa" className="h-12 w-12 rounded-xl object-cover" /><button type="button" className="text-xs text-[hsl(var(--accent))]" onClick={() => setPhoto(null)}>Eliminar</button></span>}</div><div><span className="label !text-white/75">¿Cómo querés usar Worky?</span><div className="grid gap-3 sm:grid-cols-2">{[['client', 'Buscar ayuda'], ['professional', 'Ofrecer mis servicios']].map(([value, label]) => <button type="button" key={value} onClick={() => setRoleLocal(value as Role)} className={`rounded-2xl border p-4 text-left text-sm font-bold ${role === value ? 'border-[hsl(var(--accent))] bg-white/10' : 'border-white/15 bg-white/[.04]'}`}>{label}<span className="mt-1 block text-xs font-normal text-white/55">{value === 'client' ? 'Encontrá un Partner para tu changa.' : 'Mostrá tus oficios y recibí oportunidades.'}</span></button>)}</div></div></>}{step === 2 && <div className="space-y-4">{role === 'client' ? <><p className="text-sm text-white/65">Personalicemos tu experiencia.</p>{question('zona', '¿En qué zona vivís?')}{question('preferencia', '¿Qué valorás más al contratar?')}{question('frecuencia', '¿Con qué frecuencia necesitás ayuda?')}</> : <><p className="text-sm text-white/65">Contanos qué hacés. La verificación es informativa y no bloquea cuentas de prueba.</p>{services.map((service, index) => <div className="grid gap-2 sm:grid-cols-[1fr_1fr_100px]" key={index}><input value={service.oficio} onChange={(event) => setServices((current) => current.map((item, i) => i === index ? { ...item, oficio: event.target.value } : item))} className="field border-white/15 bg-white/[.08] text-white" placeholder="Oficio" required={index === 0} /><select value={service.categoria} onChange={(event) => setServices((current) => current.map((item, i) => i === index ? { ...item, categoria: event.target.value } : item))} className="field border-white/15 bg-white/[.08] text-white"><option>Plomería</option><option>Electricidad</option><option>Gas</option><option>Albañilería</option><option>Otro</option></select><input type="number" value={service.experienciaAnios} onChange={(event) => setServices((current) => current.map((item, i) => i === index ? { ...item, experienciaAnios: Number(event.target.value) } : item))} className="field border-white/15 bg-white/[.08] text-white" placeholder="Años" /></div>)}<button type="button" className="text-xs font-bold text-[hsl(var(--accent))]" onClick={() => setServices((current) => [...current, { oficio: '', categoria: 'Otro', experienciaAnios: 0 }])}>+ Agregar otro oficio</button></>}</div>}{step === 3 && <div className="space-y-4">{role === 'professional' ? <><p className="text-sm text-white/65">Subí tus documentos. Son privados y solo accesibles para verificación.</p><div className="grid gap-3 sm:grid-cols-3">{[['dni_frente', 'DNI frente', 'image/*'], ['dni_dorso', 'DNI dorso', 'image/*'], ['antecedentes_penales', 'Antecedentes penales PDF', 'application/pdf']].map(([key, label, accept]) => <label key={key} className="rounded-2xl border border-dashed border-white/20 p-3 text-xs font-bold">{label}<input type="file" accept={accept} className="mt-2 block w-full text-[10px]" onChange={(event) => void file(key, event.target.files?.[0])} />{docs[key] && <span className="mt-2 block truncate text-white/60">{docs[key].name}</span>}{uploading === key && <span className="mt-2 block text-[hsl(var(--accent))]">Cargando...</span>}</label>)}</div>{question('tipoTrabajo', '¿Qué trabajos hacés mejor?')}{question('zonaTrabajo', '¿En qué zona trabajás?')}{question('objetivo', '¿Qué esperás de Worky?')}</> : <><p className="text-sm text-white/65">Listo. Revisá tus datos y creá tu cuenta.</p><div className="rounded-2xl bg-white/[.07] p-4 text-sm leading-relaxed"><b>{data.name}</b><br />{data.email}<br />{data.city}, {data.province}</div></>}</div>}{error && <p className="text-xs font-semibold text-[hsl(var(--accent))]">{error}</p>}<div className="flex gap-3"><Button type="button" variant="ghost" className="flex-1 text-white" disabled={step === 1} onClick={() => setStep((current) => current - 1)}>Atrás</Button><Button type="submit" variant="soft" className="flex-1 py-3.5" disabled={auth.isLoading || Boolean(uploading)}>{step < 3 ? 'Continuar' : 'Crear mi cuenta'} <ChevronRight size={17} /></Button></div></form><p className="mt-7 text-center text-sm text-white/55">¿Ya tenés una cuenta? <button type="button" onClick={() => setLocation('/')} className="font-bold text-[hsl(var(--accent))]">Ingresá</button></p></div></section></div>;
+  if (mode === 'login') return authLayout(<><div className="mb-8"><p className="eyebrow !text-[hsl(var(--accent))]">Volvé a tu red</p><h2 className="display-font mt-3 text-4xl font-bold tracking-[-.06em]">Hola de nuevo.</h2><p className="mt-3 text-sm text-white/60">Ingresá para seguir con tus changas.</p></div><form onSubmit={loginSubmit} className="space-y-4">{input('email', 'Tu email', 'email')}{input('password', 'Contraseña', 'password')}<div className="flex justify-end"><button type="button" onClick={() => { setMode('forgot'); setError(''); setSuccess(''); }} className="text-xs font-bold text-[hsl(var(--accent))]" data-testid="button-forgot-password">¿Olvidaste tu contraseña?</button></div>{error && <p className="text-xs font-semibold text-[hsl(var(--accent))]" role="alert">{error}</p>}{success && <p className="rounded-xl border border-[hsl(var(--accent)/.35)] bg-[hsl(var(--accent)/.12)] p-3 text-xs font-semibold text-[hsl(var(--accent))]" role="status">{success}</p>}<Button type="submit" variant="soft" className="mt-3 w-full py-3.5" disabled={auth.isLoading} testId="button-auth-submit">Entrar a Worky <ChevronRight size={17} /></Button></form><div className="my-7 flex items-center gap-3 text-[11px] text-white/35"><span className="h-px flex-1 bg-white/10" /> acceso simple y seguro <span className="h-px flex-1 bg-white/10" /></div><p className="text-center text-sm text-white/55">¿Todavía no tenés cuenta? <button type="button" onClick={() => { setMode('register'); setStep(1); }} className="font-bold text-[hsl(var(--accent))]" data-testid="button-toggle-auth">Registrate</button></p><p className="mt-7 text-center text-[11px] leading-relaxed text-white/35">Tu información queda protegida.</p></>);
+  return <div className="grain flex min-h-[100dvh] flex-col bg-[hsl(var(--secondary))] text-white md:flex-row"><section className="relative hidden w-[46%] overflow-hidden p-12 md:flex md:flex-col"><Brand light /><div className="relative my-auto max-w-md"><p className="eyebrow !text-[hsl(var(--accent))]">La red que mueve tu barrio</p><h1 className="display-font mt-4 text-5xl font-bold leading-[.98] tracking-[-.06em]">Cuando hace falta,<br /><span className="text-[hsl(var(--accent))]">aparece alguien.</span></h1><p className="mt-6 max-w-sm text-base leading-relaxed text-white/65">Una cuenta para encontrar, contratar, ofrecer y recomendar.</p></div></section><section className="flex flex-1 items-center justify-center px-5 py-10"><div className="w-full max-w-[600px]"><div className="mb-7 md:hidden"><Brand light /></div><div className="mb-5 flex items-center justify-between"><div><p className="eyebrow !text-[hsl(var(--accent))]">Unite a Worky</p><h2 className="display-font mt-2 text-4xl font-bold tracking-[-.06em]">Empecemos cerca.</h2></div><span className="rounded-full bg-white/10 px-3 py-1 text-xs font-bold">Paso {step} de 3</span></div><div className="mb-6 h-1.5 rounded-full bg-white/10"><div className="h-full rounded-full bg-[hsl(var(--accent))] transition-all" style={{ width: `${step * 33.33}%` }} /></div><form onSubmit={(event) => { event.preventDefault(); if (step < 3) setStep((current) => current + 1); else void finish(); }} className="space-y-4">{step === 1 && <><div className="grid gap-4 sm:grid-cols-2">{input('name', 'Nombre y apellido')}{input('email', 'Email', 'email')}{input('phone', 'Teléfono', 'tel')}{input('age', 'Edad', 'number')}{input('password', 'Contraseña', 'password')}{input('confirm', 'Confirmar contraseña', 'password')}</div><div className="grid gap-4 sm:grid-cols-3">{input('address', 'Dirección')}{input('city', 'Ciudad')}{input('province', 'Provincia')}</div><div><span className="label !text-white/75">Foto de perfil (opcional)</span><label className="inline-flex cursor-pointer items-center rounded-xl border border-dashed border-white/25 px-4 py-3 text-xs font-bold">{photo ? 'Reemplazar foto' : 'Subir foto'}<input type="file" accept="image/*" capture="user" className="hidden" onChange={(event) => void file('photo', event.target.files?.[0])} /></label>{photo && <span className="ml-3 inline-flex items-center gap-2"><img src={photo.preview} alt="Vista previa" className="h-12 w-12 rounded-xl object-cover" /><button type="button" className="text-xs text-[hsl(var(--accent))]" onClick={() => setPhoto(null)}>Eliminar</button></span>}</div><div><span className="label !text-white/75">¿Cómo querés usar Worky?</span><div className="grid gap-3 sm:grid-cols-2">{[['client', 'Buscar ayuda'], ['professional', 'Ofrecer mis servicios']].map(([value, label]) => <button type="button" key={value} onClick={() => setRoleLocal(value as Role)} className={`rounded-2xl border p-4 text-left text-sm font-bold ${role === value ? 'border-[hsl(var(--accent))] bg-white/10' : 'border-white/15 bg-white/[.04]'}`}>{label}<span className="mt-1 block text-xs font-normal text-white/55">{value === 'client' ? 'Encontrá un Partner para tu changa.' : 'Mostrá tus oficios y recibí oportunidades.'}</span></button>)}</div></div></>}{step === 2 && <div className="space-y-4">{role === 'client' ? <><p className="text-sm text-white/65">Personalicemos tu experiencia.</p>{question('zona', '¿En qué barrio o zona de Alta Gracia vivís?')}{question('preferencia', '¿Qué valorás más al contratar?')}{question('frecuencia', '¿Con qué frecuencia necesitás ayuda?')}</> : <><p className="text-sm text-white/65">Contanos qué hacés. La verificación es informativa y no bloquea cuentas de prueba.</p>{services.map((service, index) => <div className="grid gap-2 sm:grid-cols-[1fr_1fr_100px]" key={index}><input value={service.oficio} onChange={(event) => setServices((current) => current.map((item, i) => i === index ? { ...item, oficio: event.target.value } : item))} className="field border-white/15 bg-white/[.08] text-white" placeholder="Oficio" required={index === 0} /><select value={service.categoria} onChange={(event) => setServices((current) => current.map((item, i) => i === index ? { ...item, categoria: event.target.value } : item))} className="field border-white/15 bg-white/[.08] text-white"><option>Plomería</option><option>Electricidad</option><option>Gas</option><option>Albañilería</option><option>Otro</option></select><input type="number" value={service.experienciaAnios} onChange={(event) => setServices((current) => current.map((item, i) => i === index ? { ...item, experienciaAnios: Number(event.target.value) } : item))} className="field border-white/15 bg-white/[.08] text-white" placeholder="Años" /></div>)}<button type="button" className="text-xs font-bold text-[hsl(var(--accent))]" onClick={() => setServices((current) => [...current, { oficio: '', categoria: 'Otro', experienciaAnios: 0 }])}>+ Agregar otro oficio</button></>}</div>}{step === 3 && <div className="space-y-4">{role === 'professional' ? <><p className="text-sm text-white/65">Subí tus documentos. Son privados y solo accesibles para verificación.</p><div className="grid gap-3 sm:grid-cols-3">{[['dni_frente', 'DNI frente', 'image/*'], ['dni_dorso', 'DNI dorso', 'image/*'], ['antecedentes_penales', 'Antecedentes penales PDF', 'application/pdf']].map(([key, label, accept]) => <label key={key} className="rounded-2xl border border-dashed border-white/20 p-3 text-xs font-bold">{label}<input type="file" accept={accept} className="mt-2 block w-full text-[10px]" onChange={(event) => void file(key, event.target.files?.[0])} />{docs[key] && <span className="mt-2 block truncate text-white/60">{docs[key].name}</span>}{uploading === key && <span className="mt-2 block text-[hsl(var(--accent))]">Cargando...</span>}</label>)}</div>{question('tipoTrabajo', '¿Qué trabajos hacés mejor?')}{question('zonaTrabajo', '¿En qué barrio o zona de Alta Gracia trabajás?')}{question('objetivo', '¿Qué esperás de Worky?')}</> : <><p className="text-sm text-white/65">Listo. Revisá tus datos y creá tu cuenta.</p><div className="rounded-2xl bg-white/[.07] p-4 text-sm leading-relaxed"><b>{data.name}</b><br />{data.email}<br />{data.city}, {data.province}</div></>}</div>}{error && <p className="text-xs font-semibold text-[hsl(var(--accent))]">{error}</p>}<div className="flex gap-3"><Button type="button" variant="ghost" className="flex-1 text-white" disabled={step === 1} onClick={() => setStep((current) => current - 1)}>Atrás</Button><Button type="submit" variant="soft" className="flex-1 py-3.5" disabled={auth.isLoading || Boolean(uploading)}>{step < 3 ? 'Continuar' : 'Crear mi cuenta'} <ChevronRight size={17} /></Button></div></form><p className="mt-7 text-center text-sm text-white/55">¿Ya tenés una cuenta? <button type="button" onClick={() => setLocation('/')} className="font-bold text-[hsl(var(--accent))]">Ingresá</button></p></div></section></div>;
 }
 
 function ProfessionalCard({ professional }: { professional: WorkyProfessional }) {
@@ -1465,41 +1547,6 @@ function PartnerPage() {
   return <div className="mx-auto max-w-3xl space-y-7"><div><p className="eyebrow">Tu cuenta Worky</p><h1 className="display-font mt-2 text-4xl font-bold tracking-[-.055em]">Ofrecé lo que sabés hacer.</h1><p className="mt-2 text-sm text-[hsl(var(--muted-foreground))]">Usás la misma cuenta para contratar y ofrecer servicios. Completá estos datos para aparecer como Partner.</p></div><form onSubmit={submit} className="grid gap-5 rounded-2xl border border-[hsl(var(--border))] bg-[hsl(var(--card))] p-6 md:grid-cols-2 md:p-8"><label><span className="label">¿Qué oficio ofrecés?</span><input required minLength={2} value={form.oficio} onChange={(e) => setForm({ ...form, oficio: e.target.value })} className="field" placeholder="Ej: Electricista" data-testid="input-partner-trade" /></label><label><span className="label">Categoría</span><select required value={form.categoria} onChange={(e) => setForm({ ...form, categoria: e.target.value })} className="field"><option value="">Elegí una categoría</option>{categories.map((category) => <option key={category} value={category}>{category}</option>)}</select></label><label><span className="label">Precio de referencia</span><input type="number" min="0" value={form.precioReferencia} onChange={(e) => setForm({ ...form, precioReferencia: e.target.value })} className="field" placeholder="12000" /></label><label className="md:col-span-2"><span className="label">Contá brevemente sobre tu trabajo</span><textarea value={form.about} onChange={(e) => setForm({ ...form, about: e.target.value })} className="field min-h-32 resize-y" placeholder="Experiencia, especialidades y zonas donde trabajás..." /></label>{error && <p className="md:col-span-2 text-xs font-bold text-[hsl(var(--destructive))]">{error}</p>}{saved && <p className="md:col-span-2 text-xs font-bold text-[#31825a]">Tu perfil Partner fue creado.</p>}<div className="md:col-span-2 flex justify-end border-t border-[hsl(var(--border))] pt-5"><Button type="submit" testId="button-create-partner">Empezar como Partner <ChevronRight size={16} /></Button></div></form></div>;
 }
 
-function AdminVerificationsPage() {
-  const [reasonById, setReasonById] = useState<Record<number, string>>({});
-  const [actionId, setActionId] = useState<number | null>(null);
-  const [error, setError] = useState('');
-  const documents = useQuery({
-    queryKey: ['admin-verifications'],
-    queryFn: () => apiRequest<VerificationDocument[]>('/admin/verificaciones'),
-    refetchInterval: 15000,
-  });
-  const resolve = async (document: VerificationDocument, estado: 'verified' | 'rejected') => {
-    const motivo = reasonById[document.id]?.trim() || '';
-    if (!motivo) { setError(`Agregá un motivo para ${verificationLabels[document.tipo].toLowerCase()}.`); return; }
-    setActionId(document.id); setError('');
-    try {
-      await apiRequest(`/admin/verificaciones/${document.id}`, { method: 'PATCH', body: JSON.stringify({ estado, motivo }) });
-      await documents.refetch();
-      queryClient.invalidateQueries({ queryKey: ['worky-notifications'] });
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'No pudimos guardar la decisión.');
-    } finally { setActionId(null); }
-  };
-  if (documents.isLoading) return <LoadingBlock label="Cargando verificaciones pendientes..." />;
-  if (documents.isError) return <ErrorState onRetry={() => void documents.refetch()} />;
-  const rows = documents.data || [];
-  return <div className="mx-auto max-w-5xl space-y-8" data-testid="admin-verifications-page">
-    <div><p className="eyebrow">Operaciones</p><h1 className="display-font mt-2 text-4xl font-bold tracking-[-.055em]">Verificaciones de Partners.</h1><p className="mt-2 max-w-2xl text-sm text-[hsl(var(--muted-foreground))]">Revisá la documentación privada y dejá una decisión clara para cada caso. Solo el equipo administrador puede acceder a estos archivos.</p></div>
-    {error && <p className="rounded-xl border border-red-200 bg-red-50 p-3 text-xs font-bold text-red-700" role="alert">{error}</p>}
-    {!rows.length ? <EmptyState icon={ShieldCheck} title="No hay verificaciones pendientes" copy="La cola está al día. Los nuevos documentos van a aparecer acá cuando un Partner complete su alta." /> :
-      <div className="space-y-4">{rows.map((document) => <article key={document.id} className="rounded-2xl border border-[hsl(var(--border))] bg-[hsl(var(--card))] p-5 md:p-6" data-testid={`verification-${document.id}`}>
-        <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between"><div><div className="flex flex-wrap items-center gap-2"><h2 className="display-font text-xl font-bold">{document.partner.nombre}</h2><span className="status status-amber">{verificationStatusLabels[document.estado]}</span></div><p className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">{document.partner.email} · {document.perfil?.oficio || 'Perfil sin oficio'} · {document.perfil?.categoria || 'Sin categoría'}</p></div><span className="text-xs text-[hsl(var(--muted-foreground))]">Recibido {dateLabel(document.createdAt)}</span></div>
-        <div className="mt-5 flex flex-col gap-4 rounded-xl bg-[hsl(var(--muted)/.65)] p-4 sm:flex-row sm:items-center sm:justify-between"><div><p className="text-sm font-bold">{verificationLabels[document.tipo]}</p><p className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">{document.nombre} · {Math.round(document.sizeBytes / 1024)} KB</p></div><Button variant="ghost" onClick={() => { void openPrivateDocument(document.objectPath).catch((cause) => setError(cause instanceof Error ? cause.message : 'No pudimos abrir el documento.')); }} testId={`button-open-verification-${document.id}`}>Abrir documento</Button></div>
-        <div className="mt-4"><label><span className="label">Motivo de la decisión</span><textarea value={reasonById[document.id] || ''} onChange={(event) => setReasonById((current) => ({ ...current, [document.id]: event.target.value }))} className="field min-h-20 resize-y" maxLength={1000} placeholder="Ej: La imagen se ve nítida y los datos coinciden..." data-testid={`textarea-verification-reason-${document.id}`} /></label><div className="mt-3 flex flex-wrap justify-end gap-2"><Button variant="danger" disabled={actionId === document.id} onClick={() => void resolve(document, 'rejected')} testId={`button-reject-verification-${document.id}`}>{actionId === document.id ? <LoaderCircle className="animate-spin" size={15} /> : null} Rechazar</Button><Button disabled={actionId === document.id} onClick={() => void resolve(document, 'verified')} testId={`button-approve-verification-${document.id}`}>{actionId === document.id ? <LoaderCircle className="animate-spin" size={15} /> : null} Aprobar</Button></div></div>
-      </article>)}</div>}
-  </div>;
-}
 function RoutedErrorBoundary({ children }: { children: ReactNode }) {
   const [location] = useLocation();
   return <ErrorBoundary resetKey={location}>{children}</ErrorBoundary>;
@@ -1509,16 +1556,22 @@ function RouterContent({ role, setRole }: { role: Role; setRole: (role: Role) =>
   const auth = useAuth();
   const [location] = useLocation();
   const basePath = import.meta.env?.BASE_URL ?? '/';
+  const professionalProfile = useGetMyProfessionalProfile({
+    query: {
+      queryKey: getGetMyProfessionalProfileQueryKey(),
+      retry: false,
+      enabled: Boolean(auth.user && auth.user.rol !== 'admin'),
+    },
+  });
+  const hasProfessionalAccount = hasDualRoleAccount(auth.user?.rol, professionalProfile.data);
+  const savedRole = localStorage.getItem('worky-role');
+  const hasSavedRolePreference = savedRole === 'client' || savedRole === 'professional';
+  const effectiveRole = resolveEffectiveRole(auth.user?.rol, role, hasSavedRolePreference, hasProfessionalAccount);
   if (auth.isLoading) return <div className="flex min-h-[100dvh] items-center justify-center bg-[hsl(var(--background))]"><LoadingBlock label="Recuperando tu sesión..." /></div>;
   if (!auth.isAuthenticated) return <RoutedErrorBoundary><AuthPage setRole={setRole} /></RoutedErrorBoundary>;
-  const effectiveRole: Role = auth.user?.rol === 'admin' ? 'admin' : auth.user?.rol === 'profesional' ? 'professional' : role === 'professional' ? 'professional' : 'client';
-  const content = location === '/registro'
-    ? (effectiveRole === 'professional'
-      ? <AppShell role="professional" setRole={setRole}><PartnerProfilePage /></AppShell>
-      : <AppShell role={effectiveRole} setRole={setRole}><HomePage /></AppShell>)
-    : location === '/services'
-      ? <AppShell role="professional" setRole={setRole}><PartnerProfilePage /></AppShell>
-      : <RoutedErrorBoundary><Switch><Route path="/" component={() => { window.history.replaceState({}, '', `${basePath}home`); return null; }} /><Route path="/home"><AppShell role={effectiveRole} setRole={setRole}><HomePage /></AppShell></Route><Route path="/professional/:id"><AppShell role={effectiveRole} setRole={setRole}><ProfessionalPage /></AppShell></Route><Route path="/admin/verificaciones">{effectiveRole === 'admin' ? <AppShell role="admin" setRole={setRole}><AdminVerificationsPage /></AppShell> : <NotFound />}</Route><Route path="/partner/dashboard"><AppShell role="professional" setRole={setRole}><PartnerDashboard /></AppShell></Route><Route path="/jobs/new"><AppShell role={effectiveRole} setRole={setRole}><NewJobPage /></AppShell></Route><Route path="/jobs"><AppShell role={effectiveRole} setRole={setRole}><JobsPage role={effectiveRole === 'professional' ? 'professional' : 'client'} /></AppShell></Route><Route path="/conversations"><AppShell role={effectiveRole} setRole={setRole}><ConversationsPage role={effectiveRole} /></AppShell></Route><Route path="/chat/:id"><AppShell role={effectiveRole} setRole={setRole}><ChatPage role={effectiveRole} /></AppShell></Route><Route path="/partner"><AppShell role={effectiveRole} setRole={setRole}><PartnerPage /></AppShell></Route><Route path="/profile"><AppShell role={effectiveRole} setRole={setRole}><ProfilePage role={effectiveRole === 'professional' ? 'professional' : 'client'} /></AppShell></Route><Route path="/settings"><AppShell role={effectiveRole} setRole={setRole}><SettingsPage /></AppShell></Route><Route component={NotFound} /></Switch></RoutedErrorBoundary>;
+  const content = location === '/services'
+    ? <AppShell role="professional" setRole={setRole}><PartnerProfilePage /></AppShell>
+    : <RoutedErrorBoundary><Switch><Route path="/" component={() => { window.history.replaceState({}, '', `${basePath}home`); return null; }} /><Route path="/home"><AppShell role={effectiveRole} setRole={setRole}><HomePage /></AppShell></Route><Route path="/professional/:id"><AppShell role={effectiveRole} setRole={setRole}><ProfessionalPage /></AppShell></Route><Route path="/admin">{effectiveRole === 'admin' ? <AppShell role="admin" setRole={setRole}><AdminConsolePage /></AppShell> : <NotFound />}</Route><Route path="/admin/verificaciones">{effectiveRole === 'admin' ? <AppShell role="admin" setRole={setRole}><AdminConsolePage initialSection="verifications" /></AppShell> : <NotFound />}</Route><Route path="/partner/dashboard"><AppShell role="professional" setRole={setRole}><PartnerDashboard /></AppShell></Route><Route path="/jobs/new"><AppShell role={effectiveRole} setRole={setRole}><NewJobPage /></AppShell></Route><Route path="/jobs"><AppShell role={effectiveRole} setRole={setRole}><JobsPage role={effectiveRole === 'professional' ? 'professional' : 'client'} /></AppShell></Route><Route path="/conversations"><AppShell role={effectiveRole} setRole={setRole}><ConversationsPage role={effectiveRole} /></AppShell></Route><Route path="/chat/:id"><AppShell role={effectiveRole} setRole={setRole}><ChatPage role={effectiveRole} /></AppShell></Route><Route path="/partner"><AppShell role={effectiveRole} setRole={setRole}><PartnerPage /></AppShell></Route><Route path="/profile"><AppShell role={effectiveRole} setRole={setRole}><ProfilePage role={effectiveRole === 'professional' ? 'professional' : 'client'} /></AppShell></Route><Route path="/settings"><AppShell role={effectiveRole} setRole={setRole}><SettingsPage /></AppShell></Route><Route component={NotFound} /></Switch></RoutedErrorBoundary>;
   return <><ProfessionalLocationTracker enabled={effectiveRole === 'professional'} />{content}</>;
 }
 
@@ -1534,14 +1587,3 @@ const verificationStatusLabels: Record<VerificationDocument['estado'], string> =
   pending_verification: 'Pendiente de revisión', verified: 'Aprobado', rejected: 'Rechazado',
 };
 
-const verificationLabels: Record<VerificationDocument['tipo'], string> = {
-  dni_frente: 'DNI — frente', dni_dorso: 'DNI — dorso', antecedentes_penales: 'Antecedentes penales',
-};
-
-async function openPrivateDocument(objectPath: string) {
-  const response = await fetch(`/api/v1/storage/objects${objectPath}`, { headers: { Authorization: `Bearer ${getToken()}` } });
-  if (!response.ok) throw new Error('No pudimos abrir el documento.');
-  const url = URL.createObjectURL(await response.blob());
-  window.open(url, '_blank', 'noopener,noreferrer');
-  window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
-}

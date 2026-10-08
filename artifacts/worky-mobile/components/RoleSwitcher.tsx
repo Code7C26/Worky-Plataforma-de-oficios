@@ -3,8 +3,9 @@ import { ActivityIndicator, Pressable, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { AppText } from '@/components/WorkyUI';
 import { useColors } from '@/hooks/useColors';
+import type { WorkyRole } from '@/lib/role-switch';
 
-export type WorkyRole = 'cliente' | 'profesional';
+export type { WorkyRole } from '@/lib/role-switch';
 
 const options: { role: WorkyRole; label: string; icon: React.ComponentProps<typeof Feather>['name'] }[] = [
   { role: 'cliente', label: 'Cliente', icon: 'search' },
@@ -27,6 +28,7 @@ export function RoleSwitcher({
   return (
     <View>
       <View
+        accessibilityRole="radiogroup"
         accessibilityLabel="Cambiar perfil de uso"
         style={{
           flexDirection: 'row',
@@ -42,7 +44,9 @@ export function RoleSwitcher({
             <Pressable
               key={option.role}
               accessibilityRole="radio"
-              accessibilityState={{ selected, disabled }}
+              accessibilityLabel={option.label}
+              accessibilityState={{ checked: selected, disabled }}
+              aria-checked={selected}
               disabled={disabled}
               onPress={() => onSelect(option.role)}
               testID={`button-role-${option.role === 'profesional' ? 'partner' : 'cliente'}`}

@@ -1,0 +1,391 @@
+@import url("https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap");
+
+.worky-conversations {
+  --worky-background: #f9f6f0;
+  --worky-foreground: #17223a;
+  --worky-card: #fdfdfc;
+  --worky-primary: #f58224;
+  --worky-secondary: #203655;
+  --worky-secondary-foreground: #fdfdfc;
+  --worky-muted: #efe9e1;
+  --worky-muted-foreground: #5e6b87;
+  --worky-accent: #f8c859;
+  --worky-border: #e3ddd3;
+  --worky-radius: 14.4px;
+  --whatsapp-green: #25d366;
+  min-height: 100vh;
+  background: var(--worky-background);
+  color: var(--worky-foreground);
+  font-family: "DM Sans", sans-serif;
+}
+
+.worky-conversations *,
+.worky-conversations *::before,
+.worky-conversations *::after {
+  box-sizing: border-box;
+}
+
+.worky-conversations button {
+  color: inherit;
+  font: inherit;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.worky-conversations .mobile-frame {
+  position: relative;
+  width: min(100%, 430px);
+  min-height: 100vh;
+  margin: 0 auto;
+  overflow: hidden;
+  background: var(--worky-background);
+}
+
+.worky-conversations .screen {
+  min-height: 100vh;
+  padding: 81px 16px 142px;
+}
+
+.worky-conversations .page-header {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  margin: 0 4px 16px;
+}
+
+.worky-conversations .eyebrow {
+  margin: 0;
+  color: var(--worky-primary);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.13em;
+  line-height: 16px;
+  text-transform: uppercase;
+}
+
+.worky-conversations .title {
+  margin: 0;
+  font-family: "Space Grotesk", sans-serif;
+  font-size: 25px;
+  font-weight: 600;
+  letter-spacing: -0.6px;
+  line-height: 31px;
+}
+
+.worky-conversations .description {
+  margin: 0;
+  color: var(--worky-muted-foreground);
+  font-size: 15px;
+  line-height: 22px;
+}
+
+.worky-conversations .current-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.worky-conversations .current-row {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: 0;
+  padding: 14px;
+  border: 1px solid var(--worky-border);
+  border-radius: var(--worky-radius);
+  background: var(--worky-card);
+  box-shadow: 0 7px 16px rgba(23, 34, 58, 0.045);
+  text-align: left;
+}
+
+.worky-conversations .avatar {
+  display: grid;
+  width: 46px;
+  height: 46px;
+  flex: 0 0 46px;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--worky-secondary);
+  color: var(--worky-secondary-foreground);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.worky-conversations .current-copy {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: 4px;
+  margin-left: 11px;
+}
+
+.worky-conversations .current-topline,
+.worky-conversations .wa-topline,
+.worky-conversations .wa-message-line {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.worky-conversations .person-name {
+  overflow: hidden;
+  color: var(--worky-foreground);
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 18px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.worky-conversations .timestamp,
+.worky-conversations .category,
+.worky-conversations .preview {
+  color: var(--worky-muted-foreground);
+  font-size: 12px;
+  line-height: 17px;
+}
+
+.worky-conversations .timestamp {
+  flex: 0 0 auto;
+}
+
+.worky-conversations .current-category {
+  color: var(--worky-primary);
+}
+
+.worky-conversations .preview {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.worky-conversations .current-badge {
+  display: grid;
+  min-width: 22px;
+  height: 22px;
+  flex: 0 0 auto;
+  place-items: center;
+  margin-left: 8px;
+  border-radius: 50%;
+  background: var(--worky-primary);
+  color: var(--worky-primary-foreground);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.worky-conversations .chevron {
+  flex: 0 0 auto;
+  margin-left: 5px;
+  color: var(--worky-muted-foreground);
+}
+
+.worky-conversations .wa-screen {
+  padding: 76px 0 142px;
+}
+
+.worky-conversations .wa-header {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 0 20px 18px;
+}
+
+.worky-conversations .wa-header .title {
+  font-size: 27px;
+  line-height: 34px;
+}
+
+.worky-conversations .wa-subtitle {
+  margin: 0;
+  color: var(--worky-muted-foreground);
+  font-size: 14px;
+  line-height: 20px;
+}
+
+.worky-conversations .wa-list {
+  background: var(--worky-card);
+}
+
+.worky-conversations .wa-row {
+  display: flex;
+  min-height: 78px;
+  align-items: center;
+  gap: 12px;
+  padding: 11px 16px;
+  border: 0;
+  background: transparent;
+  text-align: left;
+}
+
+.worky-conversations .wa-avatar {
+  width: 54px;
+  height: 54px;
+  flex-basis: 54px;
+  font-size: 15px;
+}
+
+.worky-conversations .tone-1 { background: #d7eee1; color: #23613f; }
+.worky-conversations .tone-2 { background: #e7d7c8; color: #6f442c; }
+.worky-conversations .tone-3 { background: #d9e3f5; color: #35517d; }
+.worky-conversations .tone-4 { background: #efdfc7; color: #71512a; }
+.worky-conversations .tone-5 { background: #e6dced; color: #684e79; }
+
+.worky-conversations .wa-copy {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.worky-conversations .wa-name-line {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  align-items: center;
+  gap: 6px;
+}
+
+.worky-conversations .wa-name {
+  overflow: hidden;
+  color: #17223a;
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 20px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.worky-conversations .wa-category {
+  flex: 0 1 auto;
+  overflow: hidden;
+  padding: 2px 6px;
+  border-radius: 999px;
+  background: #f2f0ec;
+  color: #687287;
+  font-size: 10px;
+  line-height: 14px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.worky-conversations .wa-time {
+  flex: 0 0 auto;
+  color: #8790a0;
+  font-size: 11px;
+  line-height: 16px;
+}
+
+.worky-conversations .wa-time-unread {
+  color: #138c4b;
+}
+
+.worky-conversations .wa-preview {
+  min-width: 0;
+  overflow: hidden;
+  color: #687287;
+  font-size: 13px;
+  line-height: 18px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.worky-conversations .wa-badge {
+  display: grid;
+  min-width: 20px;
+  height: 20px;
+  flex: 0 0 auto;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--whatsapp-green);
+  color: white;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.worky-conversations .wa-divider {
+  height: 1px;
+  margin-left: 82px;
+  background: #ece9e5;
+}
+
+.worky-conversations .bottom-nav-shell {
+  position: fixed;
+  z-index: 5;
+  right: 12px;
+  bottom: 8px;
+  left: 12px;
+  width: min(calc(100% - 24px), 406px);
+  margin: 0 auto;
+}
+
+.worky-conversations .bottom-nav {
+  display: flex;
+  min-height: 70px;
+  align-items: flex-end;
+  justify-content: space-around;
+  padding: 0 4px;
+  border: 1px solid var(--worky-border);
+  border-radius: 25px;
+  background: var(--worky-card);
+  box-shadow: 0 8px 18px rgba(23, 34, 58, 0.1);
+}
+
+.worky-conversations .nav-item {
+  display: flex;
+  min-width: 0;
+  min-height: 66px;
+  flex: 1;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--worky-muted-foreground);
+}
+
+.worky-conversations .nav-icon {
+  display: grid;
+  width: 34px;
+  height: 31px;
+  place-items: center;
+  border-radius: 12px;
+}
+
+.worky-conversations .nav-item-active {
+  color: var(--worky-primary);
+}
+
+.worky-conversations .nav-item-active .nav-icon {
+  background: var(--worky-muted);
+}
+
+.worky-conversations .nav-label {
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 14px;
+}
+
+.worky-conversations .nav-item-center {
+  margin-top: -22px;
+}
+
+.worky-conversations .nav-center {
+  display: grid;
+  width: 56px;
+  height: 56px;
+  place-items: center;
+  border: 4px solid var(--worky-card);
+  border-radius: 50%;
+  background: var(--worky-secondary);
+  box-shadow: 0 5px 10px rgba(23, 34, 58, 0.16);
+  color: var(--worky-secondary-foreground);
+}
+
+.worky-conversations .nav-center-label {
+  color: var(--worky-secondary);
+}

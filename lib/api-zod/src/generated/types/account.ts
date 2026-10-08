@@ -13,6 +13,8 @@ export interface Account {
   nombre: string;
   email: string;
   /** @nullable */
+  emailVerifiedAt: Date | null;
+  /** @nullable */
   telefono?: string | null;
   /** @nullable */
   edad?: number | null;

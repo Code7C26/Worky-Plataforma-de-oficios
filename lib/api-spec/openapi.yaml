@@ -10,12 +10,413 @@ servers:
 tags:
   - name: health
     description: Health operations
+  - name: storage
+    description: File storage operations
   - name: professionals
   - name: jobs
   - name: messages
   - name: appointments
   - name: auth
+  - name: notifications
+  - name: partner
+  - name: admin
+    description: Administrative operations for Worky
 paths:
+  /admin/dashboard:
+    get:
+      operationId: getAdminDashboard
+      tags: [admin]
+      summary: Get administrative dashboard totals
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Administrative totals and recent activity
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AdminDashboard" }
+        "401": { description: Authentication required }
+        "403": { description: Administrator access required }
+  /admin/accounts:
+    get:
+      operationId: listAdminAccounts
+      tags: [admin]
+      summary: Search account records
+      security:
+        - bearerAuth: []
+      parameters:
+        - { in: query, name: search, schema: { type: string } }
+        - { in: query, name: role, schema: { type: string, enum: [cliente, profesional, admin] } }
+        - { in: query, name: active, schema: { type: boolean } }
+        - { in: query, name: page, schema: { type: number, minimum: 1 } }
+        - { in: query, name: limit, schema: { type: number, minimum: 1, maximum: 100 } }
+      responses:
+        "200":
+          description: Account page
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AdminAccountPage" }
+        "401": { description: Authentication required }
+        "403": { description: Administrator access required }
+  /admin/accounts/{id}/status:
+    patch:
+      operationId: updateAdminAccountStatus
+      tags: [admin]
+      summary: Suspend or reactivate a non-administrator account
+      security:
+        - bearerAuth: []
+      parameters:
+        - { in: path, name: id, required: true, schema: { type: number } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AdminAccountStatusInput" }
+      responses:
+        "200":
+          description: Updated account status
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AdminAccount" }
+        "400": { description: Invalid status change }
+        "401": { description: Authentication required }
+        "403": { description: Administrator access required }
+        "404": { description: Account not found }
+        "409": { description: Account cannot be changed }
+  /admin/partners:
+    get:
+      operationId: listAdminPartners
+      tags: [admin]
+      summary: Search Partner profiles and their document states
+      security:
+        - bearerAuth: []
+      parameters:
+        - { in: query, name: search, schema: { type: string } }
+        - { in: query, name: verificationStatus, schema: { type: string, enum: [pending_verification, verified, rejected] } }
+        - { in: query, name: enabled, schema: { type: boolean } }
+        - { in: query, name: page, schema: { type: number, minimum: 1 } }
+        - { in: query, name: limit, schema: { type: number, minimum: 1, maximum: 100 } }
+      responses:
+        "200":
+          description: Partner page
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AdminPartnerPage" }
+        "401": { description: Authentication required }
+        "403": { description: Administrator access required }
+  /admin/partners/{id}/activation:
+    patch:
+      operationId: updateAdminPartnerActivation
+      tags: [admin]
+      summary: Enable or suspend a verified Partner profile
+      security:
+        - bearerAuth: []
+      parameters:
+        - { in: path, name: id, required: true, schema: { type: number } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AdminPartnerActivationInput" }
+      responses:
+        "200":
+          description: Updated Partner activation state
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AdminPartner" }
+        "400": { description: Invalid status change }
+        "401": { description: Authentication required }
+        "403": { description: Administrator access required }
+        "404": { description: Partner not found }
+        "409": { description: Partner cannot be enabled before verification or while the account is suspended }
+  /admin/jobs:
+    get:
+      operationId: listAdminJobs
+      tags: [admin]
+      summary: Search job records
+      security:
+        - bearerAuth: []
+      parameters:
+        - { in: query, name: search, schema: { type: string } }
+        - { in: query, name: status, schema: { type: string } }
+        - { in: query, name: page, schema: { type: number, minimum: 1 } }
+        - { in: query, name: limit, schema: { type: number, minimum: 1, maximum: 100 } }
+      responses:
+        "200":
+          description: Job page
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AdminJobPage" }
+        "401": { description: Authentication required }
+        "403": { description: Administrator access required }
+  /admin/bookings:
+    get:
+      operationId: listAdminBookings
+      tags: [admin]
+      summary: Search booking records
+      security:
+        - bearerAuth: []
+      parameters:
+        - { in: query, name: search, schema: { type: string } }
+        - { in: query, name: status, schema: { type: string } }
+        - { in: query, name: page, schema: { type: number, minimum: 1 } }
+        - { in: query, name: limit, schema: { type: number, minimum: 1, maximum: 100 } }
+      responses:
+        "200":
+          description: Booking page
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AdminBookingPage" }
+        "401": { description: Authentication required }
+        "403": { description: Administrator access required }
+  /admin/payments:
+    get:
+      operationId: listAdminPayments
+      tags: [admin]
+      summary: Search payment records without provider secrets
+      security:
+        - bearerAuth: []
+      parameters:
+        - { in: query, name: search, schema: { type: string } }
+        - { in: query, name: status, schema: { type: string } }
+        - { in: query, name: page, schema: { type: number, minimum: 1 } }
+        - { in: query, name: limit, schema: { type: number, minimum: 1, maximum: 100 } }
+      responses:
+        "200":
+          description: Payment page
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AdminPaymentPage" }
+        "401": { description: Authentication required }
+        "403": { description: Administrator access required }
+  /admin/settlements:
+    get:
+      operationId: listAdminSettlements
+      tags: [admin]
+      summary: Search Partner settlement records
+      security:
+        - bearerAuth: []
+      parameters:
+        - { in: query, name: search, schema: { type: string } }
+        - { in: query, name: status, schema: { type: string } }
+        - { in: query, name: page, schema: { type: number, minimum: 1 } }
+        - { in: query, name: limit, schema: { type: number, minimum: 1, maximum: 100 } }
+      responses:
+        "200":
+          description: Settlement page
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AdminSettlementPage" }
+        "401": { description: Authentication required }
+        "403": { description: Administrator access required }
+  /admin/reviews:
+    get:
+      operationId: listAdminReviews
+      tags: [admin]
+      summary: Search review records
+      security:
+        - bearerAuth: []
+      parameters:
+        - { in: query, name: search, schema: { type: string } }
+        - { in: query, name: page, schema: { type: number, minimum: 1 } }
+        - { in: query, name: limit, schema: { type: number, minimum: 1, maximum: 100 } }
+      responses:
+        "200":
+          description: Review page
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AdminReviewPage" }
+        "401": { description: Authentication required }
+        "403": { description: Administrator access required }
+  /admin/recommendations:
+    get:
+      operationId: listAdminRecommendations
+      tags: [admin]
+      summary: Search recommendation records
+      security:
+        - bearerAuth: []
+      parameters:
+        - { in: query, name: search, schema: { type: string } }
+        - { in: query, name: visibility, schema: { type: string, enum: [publica, privada] } }
+        - { in: query, name: page, schema: { type: number, minimum: 1 } }
+        - { in: query, name: limit, schema: { type: number, minimum: 1, maximum: 100 } }
+      responses:
+        "200":
+          description: Recommendation page
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AdminRecommendationPage" }
+        "401": { description: Authentication required }
+        "403": { description: Administrator access required }
+  /admin/recommendations/{id}/visibility:
+    patch:
+      operationId: updateAdminRecommendationVisibility
+      tags: [admin]
+      summary: Change the public visibility of a recommendation
+      security:
+        - bearerAuth: []
+      parameters:
+        - { in: path, name: id, required: true, schema: { type: number } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AdminRecommendationVisibilityInput" }
+      responses:
+        "200":
+          description: Updated recommendation
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AdminRecommendation" }
+        "400": { description: Invalid visibility }
+        "401": { description: Authentication required }
+        "403": { description: Administrator access required }
+        "404": { description: Recommendation not found }
+  /admin/catalog:
+    get:
+      operationId: listAdminCatalog
+      tags: [admin]
+      summary: List active and inactive service catalog entries
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Catalog entries
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/AdminCatalogItem" }
+        "401": { description: Authentication required }
+        "403": { description: Administrator access required }
+    post:
+      operationId: createAdminCatalogItem
+      tags: [admin]
+      summary: Add an entry to the service catalog
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AdminCatalogInput" }
+      responses:
+        "201":
+          description: Created catalog entry
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AdminCatalogItem" }
+        "400": { description: Invalid catalog entry }
+        "401": { description: Authentication required }
+        "403": { description: Administrator access required }
+        "409": { description: Catalog entry already exists }
+  /admin/catalog/{id}:
+    patch:
+      operationId: updateAdminCatalogItem
+      tags: [admin]
+      summary: Update or deactivate a service catalog entry
+      security:
+        - bearerAuth: []
+      parameters:
+        - { in: path, name: id, required: true, schema: { type: number } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AdminCatalogUpdate" }
+      responses:
+        "200":
+          description: Updated catalog entry
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AdminCatalogItem" }
+        "400": { description: Invalid catalog entry }
+        "401": { description: Authentication required }
+        "403": { description: Administrator access required }
+        "404": { description: Catalog entry not found }
+        "409": { description: Catalog entry already exists }
+  /admin/resources:
+    get:
+      operationId: listAdminResources
+      tags: [admin]
+      summary: Inventory public Partner portfolio and profile image metadata
+      security:
+        - bearerAuth: []
+      parameters:
+        - { in: query, name: search, schema: { type: string } }
+        - { in: query, name: page, schema: { type: number, minimum: 1 } }
+        - { in: query, name: limit, schema: { type: number, minimum: 1, maximum: 100 } }
+      responses:
+        "200":
+          description: Resource metadata page; private chat content is not included
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AdminResourcePage" }
+        "401": { description: Authentication required }
+        "403": { description: Administrator access required }
+  /admin/activity:
+    get:
+      operationId: listAdminActivity
+      tags: [admin]
+      summary: List auditable administrative and operational events
+      security:
+        - bearerAuth: []
+      parameters:
+        - { in: query, name: entity, schema: { type: string } }
+        - { in: query, name: page, schema: { type: number, minimum: 1 } }
+        - { in: query, name: limit, schema: { type: number, minimum: 1, maximum: 100 } }
+      responses:
+        "200":
+          description: Audit event page
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AdminActivityPage" }
+        "401": { description: Authentication required }
+        "403": { description: Administrator access required }
+  /admin/verificaciones:
+    get:
+      operationId: listAdminVerifications
+      tags: [admin]
+      summary: List private Partner verification documents by status
+      security:
+        - bearerAuth: []
+      parameters:
+        - { in: query, name: estado, schema: { type: string, enum: [pending_verification, verified, rejected] } }
+      responses:
+        "200":
+          description: Verification documents for authorized administrative review
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/AdminVerificationDocument" }
+        "401": { description: Authentication required }
+        "403": { description: Administrator access required }
+  /admin/verificaciones/{id}:
+    patch:
+      operationId: resolveAdminVerification
+      tags: [admin]
+      summary: Approve or reject a pending verification document
+      security:
+        - bearerAuth: []
+      parameters:
+        - { in: path, name: id, required: true, schema: { type: number } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AdminVerificationDecisionInput" }
+      responses:
+        "200":
+          description: Verification decision and resulting Partner verification state
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AdminVerificationDecisionResult" }
+        "400": { description: Invalid verification decision }
+        "401": { description: Authentication required }
+        "403": { description: Administrator access required }
+        "404": { description: Verification document not found }
+        "409": { description: Verification document already resolved }
   /healthz:
     get:
       operationId: healthCheck
@@ -29,6 +430,25 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+  /storage/uploads/request-url:
+    post:
+      operationId: requestUploadUrl
+      tags: [storage]
+      summary: Prepare a signed upload
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/UploadUrlRequest" }
+      responses:
+        "200":
+          description: Signed upload destination
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/UploadUrlResponse" }
+        "400": { description: Invalid upload metadata }
+        "403": { description: Not allowed to upload to this conversation }
+        "500": { description: Could not prepare the upload }
   /auth/register:
     post:
       operationId: registerAccount
@@ -47,6 +467,44 @@ paths:
               schema: { $ref: "#/components/schemas/AuthSession" }
         "400": { description: Invalid registration data }
         "409": { description: Email already in use }
+  /auth/email-verification/account/request:
+    post:
+      operationId: requestAccountEmailVerification
+      tags: [auth]
+      summary: Send a one-time code to verify the current account email
+      security:
+        - bearerAuth: []
+      responses:
+        "202":
+          description: Verification code sent
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EmailVerificationMessage" }
+        "401": { description: Authentication required }
+        "409": { description: Email already verified }
+        "429": { description: Too many requests }
+        "503": { description: Email delivery unavailable }
+  /auth/email-verification/account/confirm:
+    post:
+      operationId: confirmAccountEmailVerification
+      tags: [auth]
+      summary: Confirm a code for the current account email
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AccountEmailVerificationConfirmation" }
+      responses:
+        "200":
+          description: Email verified
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EmailVerificationResult" }
+        "400": { description: "Invalid, expired, or already used code" }
+        "401": { description: Authentication required }
+        "429": { description: Too many attempts }
   /auth/login:
     post:
       operationId: loginAccount
@@ -598,31 +1056,57 @@ paths:
               schema: { $ref: "#/components/schemas/Appointment" }
         "403": { description: Only the client can reject }
         "404": { description: Appointment not found }
-  /admin/cuentas/rol:
-    patch:
-      operationId: grantAdminRole
-      tags: [admin]
-      summary: Assign the administrator role to an existing active account
-      description: Requires an authenticated administrator. Does not create or activate accounts.
-      security:
-        - bearerAuth: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema: { $ref: "#/components/schemas/AdminRoleGrantInput" }
+  /notificaciones:
+    get:
+      operationId: listNotifications
+      tags: [notifications]
+      summary: List notifications for the current account
       responses:
         "200":
-          description: Role assigned, or unchanged if the account was already an administrator
+          description: Notifications and unread count
           content:
             application/json:
-              schema: { $ref: "#/components/schemas/AdminRoleGrantResult" }
-        "400": { description: "Invalid email, reason, or fields" }
+              schema: { $ref: "#/components/schemas/NotificationListResponse" }
         "401": { description: Authentication required }
-        "403": { description: Administrator role required }
-        "404": { description: Account not found }
-        "409": { description: Account is disabled }
-
+  /notificaciones/{id}/leida:
+    patch:
+      operationId: markNotificationRead
+      tags: [notifications]
+      summary: Mark one notification as read
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: number }
+      responses:
+        "200":
+          description: Updated notification
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/WorkyNotification" }
+        "401": { description: Authentication required }
+        "404": { description: Notification not found }
+  /notificaciones/leidas:
+    post:
+      operationId: markAllNotificationsRead
+      tags: [notifications]
+      summary: Mark all notifications as read
+      responses:
+        "204": { description: All notifications marked as read }
+        "401": { description: Authentication required }
+  /partner/dashboard:
+    get:
+      operationId: getPartnerDashboard
+      tags: [partner]
+      summary: Get the current Partner dashboard summary
+      responses:
+        "200":
+          description: Partner activity, upcoming appointments, files, and unread notifications
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PartnerDashboardResponse" }
+        "401": { description: Authentication required }
+        "403": { description: Partner role required }
 components:
   securitySchemes:
     bearerAuth:
@@ -630,20 +1114,363 @@ components:
       scheme: bearer
       bearerFormat: JWT
   schemas:
-    AdminRoleGrantInput:
+    AdminDashboard:
       type: object
-      additionalProperties: false
-      required: [email, motivo]
+      required: [accountsTotal, accountsActive, partnersTotal, partnersPendingReview, partnersVerified, partnersEnabled, jobsTotal, bookingsTotal, paymentsTotal, settlementsTotal, reviewsTotal, recommendationsTotal, catalogItems, portfolioAssets, profilePhotos, chatMessages, recentActivity]
       properties:
-        email: { type: string, format: email, maxLength: 320 }
-        motivo: { type: string, minLength: 5, maxLength: 500 }
-    AdminRoleGrantResult:
+        accountsTotal: { type: number }
+        accountsActive: { type: number }
+        partnersTotal: { type: number }
+        partnersPendingReview: { type: number }
+        partnersVerified: { type: number }
+        partnersEnabled: { type: number }
+        jobsTotal: { type: number }
+        bookingsTotal: { type: number }
+        paymentsTotal: { type: number }
+        settlementsTotal: { type: number }
+        reviewsTotal: { type: number }
+        recommendationsTotal: { type: number }
+        catalogItems: { type: number }
+        portfolioAssets: { type: number }
+        profilePhotos: { type: number }
+        chatMessages: { type: number }
+        recentActivity:
+          type: array
+          items: { $ref: "#/components/schemas/AdminActivityEvent" }
+    AdminAccount:
       type: object
-      additionalProperties: false
-      required: [rol, changed]
+      required: [id, name, email, role, active, emailVerifiedAt, createdAt, city]
       properties:
-        rol: { type: string, enum: [admin] }
-        changed: { type: boolean }
+        id: { type: number }
+        name: { type: string }
+        email: { type: string }
+        phone: { type: ["string", "null"] }
+        role: { type: string, enum: [cliente, profesional, admin] }
+        active: { type: boolean }
+        emailVerifiedAt: { type: ["string", "null"], format: date-time }
+        createdAt: { type: string, format: date-time }
+        city: { type: ["string", "null"] }
+    AdminAccountPage:
+      type: object
+      required: [items, total, page, limit]
+      properties:
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/AdminAccount" }
+        total: { type: number }
+        page: { type: number }
+        limit: { type: number }
+    AdminAccountStatusInput:
+      type: object
+      required: [active, reason]
+      properties:
+        active: { type: boolean }
+        reason: { type: string, minLength: 5, maxLength: 1000 }
+    AdminVerificationDocumentSummary:
+      type: object
+      required: [id, type, status, name, sizeBytes, createdAt]
+      properties:
+        id: { type: number }
+        type: { type: string, enum: [dni_frente, dni_dorso, antecedentes_penales] }
+        status: { type: string, enum: [pending_verification, verified, rejected] }
+        name: { type: string }
+        sizeBytes: { type: number }
+        createdAt: { type: string, format: date-time }
+    AdminPartner:
+      type: object
+      required: [userId, name, email, trade, category, verificationStatus, verified, enabled, accountActive, available, experienceYears, referencePrice, rating, createdAt, documents]
+      properties:
+        userId: { type: number }
+        name: { type: string }
+        email: { type: string }
+        phone: { type: ["string", "null"] }
+        trade: { type: string }
+        category: { type: string }
+        verificationStatus: { type: string, enum: [pending_verification, verified, rejected] }
+        verified: { type: boolean }
+        enabled: { type: boolean }
+        accountActive: { type: boolean }
+        available: { type: boolean }
+        experienceYears: { type: number }
+        referencePrice: { type: number }
+        rating: { type: number }
+        createdAt: { type: string, format: date-time }
+        documents:
+          type: array
+          items: { $ref: "#/components/schemas/AdminVerificationDocumentSummary" }
+    AdminPartnerPage:
+      type: object
+      required: [items, total, page, limit]
+      properties:
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/AdminPartner" }
+        total: { type: number }
+        page: { type: number }
+        limit: { type: number }
+    AdminPartnerActivationInput:
+      type: object
+      required: [enabled, reason]
+      properties:
+        enabled: { type: boolean }
+        reason: { type: string, minLength: 5, maxLength: 1000 }
+    AdminJob:
+      type: object
+      required: [id, category, status, clientId, clientName, partnerId, partnerName, detail, offeredPrice, createdAt]
+      properties:
+        id: { type: number }
+        category: { type: string }
+        status: { type: string }
+        clientId: { type: number }
+        clientName: { type: string }
+        partnerId: { type: ["number", "null"] }
+        partnerName: { type: ["string", "null"] }
+        detail: { type: ["string", "null"] }
+        offeredPrice: { type: number }
+        createdAt: { type: string, format: date-time }
+    AdminJobPage:
+      type: object
+      required: [items, total, page, limit]
+      properties:
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/AdminJob" }
+        total: { type: number }
+        page: { type: number }
+        limit: { type: number }
+    AdminBooking:
+      type: object
+      required: [id, jobId, clientId, clientName, partnerId, partnerName, startsAt, endsAt, status, createdAt]
+      properties:
+        id: { type: number }
+        jobId: { type: number }
+        clientId: { type: number }
+        clientName: { type: string }
+        partnerId: { type: number }
+        partnerName: { type: string }
+        startsAt: { type: string, format: date-time }
+        endsAt: { type: ["string", "null"], format: date-time }
+        status: { type: string }
+        createdAt: { type: string, format: date-time }
+    AdminBookingPage:
+      type: object
+      required: [items, total, page, limit]
+      properties:
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/AdminBooking" }
+        total: { type: number }
+        page: { type: number }
+        limit: { type: number }
+    AdminPayment:
+      type: object
+      required: [id, jobId, clientId, clientName, amount, currency, status, provider, createdAt, updatedAt]
+      properties:
+        id: { type: number }
+        jobId: { type: number }
+        clientId: { type: number }
+        clientName: { type: string }
+        amount: { type: number }
+        currency: { type: string }
+        status: { type: string }
+        provider: { type: string }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+    AdminPaymentPage:
+      type: object
+      required: [items, total, page, limit]
+      properties:
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/AdminPayment" }
+        total: { type: number }
+        page: { type: number }
+        limit: { type: number }
+    AdminSettlement:
+      type: object
+      required: [id, jobId, partnerId, partnerName, amount, status, createdAt, updatedAt]
+      properties:
+        id: { type: number }
+        jobId: { type: number }
+        partnerId: { type: number }
+        partnerName: { type: string }
+        amount: { type: number }
+        status: { type: string }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+    AdminSettlementPage:
+      type: object
+      required: [items, total, page, limit]
+      properties:
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/AdminSettlement" }
+        total: { type: number }
+        page: { type: number }
+        limit: { type: number }
+    AdminReview:
+      type: object
+      required: [id, jobId, clientId, clientName, partnerId, partnerName, rating, comment, createdAt]
+      properties:
+        id: { type: number }
+        jobId: { type: number }
+        clientId: { type: number }
+        clientName: { type: string }
+        partnerId: { type: number }
+        partnerName: { type: string }
+        rating: { type: number }
+        comment: { type: ["string", "null"] }
+        createdAt: { type: string, format: date-time }
+    AdminReviewPage:
+      type: object
+      required: [items, total, page, limit]
+      properties:
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/AdminReview" }
+        total: { type: number }
+        page: { type: number }
+        limit: { type: number }
+    AdminRecommendation:
+      type: object
+      required: [id, clientId, clientName, partnerId, partnerName, visibility, comment, createdAt, updatedAt]
+      properties:
+        id: { type: number }
+        clientId: { type: number }
+        clientName: { type: string }
+        partnerId: { type: number }
+        partnerName: { type: string }
+        visibility: { type: string, enum: [publica, privada] }
+        comment: { type: ["string", "null"] }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+    AdminRecommendationPage:
+      type: object
+      required: [items, total, page, limit]
+      properties:
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/AdminRecommendation" }
+        total: { type: number }
+        page: { type: number }
+        limit: { type: number }
+    AdminRecommendationVisibilityInput:
+      type: object
+      required: [visibility, reason]
+      properties:
+        visibility: { type: string, enum: [publica, privada] }
+        reason: { type: string, minLength: 5, maxLength: 1000 }
+    AdminCatalogItem:
+      type: object
+      required: [id, category, specialty, active, createdAt, updatedAt]
+      properties:
+        id: { type: number }
+        category: { type: string }
+        specialty: { type: string }
+        active: { type: boolean }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+    AdminCatalogInput:
+      type: object
+      required: [category, specialty]
+      properties:
+        category: { type: string, minLength: 1, maxLength: 100 }
+        specialty: { type: string, minLength: 1, maxLength: 120 }
+    AdminCatalogUpdate:
+      type: object
+      properties:
+        category: { type: string, minLength: 1, maxLength: 100 }
+        specialty: { type: string, minLength: 1, maxLength: 120 }
+        active: { type: boolean }
+    AdminResource:
+      type: object
+      required: [id, ownerId, ownerName, kind, name, contentType, sizeBytes, createdAt]
+      properties:
+        id: { type: number }
+        ownerId: { type: number }
+        ownerName: { type: string }
+        kind: { type: string, enum: [portfolio, profile_photo] }
+        name: { type: string }
+        contentType: { type: string }
+        sizeBytes: { type: ["number", "null"] }
+        createdAt: { type: string, format: date-time }
+    AdminResourcePage:
+      type: object
+      required: [items, total, page, limit]
+      properties:
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/AdminResource" }
+        total: { type: number }
+        page: { type: number }
+        limit: { type: number }
+    AdminActivityEvent:
+      type: object
+      required: [id, actorId, actorName, entity, entityId, action, previousState, nextState, metadata, createdAt]
+      properties:
+        id: { type: number }
+        actorId: { type: ["number", "null"] }
+        actorName: { type: ["string", "null"] }
+        entity: { type: string }
+        entityId: { type: number }
+        action: { type: string }
+        previousState: { type: ["string", "null"] }
+        nextState: { type: ["string", "null"] }
+        metadata: { type: object, additionalProperties: true }
+        createdAt: { type: string, format: date-time }
+    AdminActivityPage:
+      type: object
+      required: [items, total, page, limit]
+      properties:
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/AdminActivityEvent" }
+        total: { type: number }
+        page: { type: number }
+        limit: { type: number }
+    AdminVerificationDocument:
+      type: object
+      required: [id, profesionalId, tipo, objectPath, nombre, contentType, sizeBytes, estado, createdAt, updatedAt, partner, perfil]
+      properties:
+        id: { type: number }
+        profesionalId: { type: number }
+        tipo: { type: string, enum: [dni_frente, dni_dorso, antecedentes_penales] }
+        objectPath: { type: string }
+        nombre: { type: string }
+        contentType: { type: string }
+        sizeBytes: { type: number }
+        estado: { type: string, enum: [pending_verification, verified, rejected] }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+        partner:
+          type: object
+          required: [id, nombre, email]
+          properties:
+            id: { type: number }
+            nombre: { type: string }
+            email: { type: string }
+        perfil:
+          oneOf:
+            - type: object
+              required: [oficio, categoria, estadoVerificacion]
+              properties:
+                oficio: { type: string }
+                categoria: { type: string }
+                estadoVerificacion: { type: string, enum: [pending_verification, verified, rejected] }
+            - type: "null"
+    AdminVerificationDecisionInput:
+      type: object
+      required: [estado, motivo]
+      properties:
+        estado: { type: string, enum: [verified, rejected] }
+        motivo: { type: string, minLength: 1, maxLength: 1000 }
+    AdminVerificationDecisionResult:
+      type: object
+      required: [id, estado, profileStatus]
+      properties:
+        id: { type: number }
+        estado: { type: string, enum: [verified, rejected] }
+        profileStatus: { type: string, enum: [pending_verification, verified, rejected] }
     HealthStatus:
       type: object
       properties:
@@ -671,6 +1498,21 @@ components:
         onboardingRespuestas:
           type: object
           additionalProperties: { type: string }
+    AccountEmailVerificationConfirmation:
+      type: object
+      required: [code]
+      properties:
+        code: { type: string, pattern: "^[0-9]{6}$", minLength: 6, maxLength: 6 }
+    EmailVerificationMessage:
+      type: object
+      required: [message]
+      properties:
+        message: { type: string }
+    EmailVerificationResult:
+      type: object
+      required: [verified]
+      properties:
+        verified: { type: boolean }
     AuthSession:
       type: object
       required: [token, usuario]
@@ -698,11 +1540,12 @@ components:
         capturedAt: { type: string, format: date-time }
     Account:
       type: object
-      required: [id, nombre, email, rol]
+      required: [id, nombre, email, rol, emailVerifiedAt]
       properties:
         id: { type: number }
         nombre: { type: string }
         email: { type: string }
+        emailVerifiedAt: { type: ["string", "null"], format: date-time }
         telefono: { type: ["string", "null"] }
         edad: { type: ["number", "null"] }
         fotoObjectPath: { type: ["string", "null"] }
@@ -954,6 +1797,30 @@ components:
           type: array
           maxItems: 5
           items: { $ref: "#/components/schemas/MessageAttachment" }
+    UploadUrlRequest:
+      type: object
+      required: [name, size, contentType, purpose]
+      properties:
+        name: { type: string, minLength: 1 }
+        size: { type: number, minimum: 1 }
+        contentType: { type: string, minLength: 1 }
+        purpose: { type: string, enum: [profile_photo, chat_image, file] }
+        changaId: { type: number }
+    UploadUrlResponse:
+      type: object
+      required: [uploadURL, objectPath, metadata, purpose]
+      properties:
+        uploadURL: { type: string }
+        objectPath: { type: string }
+        uploadId: { type: number }
+        metadata:
+          type: object
+          required: [name, size, contentType]
+          properties:
+            name: { type: string }
+            size: { type: number }
+            contentType: { type: string }
+        purpose: { type: string, enum: [profile_photo, chat_image, file] }
     Appointment:
       type: object
       required: [id, changaId, clienteId, profesionalId, empiezaAt, terminaAt, estado, createdAt, updatedAt]
@@ -1024,3 +1891,50 @@ components:
           oneOf:
             - $ref: "#/components/schemas/ConversationLastMessage"
             - type: "null"
+    WorkyNotification:
+      type: object
+      required: [id, tipo, titulo, detalle, href, leida, createdAt]
+      properties:
+        id: { type: number }
+        tipo: { type: string }
+        titulo: { type: string }
+        detalle: { type: ["string", "null"] }
+        href: { type: ["string", "null"] }
+        leida: { type: boolean }
+        createdAt: { type: string, format: date-time }
+    NotificationListResponse:
+      type: object
+      required: [items, unread]
+      properties:
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/WorkyNotification" }
+        unread: { type: number }
+    PartnerDashboardCalendarItem:
+      type: object
+      required: [id, empiezaAt, estado, changaId]
+      properties:
+        id: { type: number }
+        empiezaAt: { type: string, format: date-time }
+        estado: { type: string }
+        changaId: { type: number }
+    PartnerDashboardAssetSummary:
+      type: object
+      required: [id]
+      additionalProperties: true
+      properties:
+        id: { type: number }
+    PartnerDashboardResponse:
+      type: object
+      required: [trabajos, calendario, archivos, notificacionesNoLeidas]
+      properties:
+        trabajos:
+          type: array
+          items: { $ref: "#/components/schemas/Job" }
+        calendario:
+          type: array
+          items: { $ref: "#/components/schemas/PartnerDashboardCalendarItem" }
+        archivos:
+          type: array
+          items: { $ref: "#/components/schemas/PartnerDashboardAssetSummary" }
+        notificacionesNoLeidas: { type: number }

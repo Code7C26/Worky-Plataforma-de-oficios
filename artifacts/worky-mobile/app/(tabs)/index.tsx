@@ -3,7 +3,7 @@ import { Pressable, ScrollView, View } from 'react-native';
 import { router } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 import { useListProfessionals } from '@workspace/api-client-react';
-import { AppText, Avatar, BrandHeader, Screen, Surface, TextField, StateMessage } from '@/components/WorkyUI';
+import { AppText, Avatar, BrandHeader, FeedbackPressable, Screen, Surface, TextField, StateMessage } from '@/components/WorkyUI';
 import { useAuth } from '@/context/AuthContext';
 import { useColors } from '@/hooks/useColors';
 
@@ -150,7 +150,7 @@ export default function DiscoverScreen() {
               );
             })}
           </ScrollView>
-          <Pressable
+          <FeedbackPressable
             onPress={() => router.push('/job/new')}
             style={({ pressed }) => ({
               minHeight: 64,
@@ -187,7 +187,7 @@ export default function DiscoverScreen() {
               </AppText>
             </View>
             <Feather name="chevron-right" size={19} color={colors.mutedForeground} />
-          </Pressable>
+          </FeedbackPressable>
           <View style={{ flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', gap: 8 }}>
             <AppText variant="heading">Profesionales cerca</AppText>
             <AppText variant="caption" style={{ color: colors.mutedForeground }}>

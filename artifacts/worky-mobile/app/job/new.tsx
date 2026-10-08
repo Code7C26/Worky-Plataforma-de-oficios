@@ -62,7 +62,7 @@ export default function NewJobScreen() {
         <AppText variant="caption" style={{ color: colors.secondary }}>La solicitud se asignará al profesional elegido.</AppText>
       ) : null}
       {error ? <AppText variant="caption" style={{ color: colors.destructive }}>{error}</AppText> : null}
-      <Button label="Publicar trabajo" icon="arrow-up-right" loading={createJob.isPending} onPress={() => void submit()} testID="button-publish-job" />
+      <Button label="Publicar trabajo" icon="arrow-up-right" loading={createJob.isPending} feedback onPress={() => void submit()} testID="button-publish-job" />
       <Button label="Cancelar" tone="quiet" onPress={() => router.back()} />
     </Screen>
   );

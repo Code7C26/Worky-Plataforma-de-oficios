@@ -22,6 +22,7 @@ const colors = {
     cardForeground: '#17223a',
     primary: '#f58224',
     primaryForeground: '#17223a',
+    messageUnread: '#25D366',
     secondary: '#203655',
     secondaryForeground: '#fdfdfc',
     muted: '#efe9e1',

@@ -9,11 +9,646 @@ import * as zod from 'zod';
 
 
 /**
+ * @summary Get administrative dashboard totals
+ */
+export const GetAdminDashboardResponse = zod.object({
+  "accountsTotal": zod.number(),
+  "accountsActive": zod.number(),
+  "partnersTotal": zod.number(),
+  "partnersPendingReview": zod.number(),
+  "partnersVerified": zod.number(),
+  "partnersEnabled": zod.number(),
+  "jobsTotal": zod.number(),
+  "bookingsTotal": zod.number(),
+  "paymentsTotal": zod.number(),
+  "settlementsTotal": zod.number(),
+  "reviewsTotal": zod.number(),
+  "recommendationsTotal": zod.number(),
+  "catalogItems": zod.number(),
+  "portfolioAssets": zod.number(),
+  "profilePhotos": zod.number(),
+  "chatMessages": zod.number(),
+  "recentActivity": zod.array(zod.object({
+  "id": zod.number(),
+  "actorId": zod.number().nullable(),
+  "actorName": zod.string().nullable(),
+  "entity": zod.string(),
+  "entityId": zod.number(),
+  "action": zod.string(),
+  "previousState": zod.string().nullable(),
+  "nextState": zod.string().nullable(),
+  "metadata": zod.record(zod.string(), zod.unknown()),
+  "createdAt": zod.coerce.date()
+}))
+})
+
+
+/**
+ * @summary Search account records
+ */
+
+export const listAdminAccountsQueryLimitMax = 100;
+
+
+
+export const ListAdminAccountsQueryParams = zod.object({
+  "search": zod.coerce.string().optional(),
+  "role": zod.enum(['cliente', 'profesional', 'admin']).optional(),
+  "active": zod.coerce.boolean().optional(),
+  "page": zod.coerce.number().min(1).optional(),
+  "limit": zod.coerce.number().min(1).max(listAdminAccountsQueryLimitMax).optional()
+})
+
+export const ListAdminAccountsResponse = zod.object({
+  "items": zod.array(zod.object({
+  "id": zod.number(),
+  "name": zod.string(),
+  "email": zod.string(),
+  "phone": zod.string().nullish(),
+  "role": zod.enum(['cliente', 'profesional', 'admin']),
+  "active": zod.boolean(),
+  "emailVerifiedAt": zod.coerce.date().nullable(),
+  "createdAt": zod.coerce.date(),
+  "city": zod.string().nullable()
+})),
+  "total": zod.number(),
+  "page": zod.number(),
+  "limit": zod.number()
+})
+
+
+/**
+ * @summary Suspend or reactivate a non-administrator account
+ */
+export const UpdateAdminAccountStatusParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const updateAdminAccountStatusBodyReasonMin = 5;
+export const updateAdminAccountStatusBodyReasonMax = 1000;
+
+
+
+export const UpdateAdminAccountStatusBody = zod.object({
+  "active": zod.boolean(),
+  "reason": zod.string().min(updateAdminAccountStatusBodyReasonMin).max(updateAdminAccountStatusBodyReasonMax)
+})
+
+export const UpdateAdminAccountStatusResponse = zod.object({
+  "id": zod.number(),
+  "name": zod.string(),
+  "email": zod.string(),
+  "phone": zod.string().nullish(),
+  "role": zod.enum(['cliente', 'profesional', 'admin']),
+  "active": zod.boolean(),
+  "emailVerifiedAt": zod.coerce.date().nullable(),
+  "createdAt": zod.coerce.date(),
+  "city": zod.string().nullable()
+})
+
+
+/**
+ * @summary Search Partner profiles and their document states
+ */
+
+export const listAdminPartnersQueryLimitMax = 100;
+
+
+
+export const ListAdminPartnersQueryParams = zod.object({
+  "search": zod.coerce.string().optional(),
+  "verificationStatus": zod.enum(['pending_verification', 'verified', 'rejected']).optional(),
+  "enabled": zod.coerce.boolean().optional(),
+  "page": zod.coerce.number().min(1).optional(),
+  "limit": zod.coerce.number().min(1).max(listAdminPartnersQueryLimitMax).optional()
+})
+
+export const ListAdminPartnersResponse = zod.object({
+  "items": zod.array(zod.object({
+  "userId": zod.number(),
+  "name": zod.string(),
+  "email": zod.string(),
+  "phone": zod.string().nullish(),
+  "trade": zod.string(),
+  "category": zod.string(),
+  "verificationStatus": zod.enum(['pending_verification', 'verified', 'rejected']),
+  "verified": zod.boolean(),
+  "enabled": zod.boolean(),
+  "accountActive": zod.boolean(),
+  "available": zod.boolean(),
+  "experienceYears": zod.number(),
+  "referencePrice": zod.number(),
+  "rating": zod.number(),
+  "createdAt": zod.coerce.date(),
+  "documents": zod.array(zod.object({
+  "id": zod.number(),
+  "type": zod.enum(['dni_frente', 'dni_dorso', 'antecedentes_penales']),
+  "status": zod.enum(['pending_verification', 'verified', 'rejected']),
+  "name": zod.string(),
+  "sizeBytes": zod.number(),
+  "createdAt": zod.coerce.date()
+}))
+})),
+  "total": zod.number(),
+  "page": zod.number(),
+  "limit": zod.number()
+})
+
+
+/**
+ * @summary Enable or suspend a verified Partner profile
+ */
+export const UpdateAdminPartnerActivationParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const updateAdminPartnerActivationBodyReasonMin = 5;
+export const updateAdminPartnerActivationBodyReasonMax = 1000;
+
+
+
+export const UpdateAdminPartnerActivationBody = zod.object({
+  "enabled": zod.boolean(),
+  "reason": zod.string().min(updateAdminPartnerActivationBodyReasonMin).max(updateAdminPartnerActivationBodyReasonMax)
+})
+
+export const UpdateAdminPartnerActivationResponse = zod.object({
+  "userId": zod.number(),
+  "name": zod.string(),
+  "email": zod.string(),
+  "phone": zod.string().nullish(),
+  "trade": zod.string(),
+  "category": zod.string(),
+  "verificationStatus": zod.enum(['pending_verification', 'verified', 'rejected']),
+  "verified": zod.boolean(),
+  "enabled": zod.boolean(),
+  "accountActive": zod.boolean(),
+  "available": zod.boolean(),
+  "experienceYears": zod.number(),
+  "referencePrice": zod.number(),
+  "rating": zod.number(),
+  "createdAt": zod.coerce.date(),
+  "documents": zod.array(zod.object({
+  "id": zod.number(),
+  "type": zod.enum(['dni_frente', 'dni_dorso', 'antecedentes_penales']),
+  "status": zod.enum(['pending_verification', 'verified', 'rejected']),
+  "name": zod.string(),
+  "sizeBytes": zod.number(),
+  "createdAt": zod.coerce.date()
+}))
+})
+
+
+/**
+ * @summary Search job records
+ */
+
+export const listAdminJobsQueryLimitMax = 100;
+
+
+
+export const ListAdminJobsQueryParams = zod.object({
+  "search": zod.coerce.string().optional(),
+  "status": zod.coerce.string().optional(),
+  "page": zod.coerce.number().min(1).optional(),
+  "limit": zod.coerce.number().min(1).max(listAdminJobsQueryLimitMax).optional()
+})
+
+export const ListAdminJobsResponse = zod.object({
+  "items": zod.array(zod.object({
+  "id": zod.number(),
+  "category": zod.string(),
+  "status": zod.string(),
+  "clientId": zod.number(),
+  "clientName": zod.string(),
+  "partnerId": zod.number().nullable(),
+  "partnerName": zod.string().nullable(),
+  "detail": zod.string().nullable(),
+  "offeredPrice": zod.number(),
+  "createdAt": zod.coerce.date()
+})),
+  "total": zod.number(),
+  "page": zod.number(),
+  "limit": zod.number()
+})
+
+
+/**
+ * @summary Search booking records
+ */
+
+export const listAdminBookingsQueryLimitMax = 100;
+
+
+
+export const ListAdminBookingsQueryParams = zod.object({
+  "search": zod.coerce.string().optional(),
+  "status": zod.coerce.string().optional(),
+  "page": zod.coerce.number().min(1).optional(),
+  "limit": zod.coerce.number().min(1).max(listAdminBookingsQueryLimitMax).optional()
+})
+
+export const ListAdminBookingsResponse = zod.object({
+  "items": zod.array(zod.object({
+  "id": zod.number(),
+  "jobId": zod.number(),
+  "clientId": zod.number(),
+  "clientName": zod.string(),
+  "partnerId": zod.number(),
+  "partnerName": zod.string(),
+  "startsAt": zod.coerce.date(),
+  "endsAt": zod.coerce.date().nullable(),
+  "status": zod.string(),
+  "createdAt": zod.coerce.date()
+})),
+  "total": zod.number(),
+  "page": zod.number(),
+  "limit": zod.number()
+})
+
+
+/**
+ * @summary Search payment records without provider secrets
+ */
+
+export const listAdminPaymentsQueryLimitMax = 100;
+
+
+
+export const ListAdminPaymentsQueryParams = zod.object({
+  "search": zod.coerce.string().optional(),
+  "status": zod.coerce.string().optional(),
+  "page": zod.coerce.number().min(1).optional(),
+  "limit": zod.coerce.number().min(1).max(listAdminPaymentsQueryLimitMax).optional()
+})
+
+export const ListAdminPaymentsResponse = zod.object({
+  "items": zod.array(zod.object({
+  "id": zod.number(),
+  "jobId": zod.number(),
+  "clientId": zod.number(),
+  "clientName": zod.string(),
+  "amount": zod.number(),
+  "currency": zod.string(),
+  "status": zod.string(),
+  "provider": zod.string(),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date()
+})),
+  "total": zod.number(),
+  "page": zod.number(),
+  "limit": zod.number()
+})
+
+
+/**
+ * @summary Search Partner settlement records
+ */
+
+export const listAdminSettlementsQueryLimitMax = 100;
+
+
+
+export const ListAdminSettlementsQueryParams = zod.object({
+  "search": zod.coerce.string().optional(),
+  "status": zod.coerce.string().optional(),
+  "page": zod.coerce.number().min(1).optional(),
+  "limit": zod.coerce.number().min(1).max(listAdminSettlementsQueryLimitMax).optional()
+})
+
+export const ListAdminSettlementsResponse = zod.object({
+  "items": zod.array(zod.object({
+  "id": zod.number(),
+  "jobId": zod.number(),
+  "partnerId": zod.number(),
+  "partnerName": zod.string(),
+  "amount": zod.number(),
+  "status": zod.string(),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date()
+})),
+  "total": zod.number(),
+  "page": zod.number(),
+  "limit": zod.number()
+})
+
+
+/**
+ * @summary Search review records
+ */
+
+export const listAdminReviewsQueryLimitMax = 100;
+
+
+
+export const ListAdminReviewsQueryParams = zod.object({
+  "search": zod.coerce.string().optional(),
+  "page": zod.coerce.number().min(1).optional(),
+  "limit": zod.coerce.number().min(1).max(listAdminReviewsQueryLimitMax).optional()
+})
+
+export const ListAdminReviewsResponse = zod.object({
+  "items": zod.array(zod.object({
+  "id": zod.number(),
+  "jobId": zod.number(),
+  "clientId": zod.number(),
+  "clientName": zod.string(),
+  "partnerId": zod.number(),
+  "partnerName": zod.string(),
+  "rating": zod.number(),
+  "comment": zod.string().nullable(),
+  "createdAt": zod.coerce.date()
+})),
+  "total": zod.number(),
+  "page": zod.number(),
+  "limit": zod.number()
+})
+
+
+/**
+ * @summary Search recommendation records
+ */
+
+export const listAdminRecommendationsQueryLimitMax = 100;
+
+
+
+export const ListAdminRecommendationsQueryParams = zod.object({
+  "search": zod.coerce.string().optional(),
+  "visibility": zod.enum(['publica', 'privada']).optional(),
+  "page": zod.coerce.number().min(1).optional(),
+  "limit": zod.coerce.number().min(1).max(listAdminRecommendationsQueryLimitMax).optional()
+})
+
+export const ListAdminRecommendationsResponse = zod.object({
+  "items": zod.array(zod.object({
+  "id": zod.number(),
+  "clientId": zod.number(),
+  "clientName": zod.string(),
+  "partnerId": zod.number(),
+  "partnerName": zod.string(),
+  "visibility": zod.enum(['publica', 'privada']),
+  "comment": zod.string().nullable(),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date()
+})),
+  "total": zod.number(),
+  "page": zod.number(),
+  "limit": zod.number()
+})
+
+
+/**
+ * @summary Change the public visibility of a recommendation
+ */
+export const UpdateAdminRecommendationVisibilityParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const updateAdminRecommendationVisibilityBodyReasonMin = 5;
+export const updateAdminRecommendationVisibilityBodyReasonMax = 1000;
+
+
+
+export const UpdateAdminRecommendationVisibilityBody = zod.object({
+  "visibility": zod.enum(['publica', 'privada']),
+  "reason": zod.string().min(updateAdminRecommendationVisibilityBodyReasonMin).max(updateAdminRecommendationVisibilityBodyReasonMax)
+})
+
+export const UpdateAdminRecommendationVisibilityResponse = zod.object({
+  "id": zod.number(),
+  "clientId": zod.number(),
+  "clientName": zod.string(),
+  "partnerId": zod.number(),
+  "partnerName": zod.string(),
+  "visibility": zod.enum(['publica', 'privada']),
+  "comment": zod.string().nullable(),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date()
+})
+
+
+/**
+ * @summary List active and inactive service catalog entries
+ */
+export const ListAdminCatalogResponseItem = zod.object({
+  "id": zod.number(),
+  "category": zod.string(),
+  "specialty": zod.string(),
+  "active": zod.boolean(),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date()
+})
+export const ListAdminCatalogResponse = zod.array(ListAdminCatalogResponseItem)
+
+
+/**
+ * @summary Add an entry to the service catalog
+ */
+export const createAdminCatalogItemBodyCategoryMax = 100;
+
+export const createAdminCatalogItemBodySpecialtyMax = 120;
+
+
+
+export const CreateAdminCatalogItemBody = zod.object({
+  "category": zod.string().min(1).max(createAdminCatalogItemBodyCategoryMax),
+  "specialty": zod.string().min(1).max(createAdminCatalogItemBodySpecialtyMax)
+})
+
+export const CreateAdminCatalogItemResponse = zod.object({
+  "id": zod.number(),
+  "category": zod.string(),
+  "specialty": zod.string(),
+  "active": zod.boolean(),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date()
+})
+
+
+/**
+ * @summary Update or deactivate a service catalog entry
+ */
+export const UpdateAdminCatalogItemParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const updateAdminCatalogItemBodyCategoryMax = 100;
+
+export const updateAdminCatalogItemBodySpecialtyMax = 120;
+
+
+
+export const UpdateAdminCatalogItemBody = zod.object({
+  "category": zod.string().min(1).max(updateAdminCatalogItemBodyCategoryMax).optional(),
+  "specialty": zod.string().min(1).max(updateAdminCatalogItemBodySpecialtyMax).optional(),
+  "active": zod.boolean().optional()
+})
+
+export const UpdateAdminCatalogItemResponse = zod.object({
+  "id": zod.number(),
+  "category": zod.string(),
+  "specialty": zod.string(),
+  "active": zod.boolean(),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date()
+})
+
+
+/**
+ * @summary Inventory public Partner portfolio and profile image metadata
+ */
+
+export const listAdminResourcesQueryLimitMax = 100;
+
+
+
+export const ListAdminResourcesQueryParams = zod.object({
+  "search": zod.coerce.string().optional(),
+  "page": zod.coerce.number().min(1).optional(),
+  "limit": zod.coerce.number().min(1).max(listAdminResourcesQueryLimitMax).optional()
+})
+
+export const ListAdminResourcesResponse = zod.object({
+  "items": zod.array(zod.object({
+  "id": zod.number(),
+  "ownerId": zod.number(),
+  "ownerName": zod.string(),
+  "kind": zod.enum(['portfolio', 'profile_photo']),
+  "name": zod.string(),
+  "contentType": zod.string(),
+  "sizeBytes": zod.number().nullable(),
+  "createdAt": zod.coerce.date()
+})),
+  "total": zod.number(),
+  "page": zod.number(),
+  "limit": zod.number()
+})
+
+
+/**
+ * @summary List auditable administrative and operational events
+ */
+
+export const listAdminActivityQueryLimitMax = 100;
+
+
+
+export const ListAdminActivityQueryParams = zod.object({
+  "entity": zod.coerce.string().optional(),
+  "page": zod.coerce.number().min(1).optional(),
+  "limit": zod.coerce.number().min(1).max(listAdminActivityQueryLimitMax).optional()
+})
+
+export const ListAdminActivityResponse = zod.object({
+  "items": zod.array(zod.object({
+  "id": zod.number(),
+  "actorId": zod.number().nullable(),
+  "actorName": zod.string().nullable(),
+  "entity": zod.string(),
+  "entityId": zod.number(),
+  "action": zod.string(),
+  "previousState": zod.string().nullable(),
+  "nextState": zod.string().nullable(),
+  "metadata": zod.record(zod.string(), zod.unknown()),
+  "createdAt": zod.coerce.date()
+})),
+  "total": zod.number(),
+  "page": zod.number(),
+  "limit": zod.number()
+})
+
+
+/**
+ * @summary List private Partner verification documents by status
+ */
+export const ListAdminVerificationsQueryParams = zod.object({
+  "estado": zod.enum(['pending_verification', 'verified', 'rejected']).optional()
+})
+
+export const ListAdminVerificationsResponseItem = zod.object({
+  "id": zod.number(),
+  "profesionalId": zod.number(),
+  "tipo": zod.enum(['dni_frente', 'dni_dorso', 'antecedentes_penales']),
+  "objectPath": zod.string(),
+  "nombre": zod.string(),
+  "contentType": zod.string(),
+  "sizeBytes": zod.number(),
+  "estado": zod.enum(['pending_verification', 'verified', 'rejected']),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date(),
+  "partner": zod.object({
+  "id": zod.number(),
+  "nombre": zod.string(),
+  "email": zod.string()
+}),
+  "perfil": zod.union([zod.object({
+  "oficio": zod.string(),
+  "categoria": zod.string(),
+  "estadoVerificacion": zod.enum(['pending_verification', 'verified', 'rejected'])
+}),zod.null()])
+})
+export const ListAdminVerificationsResponse = zod.array(ListAdminVerificationsResponseItem)
+
+
+/**
+ * @summary Approve or reject a pending verification document
+ */
+export const ResolveAdminVerificationParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const resolveAdminVerificationBodyMotivoMax = 1000;
+
+
+
+export const ResolveAdminVerificationBody = zod.object({
+  "estado": zod.enum(['verified', 'rejected']),
+  "motivo": zod.string().min(1).max(resolveAdminVerificationBodyMotivoMax)
+})
+
+export const ResolveAdminVerificationResponse = zod.object({
+  "id": zod.number(),
+  "estado": zod.enum(['verified', 'rejected']),
+  "profileStatus": zod.enum(['pending_verification', 'verified', 'rejected'])
+})
+
+
+/**
  * Returns server health status
  * @summary Health check
  */
 export const HealthCheckResponse = zod.object({
   "status": zod.string()
+})
+
+
+/**
+ * @summary Prepare a signed upload
+ */
+
+
+
+
+
+export const RequestUploadUrlBody = zod.object({
+  "name": zod.string().min(1),
+  "size": zod.number().min(1),
+  "contentType": zod.string().min(1),
+  "purpose": zod.enum(['profile_photo', 'chat_image', 'file']),
+  "changaId": zod.number().optional()
+})
+
+export const RequestUploadUrlResponse = zod.object({
+  "uploadURL": zod.string(),
+  "objectPath": zod.string(),
+  "uploadId": zod.number().optional(),
+  "metadata": zod.object({
+  "name": zod.string(),
+  "size": zod.number(),
+  "contentType": zod.string()
+}),
+  "purpose": zod.enum(['profile_photo', 'chat_image', 'file'])
 })
 
 
@@ -59,6 +694,7 @@ export const RegisterAccountResponse = zod.object({
   "id": zod.number(),
   "nombre": zod.string(),
   "email": zod.string(),
+  "emailVerifiedAt": zod.coerce.date().nullable(),
   "telefono": zod.string().nullish(),
   "edad": zod.number().nullish(),
   "fotoObjectPath": zod.string().nullish(),
@@ -74,6 +710,33 @@ export const RegisterAccountResponse = zod.object({
   "onboardingEstado": zod.string().optional(),
   "onboardingPaso": zod.number().optional()
 })
+})
+
+
+/**
+ * @summary Send a one-time code to verify the current account email
+ */
+export const RequestAccountEmailVerificationResponse = zod.object({
+  "message": zod.string()
+})
+
+
+/**
+ * @summary Confirm a code for the current account email
+ */
+export const confirmAccountEmailVerificationBodyCodeMin = 6;
+export const confirmAccountEmailVerificationBodyCodeMax = 6;
+
+
+export const confirmAccountEmailVerificationBodyCodeRegExp = new RegExp('^[0-9]{6}$');
+
+
+export const ConfirmAccountEmailVerificationBody = zod.object({
+  "code": zod.string().min(confirmAccountEmailVerificationBodyCodeMin).max(confirmAccountEmailVerificationBodyCodeMax).regex(confirmAccountEmailVerificationBodyCodeRegExp)
+})
+
+export const ConfirmAccountEmailVerificationResponse = zod.object({
+  "verified": zod.boolean()
 })
 
 
@@ -97,6 +760,7 @@ export const LoginAccountResponse = zod.object({
   "id": zod.number(),
   "nombre": zod.string(),
   "email": zod.string(),
+  "emailVerifiedAt": zod.coerce.date().nullable(),
   "telefono": zod.string().nullish(),
   "edad": zod.number().nullish(),
   "fotoObjectPath": zod.string().nullish(),
@@ -151,6 +815,7 @@ export const GetMyAccountResponse = zod.object({
   "id": zod.number(),
   "nombre": zod.string(),
   "email": zod.string(),
+  "emailVerifiedAt": zod.coerce.date().nullable(),
   "telefono": zod.string().nullish(),
   "edad": zod.number().nullish(),
   "fotoObjectPath": zod.string().nullish(),
@@ -208,6 +873,7 @@ export const UpdateMyAccountResponse = zod.object({
   "id": zod.number(),
   "nombre": zod.string(),
   "email": zod.string(),
+  "emailVerifiedAt": zod.coerce.date().nullable(),
   "telefono": zod.string().nullish(),
   "edad": zod.number().nullish(),
   "fotoObjectPath": zod.string().nullish(),
@@ -236,6 +902,7 @@ export const SwitchAccountRoleResponse = zod.object({
   "id": zod.number(),
   "nombre": zod.string(),
   "email": zod.string(),
+  "emailVerifiedAt": zod.coerce.date().nullable(),
   "telefono": zod.string().nullish(),
   "edad": zod.number().nullish(),
   "fotoObjectPath": zod.string().nullish(),
@@ -1328,6 +1995,116 @@ export const RejectAppointmentResponse = zod.object({
   "estado": zod.enum(['solicitada', 'confirmada', 'en_curso', 'completada', 'cancelada']),
   "createdAt": zod.coerce.date(),
   "updatedAt": zod.coerce.date()
+})
+
+
+/**
+ * @summary List notifications for the current account
+ */
+export const ListNotificationsResponse = zod.object({
+  "items": zod.array(zod.object({
+  "id": zod.number(),
+  "tipo": zod.string(),
+  "titulo": zod.string(),
+  "detalle": zod.string().nullable(),
+  "href": zod.string().nullable(),
+  "leida": zod.boolean(),
+  "createdAt": zod.coerce.date()
+})),
+  "unread": zod.number()
+})
+
+
+/**
+ * @summary Mark one notification as read
+ */
+export const MarkNotificationReadParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const MarkNotificationReadResponse = zod.object({
+  "id": zod.number(),
+  "tipo": zod.string(),
+  "titulo": zod.string(),
+  "detalle": zod.string().nullable(),
+  "href": zod.string().nullable(),
+  "leida": zod.boolean(),
+  "createdAt": zod.coerce.date()
+})
+
+
+/**
+ * @summary Mark all notifications as read
+ */
+export const MarkAllNotificationsReadResponse = zod.void()
+
+
+/**
+ * @summary Get the current Partner dashboard summary
+ */
+export const GetPartnerDashboardResponse = zod.object({
+  "trabajos": zod.array(zod.object({
+  "id": zod.number(),
+  "clienteId": zod.number(),
+  "profesionalId": zod.number().nullable(),
+  "ubicacion": zod.object({
+  "direccionTexto": zod.string().optional(),
+  "ciudad": zod.string().optional(),
+  "provincia": zod.string().optional(),
+  "zona": zod.string().optional(),
+  "capturedAt": zod.coerce.date().nullish(),
+  "coordinates": zod.array(zod.number()).optional()
+}),
+  "categoria": zod.string(),
+  "precioOfrecido": zod.number(),
+  "detalle": zod.string().nullable(),
+  "estado": zod.enum(['publicada', 'aceptada', 'en_curso', 'finalizada', 'cancelada']),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string(),
+  "cliente": zod.object({
+  "id": zod.number(),
+  "nombre": zod.string(),
+  "email": zod.string(),
+  "telefono": zod.string().nullish(),
+  "fotoObjectPath": zod.string().nullish(),
+  "rol": zod.enum(['cliente', 'profesional', 'admin']),
+  "ubicacion": zod.union([zod.object({
+  "direccionTexto": zod.string().optional(),
+  "ciudad": zod.string().optional(),
+  "provincia": zod.string().optional(),
+  "zona": zod.string().optional(),
+  "capturedAt": zod.coerce.date().nullish(),
+  "coordinates": zod.array(zod.number()).optional()
+}),zod.null()]).optional()
+}),
+  "profesional": zod.union([zod.object({
+  "id": zod.number(),
+  "nombre": zod.string(),
+  "email": zod.string(),
+  "telefono": zod.string().nullish(),
+  "fotoObjectPath": zod.string().nullish(),
+  "rol": zod.enum(['cliente', 'profesional', 'admin']),
+  "ubicacion": zod.union([zod.object({
+  "direccionTexto": zod.string().optional(),
+  "ciudad": zod.string().optional(),
+  "provincia": zod.string().optional(),
+  "zona": zod.string().optional(),
+  "capturedAt": zod.coerce.date().nullish(),
+  "coordinates": zod.array(zod.number()).optional()
+}),zod.null()]).optional()
+}),zod.null()]),
+  "calificada": zod.boolean()
+})),
+  "calendario": zod.array(zod.object({
+  "id": zod.number(),
+  "empiezaAt": zod.coerce.date(),
+  "estado": zod.string(),
+  "changaId": zod.number()
+})),
+  "archivos": zod.array(zod.object({
+  "id": zod.number()
+})),
+  "notificacionesNoLeidas": zod.number()
 })
 
 

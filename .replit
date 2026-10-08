@@ -41,7 +41,7 @@ expertMode = true
 
 [postMerge]
 path = "scripts/post-merge.sh"
-timeoutMs = 20000
+timeoutMs = 120000
 
 [nix]
 channel = "stable-25_05"
@@ -49,3 +49,8 @@ packages = ["glib", "nss", "nspr", "atk", "cups", "dbus", "expat", "fontconfig",
 
 [objectStorage]
 defaultBucketID = "replit-objstore-29e3169f-edfe-4d69-96a3-6b526b73cb71"
+
+[userenv]
+
+[userenv.production]
+RESEND_FROM_EMAIL = "no-reply@worky.devs.surf"

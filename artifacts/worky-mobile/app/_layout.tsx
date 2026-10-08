@@ -5,7 +5,7 @@ import { KeyboardProvider } from 'react-native-keyboard-controller';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { setAuthTokenGetter, setBaseUrl } from '@workspace/api-client-react';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
-import { AuthProvider } from '@/context/AuthContext';
+import { AuthProvider, useAuth } from '@/context/AuthContext';
 import { getStoredToken } from '@/lib/session';
 import {
   DMSans_400Regular,
@@ -15,8 +15,9 @@ import {
   useFonts,
 } from '@expo-google-fonts/dm-sans';
 import { SpaceGrotesk_600SemiBold } from '@expo-google-fonts/space-grotesk';
-import { Stack } from 'expo-router';
+import { Redirect, Stack, useSegments } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
+import { useReducedMotion } from 'react-native-reanimated';
 
 // Prevent the splash screen from auto-hiding before asset loading is complete.
 SplashScreen.preventAutoHideAsync();
@@ -26,14 +27,22 @@ setAuthTokenGetter(getStoredToken);
 const queryClient = new QueryClient();
 
 function RootLayoutNav() {
+  const { state } = useAuth();
+  const segments = useSegments();
+  const reduceMotion = useReducedMotion();
+
+  if (state === 'signed-out' && segments[0] !== '(auth)') {
+    return <Redirect href="/(auth)/login" />;
+  }
+
   return (
     <Stack screenOptions={{ headerShown: false, headerBackTitle: 'Volver' }}>
       <Stack.Screen name="index" />
       <Stack.Screen name="(auth)" options={{ presentation: 'modal' }} />
       <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-      <Stack.Screen name="professional/[id]" />
-      <Stack.Screen name="job/new" />
-      <Stack.Screen name="chat/[changaId]" />
+      <Stack.Screen name="professional/[id]" options={{ animation: reduceMotion ? 'none' : 'slide_from_right' }} />
+      <Stack.Screen name="job/new" options={{ animation: reduceMotion ? 'none' : 'slide_from_right' }} />
+      <Stack.Screen name="chat/[changaId]" options={{ animation: reduceMotion ? 'none' : 'slide_from_right' }} />
     </Stack>
   );
 }

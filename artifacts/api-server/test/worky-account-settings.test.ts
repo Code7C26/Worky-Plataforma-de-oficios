@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import http from "node:http";
+import bcrypt from "bcryptjs";
 import { eq } from "drizzle-orm";
 import { db, users } from "@workspace/db";
 import app from "../src/app";
@@ -30,25 +31,27 @@ async function request(server: http.Server, path: string, options: { method?: st
 }
 
 async function register(server: http.Server, nombre: string, email: string) {
-  const response = await request(server, `${baseUrl}/auth/register`, {
-    method: "POST",
-    body: {
-      nombre,
-      email,
-      password: originalPassword,
-      telefono: "351 000 0000",
-      edad: 30,
-      ubicacion: {
-        direccionTexto: "Dirección original 123",
-        ciudad: "Córdoba",
-        provincia: "Córdoba",
-        coordinates: [-64.1888, -31.4201],
-        capturedAt: new Date().toISOString(),
-      },
+  const [user] = await db.insert(users).values({
+    nombre,
+    email,
+    emailVerifiedAt: new Date(),
+    passwordHash: await bcrypt.hash(originalPassword, 12),
+    telefono: "351 000 0000",
+    edad: 30,
+    ubicacion: {
+      direccionTexto: "Dirección original 123",
+      ciudad: "Córdoba",
+      provincia: "Córdoba",
+      coordinates: [-64.1888, -31.4201],
+      capturedAt: new Date().toISOString(),
     },
+  }).returning({ id: users.id });
+  const response = await request(server, `${baseUrl}/auth/login`, {
+    method: "POST",
+    body: { email, password: originalPassword },
   });
-  assert.equal(response.status, 201);
-  return response.body as { token: string; usuario: { id: number } };
+  assert.equal(response.status, 200);
+  return { ...(response.body as { token: string }), usuario: { id: user.id } };
 }
 
 async function run() {

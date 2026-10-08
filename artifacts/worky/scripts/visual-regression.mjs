@@ -16,9 +16,9 @@ const authenticatedRoutes = [
 ];
 const scenarios = [
   { route: '/', name: 'login', auth: 'anonymous' },
-  { route: '/registro', name: 'register', auth: 'anonymous', prepare: async (page) => {
+  { route: '/', name: 'register', auth: 'anonymous', prepare: async (page) => {
+    await page.getByTestId('button-toggle-auth').click();
     await page.getByTestId('input-auth-name').waitFor({ state: 'visible' });
-    await page.getByText('¿Cómo querés usar Worky?').waitFor({ state: 'visible' });
   } },
   ...authenticatedRoutes.map(([route, name]) => ({ route, name, auth: 'authenticated' })),
   { route: '/home', name: 'home-loading', auth: 'authenticated', state: 'loading', waitFor: '[aria-label="Cargando"]' },
@@ -28,7 +28,10 @@ const widths = [360, 390, 430, 768, 1024, 1440];
 const resultsDir = new URL('../test-results/visual/', import.meta.url).pathname;
 const baselinesDir = new URL('../test/visual-baselines/', import.meta.url).pathname;
 const diffDir = new URL('../test-results/visual-diff/', import.meta.url).pathname;
-const updateBaselines = process.argv.includes('--update-baselines') || process.env.UPDATE_VISUAL_BASELINES === '1';
+const updateChangedBaselines = process.argv.includes('--update-changed-baselines');
+const updateBaselines = process.argv.includes('--update-baselines') ||
+  updateChangedBaselines ||
+  process.env.UPDATE_VISUAL_BASELINES === '1';
 const profile = {
   id: 7, usuarioId: 42, oficio: 'Electricista', categoria: 'Electricidad',
   rating: 4.8, completedJobs: 32, experienciaAnios: 8, precioReferencia: 12000,
@@ -229,6 +232,7 @@ const server = spawn('pnpm', ['run', 'dev'], {
 });
 let browser;
 const failures = [];
+let baselinesUpdated = 0;
 try {
   await waitForServer();
   await rm(resultsDir, { recursive: true, force: true });
@@ -294,7 +298,19 @@ try {
         const diffPath = `${diffDir}${name}-${width}.png`;
         await page.screenshot({ path: screenshotPath, fullPage: true, animations: 'disabled' });
         if (updateBaselines) {
-          await copyFile(screenshotPath, baselinePath);
+          let shouldUpdate = true;
+          if (updateChangedBaselines) {
+            try {
+              const comparison = await compareImages(screenshotPath, baselinePath, diffPath);
+              shouldUpdate = !comparison.ok;
+            } catch (error) {
+              if (error.code !== 'ENOENT') throw error;
+            }
+          }
+          if (shouldUpdate) {
+            await copyFile(screenshotPath, baselinePath);
+            baselinesUpdated += 1;
+          }
         } else {
           try {
             const comparison = await compareImages(screenshotPath, baselinePath, diffPath);
@@ -353,6 +369,8 @@ if (failures.length) {
   console.error(`Auditoría visual fallida (${failures.length} casos):\n- ${failures.join('\n- ')}`);
   process.exit(1);
 }
-console.log(updateBaselines
-  ? `Baselines visuales actualizados: ${scenarios.length} escenarios × ${widths.length} anchos en test/visual-baselines.`
-  : `Auditoría visual OK: ${scenarios.length} escenarios × ${widths.length} anchos; no hubo cambios pixel a pixel.`);
+console.log(updateChangedBaselines
+  ? `Baselines visuales actualizados: ${baselinesUpdated} capturas con cambios pixel a pixel.`
+  : updateBaselines
+    ? `Baselines visuales actualizados: ${scenarios.length} escenarios × ${widths.length} anchos en test/visual-baselines.`
+    : `Auditoría visual OK: ${scenarios.length} escenarios × ${widths.length} anchos; no hubo cambios pixel a pixel.`);

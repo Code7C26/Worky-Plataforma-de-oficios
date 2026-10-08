@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import http from "node:http";
 import { TextDecoder } from "node:util";
+import bcrypt from "bcryptjs";
 import sharp from "sharp";
 import app from "../src/app";
 import { getNotificationSubscriberCount } from "../src/routes/worky";
@@ -119,12 +120,20 @@ async function uploadChatImage(server: http.Server, token: string, participantId
 }
 
 async function register(server: http.Server, name: string) {
-  const response = await request(server, `${baseUrl}/auth/register`, {
+  const email = `${unique}-${name}@example.test`;
+  const passwordHash = await bcrypt.hash(password, 12);
+  const [user] = await db.insert(users).values({
+    nombre: name,
+    email,
+    emailVerifiedAt: new Date(),
+    passwordHash,
+  }).returning({ id: users.id });
+  const response = await request(server, `${baseUrl}/auth/login`, {
     method: "POST",
-    body: { nombre: name, email: `${unique}-${name}@example.test`, password },
+    body: { email, password },
   });
-  assert.equal(response.status, 201);
-  return response.body as { token: string; usuario: { id: number } };
+  assert.equal(response.status, 200);
+  return { ...(response.body as { token: string }), usuario: { id: user.id } };
 }
 
 async function notifications(server: http.Server, token: string) {
@@ -332,6 +341,11 @@ async function run() {
       body: { oficio: "Gasista de pruebas", categoria: "Gas", precioReferencia: 12000 },
     });
     assert.equal(profile.status, 201);
+    await db.update(professionalProfiles).set({
+      verificado: true,
+      estadoVerificacion: "verified",
+      habilitado: true,
+    }).where(eq(professionalProfiles.usuarioId, partnerId));
     const publicProfiles = await request(server, `${baseUrl}/profesionales?search=privacy-partner`);
     assert.equal(publicProfiles.status, 200);
     const publicProfile = publicProfiles.body.find((item: any) => item.id === profile.body.id);
@@ -487,6 +501,23 @@ async function run() {
     });
     assert.equal(clientImageMessage.status, 201);
     assert.deepEqual(clientImageMessage.body.adjuntos, [clientAttachment]);
+    const captionedPath = await uploadChatImage(server, client.token, clientId, changaId, sourceImage, "captioned-chat-image.png");
+    const captionedAttachment = { objectPath: captionedPath, nombre: "captioned-chat-image.png", contentType: "image/png", sizeBytes: sourceImage.length };
+    const captionedMessage = await request(server, `${baseUrl}/chats/${changaId}/mensajes`, {
+      method: "POST",
+      token: client.token,
+      body: { texto: "Te comparto una foto del trabajo.", adjuntos: [captionedAttachment] },
+    });
+    assert.equal(captionedMessage.status, 201);
+    assert.equal(captionedMessage.body.texto, "Te comparto una foto del trabajo.");
+    assert.deepEqual(captionedMessage.body.adjuntos, [captionedAttachment]);
+    const tooManyAttachments = await request(server, `${baseUrl}/chats/${changaId}/mensajes`, {
+      method: "POST",
+      token: client.token,
+      body: { adjuntos: Array.from({ length: 6 }, () => clientAttachment) },
+    });
+    assert.equal(tooManyAttachments.status, 400);
+    assert.match(tooManyAttachments.body.error, /hasta 5 imágenes/);
     const partnerImageMessage = await request(server, `${baseUrl}/chats/${changaId}/mensajes`, {
       method: "POST", token: partner.token, body: { adjuntos: [partnerAttachment] },
     });
@@ -495,6 +526,7 @@ async function run() {
     const associatedUploads = await db.select().from(chatUploads).where(eq(chatUploads.changaId, changaId));
     assert.deepEqual(associatedUploads.map((upload) => ({ objectPath: upload.objectPath, estado: upload.estado, messageId: upload.associatedMessageId })), [
       { objectPath: clientChatImagePath, estado: "associated", messageId: clientImageMessage.body.id },
+      { objectPath: captionedPath, estado: "associated", messageId: captionedMessage.body.id },
       { objectPath: partnerChatImagePath, estado: "associated", messageId: partnerImageMessage.body.id },
     ]);
 
@@ -568,6 +600,8 @@ async function run() {
     for (const visibleMessages of [messagesForClient, messagesForPartner]) {
       assert.equal(visibleMessages.status, 200);
       assert.deepEqual(visibleMessages.body.find((item: any) => item.id === clientImageMessage.body.id).adjuntos, [clientAttachment]);
+      assert.deepEqual(visibleMessages.body.find((item: any) => item.id === captionedMessage.body.id).adjuntos, [captionedAttachment]);
+      assert.equal(visibleMessages.body.find((item: any) => item.id === captionedMessage.body.id).texto, "Te comparto una foto del trabajo.");
       assert.deepEqual(visibleMessages.body.find((item: any) => item.id === partnerImageMessage.body.id).adjuntos, [partnerAttachment]);
     }
 
@@ -612,6 +646,9 @@ async function run() {
         body: { ...invalidUpload, purpose: "chat_image", changaId },
       });
       assert.equal(rejected.status, 400);
+      if (invalidUpload.name === "too-large.png") {
+        assert.match(rejected.body.error, /10 MB/);
+      }
     }
 
     const abandonedChatPath = await uploadChatImage(server, client.token, clientId, changaId, sourceImage, "abandoned-chat-image.png");

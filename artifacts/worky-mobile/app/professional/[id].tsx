@@ -44,6 +44,7 @@ export default function ProfessionalDetailsScreen() {
         <Button
           label="Publicar trabajo para este profesional"
           icon="plus"
+          feedback
           onPress={() => router.push({ pathname: '/job/new', params: { professionalId: String(professional.usuarioId) } })}
           testID="button-request-professional"
         />

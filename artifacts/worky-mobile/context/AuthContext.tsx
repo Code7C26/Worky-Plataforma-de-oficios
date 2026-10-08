@@ -18,6 +18,7 @@ import {
   type AuthRegisterInput,
 } from '@workspace/api-client-react';
 import { clearStoredToken, getStoredToken, storeToken } from '@/lib/session';
+import { switchRoleAfterServerConfirmation, type WorkyRole } from '@/lib/role-switch';
 
 type SessionState = 'loading' | 'signed-in' | 'signed-out' | 'error';
 
@@ -27,7 +28,7 @@ interface AuthContextValue {
   signIn: (email: string, password: string) => Promise<void>;
   signUp: (input: AuthRegisterInput) => Promise<void>;
   signOut: () => Promise<void>;
-  switchRole: (role: 'cliente' | 'profesional') => Promise<Account>;
+  switchRole: (role: WorkyRole) => Promise<Account>;
   refreshSession: () => Promise<void>;
   setAccount: (account: Account) => void;
 }
@@ -91,11 +92,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [queryClient]);
 
   const signOut = useCallback(async () => {
-    try {
-      await logoutAccount();
-    } catch {
-      // The local session still needs to end if the network is unavailable.
-    }
+    void logoutAccount().catch(() => undefined);
     await clearStoredToken();
     queryClient.clear();
     setAccount(null);
@@ -103,8 +100,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [queryClient]);
 
   const switchRole = useCallback(async (role: 'cliente' | 'profesional') => {
-    const updatedAccount = await switchAccountRole({ rol: role });
-    setAccount(updatedAccount);
+    const updatedAccount = await switchRoleAfterServerConfirmation(
+      role,
+      switchAccountRole,
+      setAccount,
+    );
     await queryClient.invalidateQueries();
     return updatedAccount;
   }, [queryClient]);

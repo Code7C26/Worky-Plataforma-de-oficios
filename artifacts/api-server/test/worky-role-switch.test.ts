@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import http from "node:http";
+import bcrypt from "bcryptjs";
 import { eq } from "drizzle-orm";
 import { db, professionalProfiles, users } from "@workspace/db";
 import app from "../src/app";
@@ -54,14 +55,22 @@ async function register(
   server: http.Server,
   email: string,
 ): Promise<{ token: string; id: number }> {
-  const response = await request(server, "/api/v1/auth/register", {
+  const password = "WorkyRoleTest123!";
+  const [user] = await db.insert(users).values({
+    nombre: "Worky Role Test",
+    email,
+    emailVerifiedAt: new Date(),
+    passwordHash: await bcrypt.hash(password, 12),
+    rol: "cliente",
+  }).returning({ id: users.id });
+  const response = await request(server, "/api/v1/auth/login", {
     method: "POST",
-    body: { nombre: "Worky Role Test", email, password: "WorkyRoleTest123!", rol: "cliente" },
+    body: { email, password },
   });
-  assert.equal(response.status, 201, JSON.stringify(response.body));
+  assert.equal(response.status, 200, JSON.stringify(response.body));
   assert.equal(typeof response.body.token, "string");
-  assert.equal(typeof response.body.usuario.id, "number");
-  return { token: response.body.token, id: response.body.usuario.id };
+  assert.equal(typeof user.id, "number");
+  return { token: response.body.token, id: user.id };
 }
 
 async function run() {

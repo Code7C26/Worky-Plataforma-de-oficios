@@ -4,7 +4,7 @@ import { router } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { KeyboardAwareScrollViewCompat } from '@/components/KeyboardAwareScrollViewCompat';
-import { AppText, BrandHeader, Button, TextField } from '@/components/WorkyUI';
+import { AppText, BrandHeader, Button, LiveStatusText, TextField } from '@/components/WorkyUI';
 import { useAuth } from '@/context/AuthContext';
 import { useColors } from '@/hooks/useColors';
 
@@ -27,19 +27,23 @@ export default function RegisterScreen() {
       setError('Completá nombre, email y una contraseña de al menos 6 caracteres.');
       return;
     }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
+      setError('Ingresá un email válido.');
+      return;
+    }
     setPending(true);
     setError('');
     try {
       await signUp({
         nombre: name.trim(),
-        email: email.trim(),
+        email: email.trim().toLowerCase(),
         password,
         ...(phone.trim() ? { telefono: phone.trim() } : {}),
         rol: role,
       });
       router.replace('/(tabs)');
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : 'No pudimos crear tu cuenta.');
+      setError(getRequestError(reason, 'No pudimos crear tu cuenta. Revisá los datos e intentá nuevamente.'));
     } finally {
       setPending(false);
     }
@@ -83,11 +87,17 @@ export default function RegisterScreen() {
               })}
             </View>
             <TextField label="Nombre y apellido" inverse value={name} onChangeText={setName} placeholder="Tu nombre" autoComplete="name" testID="input-register-name" />
-            <TextField label="Email" inverse value={email} onChangeText={setEmail} placeholder="nombre@email.com" keyboardType="email-address" autoCapitalize="none" autoComplete="email" testID="input-register-email" />
+            <TextField label="Email" inverse value={email} onChangeText={setEmail} placeholder="nombre@email.com" keyboardType="email-address" autoCapitalize="none" autoComplete="email" accessibilityLabel="Email" testID="input-register-email" />
             <TextField label="Teléfono (opcional)" inverse value={phone} onChangeText={setPhone} placeholder="11 5555 5555" keyboardType="phone-pad" autoComplete="tel" testID="input-register-phone" />
             <TextField label="Contraseña" inverse value={password} onChangeText={setPassword} placeholder="Al menos 6 caracteres" secureTextEntry autoComplete="new-password" testID="input-register-password" />
-            {error ? <AppText variant="caption" style={{ color: colors.destructive }}>{error}</AppText> : null}
-            <Button label="Crear cuenta" icon="arrow-right" loading={pending} onPress={() => void submit()} testID="button-register" />
+            {error ? <LiveStatusText variant="caption" role="alert" testID="error-register" style={{ color: colors.destructive }}>{error}</LiveStatusText> : null}
+            <Button
+              label="Crear cuenta"
+              icon="arrow-right"
+              loading={pending}
+              onPress={() => void submit()}
+              testID="button-register"
+            />
           </View>
           <View style={styles.footer}>
             <AppText onDark style={{ color: colors.authMuted }}>¿Ya tenés una cuenta?</AppText>
@@ -99,6 +109,17 @@ export default function RegisterScreen() {
       </KeyboardAwareScrollViewCompat>
     </View>
   );
+}
+
+function getRequestError(reason: unknown, fallback: string) {
+  if (reason && typeof reason === 'object') {
+    const data = (reason as { data?: unknown }).data;
+    if (data && typeof data === 'object' && typeof (data as { error?: unknown }).error === 'string') {
+      return (data as { error: string }).error;
+    }
+    if (reason instanceof Error && reason.message) return reason.message;
+  }
+  return fallback;
 }
 
 const styles = StyleSheet.create({

@@ -7,6 +7,7 @@ export type AuthUser = {
   id: number;
   nombre: string;
   email: string;
+  emailVerifiedAt?: string | null;
   telefono?: string | null;
   rol: "cliente" | "profesional" | "admin";
   ubicacion?: unknown;
@@ -148,6 +149,20 @@ export async function resetPassword(token: string, newPassword: string) {
   });
 }
 
+export async function requestAccountEmailVerification() {
+  return apiRequest<{ message: string }>("/auth/email-verification/account/request", {
+    method: "POST",
+    body: JSON.stringify({}),
+  });
+}
+
+export async function confirmAccountEmailVerification(code: string) {
+  return apiRequest<{ verified: boolean }>("/auth/email-verification/account/confirm", {
+    method: "POST",
+    body: JSON.stringify({ code }),
+  });
+}
+
 export async function register(payload: { nombre: string; email: string; password: string; telefono?: string; ubicacion?: unknown; edad?: number; fotoObjectPath?: string | null; rol?: "cliente" | "profesional"; onboardingRespuestas?: Record<string, string> }) {
   const request = configureApiAuth();
   const data = await request<{ token: string; usuario: AuthUser }>("/auth/register", { method: "POST", body: JSON.stringify(payload) });
@@ -188,6 +203,10 @@ export async function currentUser() {
 }
 
 export async function logout() {
-  if (getToken()) await configureApiAuth()("/auth/logout", { method: "POST" }).catch(() => undefined);
+  const hadToken = Boolean(getToken());
+  const serverLogout = hadToken
+    ? configureApiAuth()("/auth/logout", { method: "POST" }).catch(() => undefined)
+    : Promise.resolve();
   clearToken();
+  await serverLogout;
 }

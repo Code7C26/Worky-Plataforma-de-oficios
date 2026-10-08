@@ -16,11 +16,13 @@ export const privateDocumentTypeEnum = pgEnum("worky_private_document_type", ["d
 export const chatUploadStatusEnum = pgEnum("worky_chat_upload_status", ["pending", "associated", "deleting", "deleted"]);
 export const profilePhotoUploadStatusEnum = pgEnum("worky_profile_photo_upload_status", ["pending", "associated", "deleting", "deleted"]);
 export const profilePhotoVariantEnum = pgEnum("worky_profile_photo_variant", ["source", "rendered"]);
+export const emailVerificationPurposeEnum = pgEnum("worky_email_verification_purpose", ["registration", "account"]);
 
 export const users = pgTable("worky_users", {
   id: serial("id").primaryKey(),
   nombre: text("nombre").notNull(),
   email: text("email").notNull(),
+  emailVerifiedAt: timestamp("email_verified_at", { withTimezone: true }),
   passwordHash: text("password_hash").notNull(),
   telefono: text("telefono"),
   edad: integer("edad"),
@@ -47,6 +49,23 @@ export const passwordRecoveryTokens = pgTable("worky_password_recovery_tokens", 
   index("worky_password_recovery_user_idx").on(table.usuarioId),
 ]);
 
+export const emailVerificationTokens = pgTable("worky_email_verification_tokens", {
+  id: serial("id").primaryKey(),
+  usuarioId: integer("usuario_id").references(() => users.id, { onDelete: "cascade" }),
+  email: text("email").notNull(),
+  purpose: emailVerificationPurposeEnum("purpose").notNull(),
+  tokenHash: text("token_hash").notNull(),
+  attempts: integer("attempts").notNull().default(0),
+  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+  verifiedAt: timestamp("verified_at", { withTimezone: true }),
+  usedAt: timestamp("used_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+}, (table) => [
+  uniqueIndex("worky_email_verification_token_hash_idx").on(table.tokenHash),
+  index("worky_email_verification_user_idx").on(table.usuarioId),
+  index("worky_email_verification_email_purpose_idx").on(table.email, table.purpose, table.createdAt),
+]);
+
 export const professionalProfiles = pgTable("worky_professional_profiles", {
   id: serial("id").primaryKey(),
   usuarioId: integer("usuario_id").notNull().unique().references(() => users.id),
@@ -54,6 +73,7 @@ export const professionalProfiles = pgTable("worky_professional_profiles", {
   categoria: categoryEnum("categoria").notNull(),
   matriculaHabilitante: text("matricula_habilitante"),
   verificado: boolean("verificado").notNull().default(false),
+  habilitado: boolean("habilitado").notNull().default(true),
   estadoVerificacion: verificationStatusEnum("estado_verificacion").notNull().default("pending_verification"),
   skills: text("skills").array().notNull().default([]),
   about: text("about"),
@@ -64,7 +84,10 @@ export const professionalProfiles = pgTable("worky_professional_profiles", {
   cantidadChangas: integer("cantidad_changas").notNull().default(0),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
-}, (table) => [index("worky_profiles_category_idx").on(table.categoria)]);
+}, (table) => [
+  index("worky_profiles_category_idx").on(table.categoria),
+  index("worky_profiles_public_state_idx").on(table.habilitado, table.verificado, table.categoria),
+]);
 
 /** Catálogo administrable: estas filas son la única fuente para filtros y oportunidades. */
 export const serviceCatalog = pgTable("worky_service_catalog", {

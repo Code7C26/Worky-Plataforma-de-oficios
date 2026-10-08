@@ -1,5 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+import { createServer } from "vite";
+
+const workyRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
 test("coordina el stream entre pestañas y rehidrata avisos sin reintentos inmediatos", async () => {
   const { JSDOM } = await import("jsdom");
@@ -19,6 +24,8 @@ test("coordina el stream entre pestañas y rehidrata avisos sin reintentos inmed
     removeEventListener: globalThis.removeEventListener,
     dispatchEvent: globalThis.dispatchEvent,
   };
+  const previousReplId = process.env.REPL_ID;
+  delete process.env.REPL_ID;
   Object.defineProperties(globalThis, {
     window: { configurable: true, value: dom.window },
     document: { configurable: true, value: dom.window.document },
@@ -73,10 +80,9 @@ test("coordina el stream entre pestañas y rehidrata avisos sin reintentos inmed
   Object.defineProperty(globalThis, "EventSource", { configurable: true, value: FakeEventSource });
   Object.defineProperty(dom.window, "EventSource", { configurable: true, value: FakeEventSource });
 
-  const { cleanup, fireEvent, render, screen, waitFor } = await import("@testing-library/react");
-  const React = await import("react");
-  Object.defineProperty(globalThis, "React", { configurable: true, value: React });
-  const { default: App, queryClient } = await import("../src/App");
+  let vite: Awaited<ReturnType<typeof createServer>> | undefined;
+  let cleanup = () => {};
+  let clearQueryClient = () => {};
   const notifications = [
     { id: 301, titulo: "Nuevo mensaje", detalle: "Tenés una respuesta.", leida: false, href: "/home" },
   ];
@@ -100,6 +106,20 @@ test("coordina el stream entre pestañas y rehidrata avisos sin reintentos inmed
   };
 
   try {
+    vite = await createServer({
+      root: workyRoot,
+      configFile: path.join(workyRoot, "vite.config.ts"),
+      server: { middlewareMode: true },
+      appType: "custom",
+    });
+    const { cleanup: cleanupRenderedApp, fireEvent, render, screen, waitFor } =
+      await import("@testing-library/react");
+    cleanup = cleanupRenderedApp;
+    const React = await import("react");
+    Object.defineProperty(globalThis, "React", { configurable: true, value: React });
+    const { default: App, queryClient } = await vite.ssrLoadModule("/src/App.tsx");
+    clearQueryClient = () => queryClient.clear();
+
     render(React.createElement(App));
     await waitFor(() => assert.ok(screen.getByTestId("button-notifications")));
     await waitFor(() => assert.equal(screen.getByTestId("notification-unread-count").textContent, "1"));
@@ -129,7 +149,10 @@ test("coordina el stream entre pestañas y rehidrata avisos sin reintentos inmed
     assert.equal(screen.getByTestId("notification-unread-count").textContent, "2");
   } finally {
     cleanup();
-    queryClient.clear();
+    clearQueryClient();
+    await vite?.close();
+    if (previousReplId === undefined) delete process.env.REPL_ID;
+    else process.env.REPL_ID = previousReplId;
     globalThis.fetch = originalFetch;
     Object.defineProperties(globalThis, {
       window: { configurable: true, value: previous.window },

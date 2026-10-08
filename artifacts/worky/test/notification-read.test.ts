@@ -1,7 +1,11 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+import { createServer } from "vite";
 import { markNotificationRead } from "../src/lib/api";
 
+const workyRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const storage = new Map<string, string>();
 Object.defineProperty(globalThis, "localStorage", {
   configurable: true,
@@ -42,7 +46,7 @@ test("un fallo de red al abrir un aviso no cambia el aviso ni su contador", asyn
   assert.deepEqual(notifications, before);
   assert.equal(notifications.filter((item) => !item.leida).length, unreadBefore);
 });
-test("el aviso fallido se puede reintentar con el mismo destino y desaparece al confirmar", async () => {
+  test("el panel se cierra al tocar fuera y los avisos fallidos se pueden reintentar", async () => {
   const notifications = [
     { id: 101, titulo: "Nuevo mensaje", href: "/chat/42", leida: false },
     { id: 102, titulo: "Nueva propuesta", href: "/chat/84", leida: false },
@@ -190,6 +194,8 @@ test("la interfaz apila dos avisos fallidos y quita solo el reintento confirmado
     removeEventListener: globalThis.removeEventListener,
     dispatchEvent: globalThis.dispatchEvent,
   };
+  const previousReplId = process.env.REPL_ID;
+  delete process.env.REPL_ID;
   Object.defineProperties(globalThis, {
     window: { configurable: true, value: dom.window },
     document: { configurable: true, value: dom.window.document },
@@ -205,11 +211,8 @@ test("la interfaz apila dos avisos fallidos y quita solo el reintento confirmado
     dispatchEvent: { configurable: true, value: dom.window.dispatchEvent.bind(dom.window) },
   });
 
-  const { cleanup, fireEvent, render, screen, waitFor } = await import("@testing-library/react");
-  const React = await import("react");
-  const { createElement } = React;
-  Object.defineProperty(globalThis, "React", { configurable: true, value: React });
-  const { default: App } = await import("../src/App");
+  let vite: Awaited<ReturnType<typeof createServer>> | undefined;
+  let cleanup = () => {};
   const notifications = [
     { id: 201, titulo: "Nuevo mensaje", detalle: "Tenés una respuesta.", leida: false, href: "/home" },
     { id: 202, titulo: "Nueva propuesta", detalle: "Recibiste una propuesta.", leida: false, href: "/home" },
@@ -270,12 +273,34 @@ test("la interfaz apila dos avisos fallidos y quita solo el reintento confirmado
   };
 
   try {
-    render(createElement(App));
+    vite = await createServer({
+      root: workyRoot,
+      configFile: path.join(workyRoot, "vite.config.ts"),
+      server: { middlewareMode: true },
+      appType: "custom",
+    });
+    const { cleanup: cleanupRenderedApp, fireEvent, render, screen, waitFor } =
+      await import("@testing-library/react");
+    cleanup = cleanupRenderedApp;
+    const React = await import("react");
+    Object.defineProperty(globalThis, "React", { configurable: true, value: React });
+    const { default: App } = await vite.ssrLoadModule("/src/App.tsx");
+
+    render(React.createElement(App));
     await waitFor(() => assert.ok(screen.getByTestId("button-notifications")));
     await waitFor(() => assert.equal(screen.getByTestId("notification-unread-count").textContent, "2"));
 
     fireEvent.click(screen.getByTestId("button-notifications"));
     await waitFor(() => assert.ok(screen.getByTestId("notification-201")));
+    assert.equal(screen.getByTestId("button-notifications").getAttribute("aria-expanded"), "true");
+    fireEvent.pointerDown(document.body);
+    await waitFor(() => assert.equal(screen.queryByRole("region", { name: "Notificaciones" }), null));
+    assert.equal(screen.getByTestId("button-notifications").getAttribute("aria-expanded"), "false");
+
+    fireEvent.click(screen.getByTestId("button-notifications"));
+    await waitFor(() => assert.ok(screen.getByTestId("notification-201")));
+    fireEvent.pointerDown(screen.getByTestId("notification-201"));
+    assert.ok(screen.getByRole("region", { name: "Notificaciones" }));
     fireEvent.click(screen.getByTestId("notification-201"));
     await waitFor(() => assert.ok(screen.getByTestId("notification-read-error-201")));
 
@@ -307,6 +332,9 @@ test("la interfaz apila dos avisos fallidos y quita solo el reintento confirmado
     assert.deepEqual(requestIds, [201, 202, 201]);
   } finally {
     cleanup();
+    await vite?.close();
+    if (previousReplId === undefined) delete process.env.REPL_ID;
+    else process.env.REPL_ID = previousReplId;
     globalThis.fetch = originalFetch;
     Object.defineProperties(globalThis, {
       window: { configurable: true, value: previousGlobals.window },

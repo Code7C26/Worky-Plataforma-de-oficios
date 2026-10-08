@@ -1,9 +1,10 @@
 - [API contract validation](api-contract-validation.md) — use OpenAPI number for numeric fields until the generated Zod runtime supports z.int().
+- [Email verification after signup](registration-verification-proof-binding.md) — create accounts immediately; verification remains available later in authenticated settings.
 - [Test isolation for audit histories](test-isolation.md) — isolate entity histories before assertions so interrupted cleanup cannot leak stale audit rows.
 - [Offline queue synchronization](offline-queue-synchronization.md) — serialize retries per conversation and remove local attempts only after the server confirms them.
 - [Build environment defaults](build-environment-defaults.md) — align Vite fallbacks with artifact service values because recursive root builds lack injected service env.
 - [Artifact config validation](artifact-config-validation.md) — filtered pnpm commands run from the package directory, so cross-package checks need an explicit workspace root.
-- [JSDOM integration test isolation](jsdom-integration-test-isolation.md) — keep React/JSDOM integration cases in separate test processes when global DOM state is replaced between tests.
+- [JSDOM integration test isolation](jsdom-integration-test-isolation.md) — isolate DOM-global tests and ensure linked hooks use the same React runtime as the renderer.
 - [Visual audit browser runtime](visual-audit-browser-runtime.md) — browser-based layout checks need Playwright plus explicit Nix graphics libraries in this workspace.
 - [PNG visual comparison formats](png-visual-comparison.md) — Playwright screenshots may be RGB PNGs, so comparisons must support RGB and RGBA.
 - [Visual baseline noise](visual-baseline-noise.md) — rerun one-pixel visual mismatches before approving a baseline update; headless rendering can vary minimally.
@@ -15,3 +16,22 @@
 - [Direct image upload validation](direct-image-upload-validation.md) — signed upload URLs cannot inspect bytes; validate image content before associating the object.
 - [Profile photo cleanup races](profile-photo-cleanup-races.md) — lock the account before claiming photo objects and re-check the current path before deletion.
 - [Development schema synchronization](development-schema-synchronization.md) — API privacy tests require generated database declarations and the development schema to match the current Drizzle source.
+- [GitHub connector publishing](github-connector-publishing.md) — API auth and shell Git auth are separate; verify blobs and throttle connector uploads.
+- [Live location privacy](live-location-privacy.md) — browser tracking needs a movement watch plus heartbeat, while exact coordinates stay server-private.
+- [Own profile identity](profile-id-ambiguity.md) — resolve the current account through the authenticated profile endpoint before public detail lookups.
+- [Account settings concurrency](account-settings-concurrency.md) — settings forms own separate fields; merge address and live coordinates atomically to prevent lost updates.
+- [Role-scoped conversations](role-scoped-conversations.md) — one account switches roles without losing its Partner profile; inbox follows active role, notifications stay account-wide.
+- [Inverted chat list layout](inverted-chat-list-layout.md) — rely on FlatList inversion; manual vertical flips turn message text and empty states upside down.
+- [OpenAPI format compatibility](openapi-email-schema-compatibility.md) — avoid generated email/URL Zod validators unsupported by the installed Zod 3 runtime.
+- [Expo patch maturity window](expo-patch-maturity-window.md) — do not bypass the package registry's minimum-age policy for newly released SDK patches.
+- [Workspace package installs](workspace-package-installs.md) — target artifact packages with a pnpm workspace filter instead of adding dependencies at the monorepo root.
+- [Metro and generated API code](metro-codegen-output-race.md) — finish OpenAPI codegen before starting or restarting Metro; Orval temporarily cleans the generated client directory.
+- [Workspace-scoped package installs](package-install-workspace-scope.md) — package additions in a monorepo must target the intended workspace package, not the root.
+- [React Native Web radio state](react-native-web-radio-state.md) — set `aria-checked` explicitly alongside `accessibilityState`; web output may omit the checked state otherwise.
+- [Selective mobile motion](selective-mobile-motion.md) — use brief motion for navigation, primary actions, and confirmations; keep secondary controls quiet and respect reduced-motion settings.
+- [React Native Web live announcements](react-native-web-live-announcements.md) — assert rendered ARIA and server-confirmed timing in a real browser.
+- [Vite React Query deduplication](vite-react-query-dedupe.md) — duplicate QueryClient contexts can break production even when the provider is present.
+- [Worky marketing site separation](worky-marketing-site-scope.md) — keep the public landing in its own Replit project and domain, separate from the marketplace deployment.
+- [Production email sender](production-email-sender.md) — Resend's default sender cannot deliver to arbitrary users; require a verified-domain sender and privacy-safe diagnostics.
+- [Partner approval and publication](partner-approval-and-publication.md) — document approval, directory eligibility, and account suspension are separate states.
+- [Admin manager hosting](admin-manager-hosting.md) — the user chose a separate Repl/domain for the gestor; connect it to Worky's API instead of adding a marketplace route.
