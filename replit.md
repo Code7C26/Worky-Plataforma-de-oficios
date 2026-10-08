@@ -11,9 +11,9 @@ Marketplace que conecta clientes con profesionales de oficios para publicar, ace
 - `pnpm --filter @workspace/api-spec run codegen` — regenerate API hooks and Zod schemas from the OpenAPI spec
 - `pnpm --filter @workspace/db run push` — push DB schema changes (dev only)
 - Required env: `DATABASE_URL` — Postgres connection string
-- Optional env: `WORKY_ADMIN_SIGNUP_ALLOWED_EMAILS` — comma-separated admin-signup allowlist; unset or empty disables the flow. Configure it in the API Repl without committing the addresses.
-- Admin signup sends one-time codes directly through Gmail SMTP, never Resend. Configure `WORKY_ADMIN_GMAIL_USER` with the authorized Worky Gmail mailbox and `WORKY_ADMIN_GMAIL_APP_PASSWORD` as a Secret in the API Repl. Use a Google application password with two-step verification, never the normal mailbox password. Missing or invalid mail configuration refuses delivery; there is no fallback provider.
-- This SMTP change is limited to admin signup. Existing account-email verification and password recovery keep their current transports. Signup stores only hashed codes in Worky's current PostgreSQL; apply its reviewed schema change through the API Repl, without creating another database.
+- Optional env: `WORKY_ADMIN_SIGNUP_ALLOWED_EMAILS` — comma-separated admin-signup allowlist; unset or empty disables the flow. Configure it for the API Server artifact in the existing Worky Repl without committing the addresses.
+- Admin signup sends one-time codes directly through Gmail SMTP, never Resend. Configure `WORKY_ADMIN_GMAIL_USER` with the authorized Worky Gmail mailbox and `WORKY_ADMIN_GMAIL_APP_PASSWORD` as a Secret for API Server in the existing Worky Repl. Use a Google application password with two-step verification, never the normal mailbox password. Missing or invalid mail configuration refuses delivery; there is no fallback provider.
+- This SMTP change is limited to admin signup. Existing account-email verification and password recovery keep their current transports. Signup stores only hashed codes in Worky's current PostgreSQL; apply its reviewed schema change through the existing API Server artifact, without creating another database or a separate API Repl.
 
 ## Stack
 

@@ -310,6 +310,36 @@ test("an existing admin can authenticate once without duplicate promotion or aud
   assert.equal((await complete(challenge.code)).status, 400);
 });
 
+test("an existing unverified admin records email verification after valid code and current password", async () => {
+  const account = await seedAccount({ rol: "admin", emailVerifiedAt: null });
+  const challenge = await seedChallenge();
+  const response = await complete(challenge.code);
+  assert.equal(response.status, 200);
+  assert.equal(verifyToken(response.body.token), account.id);
+  const state = await snapshot();
+  assert(state.accounts[0].emailVerifiedAt instanceof Date);
+  assert.equal(state.accounts[0].rol, "admin");
+  assert.equal(state.accounts[0].passwordHash, account.passwordHash);
+  assert.equal(response.body.usuario.emailVerifiedAt, state.accounts[0].emailVerifiedAt.toISOString());
+  assert.equal(state.audit.length, 0, "Email verification must not duplicate a role grant");
+  assert(state.codes[0].usedAt);
+  assert.equal((await complete(challenge.code)).status, 400);
+  assert.deepEqual(await snapshot(), state);
+});
+
+test("a preexisting admin remains email-unverified when either code or current password fails", async () => {
+  await seedAccount({ rol: "admin", emailVerifiedAt: null });
+  const challenge = await seedChallenge();
+  const wrongCode = ((Number(challenge.code) + 1) % 1_000_000).toString().padStart(6, "0");
+  assert.equal((await complete(wrongCode)).status, 400);
+  assert.equal((await snapshot()).accounts[0].emailVerifiedAt, null);
+  assert.equal((await complete(challenge.code, { password: "incorrect-fixture-password" })).status, 401);
+  const state = await snapshot();
+  assert.equal(state.accounts[0].emailVerifiedAt, null);
+  assert.equal(state.codes[0].usedAt, null);
+  assert.equal(state.audit.length, 0);
+});
+
 for (const existing of [false, true]) {
   test(`simultaneous completion has one winner for ${existing ? "promotion" : "creation"}`, async () => {
     if (existing) await seedAccount();

@@ -389,7 +389,16 @@ router.post("/auth/admin-signup/complete", adminSignupCompleteLimiter, async (re
     let account: typeof users.$inferSelect;
     if (existing) {
       if (existing.rol === "admin") {
-        account = existing;
+        if (existing.emailVerifiedAt) {
+          account = existing;
+        } else {
+          const [verifiedAdmin] = await tx.update(users)
+            .set({ emailVerifiedAt: now, updatedAt: now })
+            .where(eq(users.id, existing.id))
+            .returning();
+          if (!verifiedAdmin) return { kind: "invalid" as const };
+          account = verifiedAdmin;
+        }
       } else {
         const [promoted] = await tx.update(users)
           .set({ rol: "admin", emailVerifiedAt: existing.emailVerifiedAt ?? now, updatedAt: now })
