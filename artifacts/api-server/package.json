@@ -12,7 +12,8 @@
     "test:privacy": "tsx test/worky-privacy.test.ts",
     "test:location": "tsx test/worky-location.test.ts",
     "test:account-settings": "tsx test/worky-account-settings.test.ts",
-    "test:role-switch": "tsx test/worky-role-switch.test.ts"
+    "test:role-switch": "tsx test/worky-role-switch.test.ts",
+    "test:partner-visibility": "tsx test/worky-partner-visibility.test.ts"
   },
   "dependencies": {
     "@google-cloud/storage": "^7.22.0",
