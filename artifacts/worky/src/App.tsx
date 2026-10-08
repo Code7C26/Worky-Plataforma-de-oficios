@@ -23,7 +23,7 @@ import { ErrorBoundary } from '@/components/error-boundary';
 import NotFound from '@/pages/not-found';
 import { Route, Switch, Link, Router as WouterRouter, useLocation, useParams } from 'wouter';
 import { AuthUser, WorkyApiError, addPendingAppointmentAttempt, apiRequest, clearToken, configureApiAuth, currentUser, fetchWorkyObject, getPendingAppointmentAttempts, getToken, login, logout, markNotificationRead, register, requestPasswordRecovery, resetPassword, savePendingAppointmentAttempts, syncPendingAppointmentAttempts, uploadWorkyFile, type PendingAppointmentAttempt } from '@/lib/api';
-import { isRegistrationEntryPath } from '@/lib/auth-entry';
+import { getAuthReturnLocation, isRegistrationEntryPath } from '@/lib/auth-entry';
 import { appointmentErrorMessage, type AppointmentAction } from '@/appointment-errors';
 import { sortProfessionalsByDistance } from '@/lib/professionals';
 import SettingsPage from '@/pages/settings';
@@ -682,8 +682,9 @@ function AuthPage({ setRole }: { setRole: (role: Role) => void }) {
         }
       }
       await apiRequest('/auth/onboarding', { method: 'PATCH', body: JSON.stringify({ estado: 'onboarding_completed', paso: 3, respuestas: answers }) });
-       clearRegistrationDraft();
-       setRole(role); setLocation('/home');
+      clearRegistrationDraft();
+      setRole(role);
+      setLocation(getAuthReturnLocation(location));
     } catch (cause) { setError(cause instanceof Error ? cause.message : 'No pudimos crear tu cuenta.'); }
   };
   const loginSubmit = async (event: FormEvent<HTMLFormElement>) => {
@@ -692,7 +693,7 @@ function AuthPage({ setRole }: { setRole: (role: Role) => void }) {
     try {
       await auth.login(data.email, data.password);
       setRole('client');
-      setLocation('/home');
+      setLocation(getAuthReturnLocation(location));
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'No pudimos ingresar. Intentá nuevamente.');
     }
