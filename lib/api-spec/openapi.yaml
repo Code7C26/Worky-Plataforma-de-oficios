@@ -617,7 +617,7 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/AdminRoleGrantResult" }
-        "400": { description: Invalid email, reason, or fields }
+        "400": { description: "Invalid email, reason, or fields" }
         "401": { description: Authentication required }
         "403": { description: Administrator role required }
         "404": { description: Account not found }
