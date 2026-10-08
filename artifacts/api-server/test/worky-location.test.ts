@@ -50,6 +50,7 @@ async function run() {
       body: { oficio: "Plomero de ubicación", categoria: "Plomería", precioReferencia: 15000 },
     });
     assert.equal(profile.status, 201);
+    await db.update(professionalProfiles).set({ verificado: true, estadoVerificacion: "verified" }).where(eq(professionalProfiles.usuarioId, professionalId));
 
     const firstUpdate = await request(server, `${baseUrl}/auth/location`, {
       method: "PATCH",

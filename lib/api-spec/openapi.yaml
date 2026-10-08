@@ -15,6 +15,8 @@ tags:
   - name: messages
   - name: appointments
   - name: auth
+  - name: admin
+    description: Administrative operations
 paths:
   /healthz:
     get:
@@ -192,6 +194,33 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/OperationResult" }
         "400": { description: "Invalid, expired, or already used token" }
+  /admin/partners/{profesionalId}/estado:
+    patch:
+      operationId: setPartnerStatus
+      tags: [admin]
+      summary: Enable or disable a Partner account
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: profesionalId
+          in: path
+          required: true
+          schema: { type: integer, minimum: 1 }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/PartnerStatusUpdate" }
+      responses:
+        "200":
+          description: Updated Partner status
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PartnerStatusResult" }
+        "400": { description: Invalid status or reason }
+        "401": { description: Authentication required }
+        "403": { description: Administrator role required }
+        "404": { description: Partner not found }
   /profesionales:
     get:
       operationId: listProfessionals
@@ -599,7 +628,26 @@ paths:
         "403": { description: Only the client can reject }
         "404": { description: Appointment not found }
 components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
   schemas:
+    PartnerStatusUpdate:
+      type: object
+      additionalProperties: false
+      required: [activo, motivo]
+      properties:
+        activo: { type: boolean }
+        motivo: { type: string, minLength: 1, maxLength: 500 }
+    PartnerStatusResult:
+      type: object
+      required: [partnerId, activo, changed]
+      properties:
+        partnerId: { type: integer }
+        activo: { type: boolean }
+        changed: { type: boolean }
     HealthStatus:
       type: object
       properties:
