@@ -332,6 +332,7 @@ async function run() {
       body: { oficio: "Gasista de pruebas", categoria: "Gas", precioReferencia: 12000 },
     });
     assert.equal(profile.status, 201);
+    await db.update(professionalProfiles).set({ verificado: true, estadoVerificacion: "verified" }).where(eq(professionalProfiles.usuarioId, partnerId));
     const publicProfiles = await request(server, `${baseUrl}/profesionales?search=privacy-partner`);
     assert.equal(publicProfiles.status, 200);
     const publicProfile = publicProfiles.body.find((item: any) => item.id === profile.body.id);
