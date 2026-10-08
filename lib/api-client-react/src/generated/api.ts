@@ -44,6 +44,9 @@ import type {
   AdminResourcePage,
   AdminReviewPage,
   AdminSettlementPage,
+  AdminSignupCompletion,
+  AdminSignupRequest,
+  AdminSignupRequestResult,
   AdminVerificationDecisionInput,
   AdminVerificationDecisionResult,
   AdminVerificationDocument,
@@ -1989,6 +1992,150 @@ export const useConfirmAccountEmailVerification = <TError = ErrorType<void>,
         TContext
       > => {
       return useMutation(getConfirmAccountEmailVerificationMutationOptions(options));
+    }
+
+export const getRequestAdminSignupCodeUrl = () => {
+
+
+
+
+  return `/api/v1/auth/admin-signup/request`
+}
+
+/**
+ * Sends a one-time code only when the email is in the server-side allowlist. The response does not reveal allowlist membership.
+ * @summary Request a verification code for an allowlisted administrator email
+ */
+export const requestAdminSignupCode = async (adminSignupRequest: AdminSignupRequest, options?: Parameters<typeof customFetch>[1]): Promise<AdminSignupRequestResult> => {
+
+  return customFetch<AdminSignupRequestResult>(getRequestAdminSignupCodeUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(adminSignupRequest)
+  }
+);}
+
+
+
+
+
+export const getRequestAdminSignupCodeMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof requestAdminSignupCode>>, TError,{data: BodyType<AdminSignupRequest>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof requestAdminSignupCode>>, TError,{data: BodyType<AdminSignupRequest>}, TContext> => {
+
+const mutationKey = ['requestAdminSignupCode'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof requestAdminSignupCode>>, {data: BodyType<AdminSignupRequest>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  requestAdminSignupCode(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type RequestAdminSignupCodeMutationResult = NonNullable<Awaited<ReturnType<typeof requestAdminSignupCode>>>
+    export type RequestAdminSignupCodeMutationBody = BodyType<AdminSignupRequest>
+    export type RequestAdminSignupCodeMutationError = ErrorType<void>
+
+    /**
+ * @summary Request a verification code for an allowlisted administrator email
+ */
+export const useRequestAdminSignupCode = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof requestAdminSignupCode>>, TError,{data: BodyType<AdminSignupRequest>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof requestAdminSignupCode>>,
+        TError,
+        {data: BodyType<AdminSignupRequest>},
+        TContext
+      > => {
+      return useMutation(getRequestAdminSignupCodeMutationOptions(options));
+    }
+
+export const getCompleteAdminSignupUrl = () => {
+
+
+
+
+  return `/api/v1/auth/admin-signup/complete`
+}
+
+/**
+ * Requires an allowlisted email, a valid one-time code, and the existing password when the Worky account already exists.
+ * @summary Create or promote an account after email verification
+ */
+export const completeAdminSignup = async (adminSignupCompletion: AdminSignupCompletion, options?: Parameters<typeof customFetch>[1]): Promise<AuthSession> => {
+
+  return customFetch<AuthSession>(getCompleteAdminSignupUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(adminSignupCompletion)
+  }
+);}
+
+
+
+
+
+export const getCompleteAdminSignupMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof completeAdminSignup>>, TError,{data: BodyType<AdminSignupCompletion>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof completeAdminSignup>>, TError,{data: BodyType<AdminSignupCompletion>}, TContext> => {
+
+const mutationKey = ['completeAdminSignup'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof completeAdminSignup>>, {data: BodyType<AdminSignupCompletion>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  completeAdminSignup(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CompleteAdminSignupMutationResult = NonNullable<Awaited<ReturnType<typeof completeAdminSignup>>>
+    export type CompleteAdminSignupMutationBody = BodyType<AdminSignupCompletion>
+    export type CompleteAdminSignupMutationError = ErrorType<void>
+
+    /**
+ * @summary Create or promote an account after email verification
+ */
+export const useCompleteAdminSignup = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof completeAdminSignup>>, TError,{data: BodyType<AdminSignupCompletion>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof completeAdminSignup>>,
+        TError,
+        {data: BodyType<AdminSignupCompletion>},
+        TContext
+      > => {
+      return useMutation(getCompleteAdminSignupMutationOptions(options));
     }
 
 export const getLoginAccountUrl = () => {

@@ -11,6 +11,8 @@ Marketplace que conecta clientes con profesionales de oficios para publicar, ace
 - `pnpm --filter @workspace/api-spec run codegen` — regenerate API hooks and Zod schemas from the OpenAPI spec
 - `pnpm --filter @workspace/db run push` — push DB schema changes (dev only)
 - Required env: `DATABASE_URL` — Postgres connection string
+- Optional env: `WORKY_ADMIN_SIGNUP_ALLOWED_EMAILS` — comma-separated admin-signup allowlist; unset or empty disables the flow. Configure it in the API Repl without committing the addresses.
+- Admin signup sends one-time codes through the existing Resend configuration and stores only hashed codes in Worky's current PostgreSQL. Apply its schema change through the API Repl only after review.
 
 ## Stack
 

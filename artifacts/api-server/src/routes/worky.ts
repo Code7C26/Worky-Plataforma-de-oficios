@@ -2,13 +2,15 @@ import { Router, type IRouter, type Request, type Response } from "express";
 import bcrypt from "bcryptjs";
 import rateLimit from "express-rate-limit";
 import { and, asc, desc, eq, gt, ilike, inArray, isNull, ne, or, sql, type SQL } from "drizzle-orm";
-import { chatUploads, db, jobs, messages, passwordRecoveryTokens, professionalProfiles, profilePhotoUploads, users, serviceCatalog, professionalAvailability, professionalAssets, bookings, payments, settlements, workyNotifications, workyAuditEvents, reviews, recommendations, professionalServices, professionalVerificationDocuments } from "@workspace/db";
-import { ChangeMyPasswordBody, ConfirmAccountEmailVerificationBody, RequestPasswordRecoveryBody, ResetPasswordRecoveryBody, SwitchAccountRoleBody, SwitchAccountRoleResponse, UpdateMyAccountBody, UpdateProfessionalLocationBody, UpdateProfessionalLocationResponse } from "@workspace/api-zod";
+import { adminSignupTokens, chatUploads, db, jobs, messages, passwordRecoveryTokens, professionalProfiles, profilePhotoUploads, users, serviceCatalog, professionalAvailability, professionalAssets, bookings, payments, settlements, workyNotifications, workyAuditEvents, reviews, recommendations, professionalServices, professionalVerificationDocuments } from "@workspace/db";
+import { ChangeMyPasswordBody, ConfirmAccountEmailVerificationBody, CompleteAdminSignupBody, CompleteAdminSignupResponse, RequestAdminSignupCodeBody, RequestAdminSignupCodeResponse, RequestPasswordRecoveryBody, ResetPasswordRecoveryBody, SwitchAccountRoleBody, SwitchAccountRoleResponse, UpdateMyAccountBody, UpdateProfessionalLocationBody, UpdateProfessionalLocationResponse } from "@workspace/api-zod";
 import { requireAuth, signToken, verifyToken } from "../middlewares/auth";
 import { deleteObject, isProfilePhotoSourcePath, isValidImageObject, processProfilePhoto } from "../lib/storage";
 import { cleanupRejectedChatAttachment } from "./storage";
+import { ADMIN_SIGNUP_CODE_TTL_MS, ADMIN_SIGNUP_MAX_ATTEMPTS, ADMIN_SIGNUP_RESEND_COOLDOWN_MS, createAdminSignupChallenge, getAdminSignupAllowlist, matchesAdminSignupCode } from "../lib/admin-signup";
 import { createPasswordRecovery, isPasswordRecoveryTokenValid, passwordRecoveryTokenHash } from "../lib/password-recovery";
 import { confirmEmailVerificationCode, createEmailVerificationChallenge, emailVerificationFailureDetails } from "../lib/email-verification";
+import { sendWorkyEmail } from "../lib/worky-email";
 
 const router: IRouter = Router();
 type NotificationSubscriber = { res: Response; heartbeat: ReturnType<typeof setInterval> };
@@ -25,6 +27,8 @@ function removeNotificationSubscriber(usuarioId: number, subscribers: Set<Notifi
 const authLimit = rateLimit({ windowMs: 15 * 60 * 1000, limit: 30, standardHeaders: true, legacyHeaders: false });
 const passwordRecoveryLimiter = rateLimit({ windowMs: 15 * 60 * 1000, limit: 5, standardHeaders: true, legacyHeaders: false });
 const emailVerificationLimiter = rateLimit({ windowMs: 15 * 60 * 1000, limit: 5, standardHeaders: true, legacyHeaders: false });
+const adminSignupRequestLimiter = rateLimit({ windowMs: 15 * 60 * 1000, limit: 5, standardHeaders: true, legacyHeaders: false });
+const adminSignupCompleteLimiter = rateLimit({ windowMs: 15 * 60 * 1000, limit: 10, standardHeaders: true, legacyHeaders: false });
 const categories = ["Plomería", "Electricidad", "Gas", "Albañilería", "Otro"] as const;
 const statuses = ["publicada", "aceptada", "en_curso", "finalizada", "cancelada"] as const;
 export const LIVE_LOCATION_MAX_AGE_MS = 5 * 60 * 1000;
@@ -266,6 +270,180 @@ router.post("/auth/register", authLimit, async (req, res) => {
   return res.status(201).json({ token: signToken(created.id), usuario: safeAuthenticatedUser(created) });
 });
 
+router.post("/auth/admin-signup/request", adminSignupRequestLimiter, async (req, res) => {
+  const parsed = RequestAdminSignupCodeBody.safeParse(req.body);
+  if (!parsed.success || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(parsed.data.email.trim())) return res.status(400).json({ error: "Ingresá un email válido." });
+
+  const allowlist = getAdminSignupAllowlist();
+  if (!allowlist.size) return res.status(503).json({ error: "El alta de administradores no está configurada." });
+
+  const email = parsed.data.email.trim().toLowerCase();
+  const genericResponse = RequestAdminSignupCodeResponse.parse({
+    message: "Si el correo está habilitado, vas a recibir un código de verificación válido durante 15 minutos.",
+  });
+  if (!allowlist.has(email)) return res.status(202).json(genericResponse);
+
+  const now = new Date();
+  const [previousChallenge] = await db.select({
+    createdAt: adminSignupTokens.createdAt,
+    expiresAt: adminSignupTokens.expiresAt,
+    usedAt: adminSignupTokens.usedAt,
+  }).from(adminSignupTokens).where(eq(adminSignupTokens.email, email)).limit(1);
+  if (previousChallenge && !previousChallenge.usedAt
+    && previousChallenge.expiresAt.getTime() > now.getTime()
+    && now.getTime() - previousChallenge.createdAt.getTime() < ADMIN_SIGNUP_RESEND_COOLDOWN_MS) {
+    return res.status(202).json(genericResponse);
+  }
+
+  const challenge = createAdminSignupChallenge(email);
+  await db.insert(adminSignupTokens).values({
+    email,
+    codeHash: challenge.codeHash,
+    codeSalt: challenge.salt,
+    attempts: 0,
+    expiresAt: new Date(now.getTime() + ADMIN_SIGNUP_CODE_TTL_MS),
+    usedAt: null,
+    createdAt: now,
+  }).onConflictDoUpdate({
+    target: adminSignupTokens.email,
+    set: {
+      codeHash: challenge.codeHash,
+      codeSalt: challenge.salt,
+      attempts: 0,
+      expiresAt: new Date(now.getTime() + ADMIN_SIGNUP_CODE_TTL_MS),
+      usedAt: null,
+      createdAt: now,
+    },
+  });
+
+  try {
+    await sendWorkyEmail({
+      to: email,
+      subject: "Código para crear tu cuenta administradora de Worky",
+      text: `Tu código de verificación es ${challenge.code}. Es válido durante 15 minutos y solo puede usarse una vez. Si no solicitaste este código, ignorá este correo.`,
+      html: `<p>Tu código de verificación para Worky Admin es:</p><p style="font-size:28px;font-weight:700;letter-spacing:8px">${challenge.code}</p><p>Es válido durante 15 minutos y solo puede usarse una vez.</p><p>Si no solicitaste este código, ignorá este correo.</p>`,
+    });
+  } catch {
+    await db.update(adminSignupTokens)
+      .set({ usedAt: new Date() })
+      .where(and(eq(adminSignupTokens.email, email), eq(adminSignupTokens.codeHash, challenge.codeHash), isNull(adminSignupTokens.usedAt)));
+    req.log.error({ code: "admin_signup_email_delivery_failed" }, "No se pudo enviar el código de alta admin");
+    return res.status(503).json({ error: "No pudimos enviar el código. Intentá nuevamente más tarde." });
+  }
+
+  return res.status(202).json(genericResponse);
+});
+
+router.post("/auth/admin-signup/complete", adminSignupCompleteLimiter, async (req, res) => {
+  const parsed = CompleteAdminSignupBody.safeParse(req.body);
+  if (!parsed.success || parsed.data.nombre.trim().length < 2 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(parsed.data.email.trim())) {
+    return res.status(400).json({ error: "Revisá los datos y el código de verificación." });
+  }
+
+  const allowlist = getAdminSignupAllowlist();
+  if (!allowlist.size) return res.status(503).json({ error: "El alta de administradores no está configurada." });
+
+  const email = parsed.data.email.trim().toLowerCase();
+  if (!allowlist.has(email)) return res.status(400).json({ error: "El código no es válido o venció. Pedí uno nuevo e intentá otra vez." });
+
+  const result = await db.transaction(async (tx) => {
+    const now = new Date();
+    const [challenge] = await tx.select().from(adminSignupTokens)
+      .where(eq(adminSignupTokens.email, email))
+      .for("update")
+      .limit(1);
+
+    if (!challenge || challenge.usedAt || challenge.expiresAt.getTime() <= now.getTime() || challenge.attempts >= ADMIN_SIGNUP_MAX_ATTEMPTS) {
+      return { kind: "invalid" as const };
+    }
+
+    const recordFailedAttempt = async () => {
+      const attempts = challenge.attempts + 1;
+      await tx.update(adminSignupTokens)
+        .set({ attempts, usedAt: attempts >= ADMIN_SIGNUP_MAX_ATTEMPTS ? now : null })
+        .where(eq(adminSignupTokens.id, challenge.id));
+    };
+
+    if (!matchesAdminSignupCode(email, parsed.data.codigo, challenge.codeSalt, challenge.codeHash)) {
+      await recordFailedAttempt();
+      return { kind: "invalid" as const };
+    }
+
+    const [existing] = await tx.select().from(users)
+      .where(sql`lower(${users.email}) = ${email}`)
+      .for("update")
+      .limit(1);
+
+    if (existing && !existing.activo) {
+      await tx.update(adminSignupTokens).set({ usedAt: now }).where(eq(adminSignupTokens.id, challenge.id));
+      return { kind: "inactive" as const };
+    }
+
+    if (existing && !(await bcrypt.compare(parsed.data.password, existing.passwordHash))) {
+      await recordFailedAttempt();
+      return { kind: "password" as const };
+    }
+
+    if (!existing && parsed.data.password.length < 12) return { kind: "weak-password" as const };
+
+    let account: typeof users.$inferSelect;
+    if (existing) {
+      if (existing.rol === "admin") {
+        account = existing;
+      } else {
+        const [promoted] = await tx.update(users)
+          .set({ rol: "admin", emailVerifiedAt: existing.emailVerifiedAt ?? now, updatedAt: now })
+          .where(eq(users.id, existing.id))
+          .returning();
+        if (!promoted) return { kind: "invalid" as const };
+        account = promoted;
+        await tx.insert(workyAuditEvents).values({
+          usuarioId: account.id,
+          entidad: "account",
+          entidadId: account.id,
+          accion: "role_granted",
+          estadoAnterior: existing.rol,
+          estadoNuevo: "admin",
+          metadata: { method: "verified_allowlisted_email" },
+        });
+      }
+    } else {
+      const [created] = await tx.insert(users).values({
+        nombre: parsed.data.nombre.trim(),
+        email,
+        emailVerifiedAt: now,
+        passwordHash: await bcrypt.hash(parsed.data.password, 12),
+        rol: "admin",
+      }).returning();
+      if (!created) return { kind: "invalid" as const };
+      account = created;
+      await tx.insert(workyAuditEvents).values({
+        usuarioId: account.id,
+        entidad: "account",
+        entidadId: account.id,
+        accion: "admin_self_signup",
+        estadoAnterior: null,
+        estadoNuevo: "admin",
+        metadata: { method: "verified_allowlisted_email" },
+      });
+    }
+
+    await tx.update(adminSignupTokens).set({ usedAt: now }).where(eq(adminSignupTokens.id, challenge.id));
+    return { kind: existing ? "authenticated" as const : "created" as const, user: account };
+  });
+
+  if (result.kind === "invalid") return res.status(400).json({ error: "El código no es válido o venció. Pedí uno nuevo e intentá otra vez." });
+  if (result.kind === "password") return res.status(401).json({ error: "No se pudo completar. Si ya tenés una cuenta Worky, ingresá tu contraseña actual." });
+  if (result.kind === "inactive") return res.status(409).json({ error: "No se pudo completar el alta. Contactá al equipo de Worky." });
+  if (result.kind === "weak-password") return res.status(422).json({ error: "Para una cuenta nueva, elegí una contraseña de al menos 12 caracteres." });
+
+  const response = CompleteAdminSignupResponse.parse({
+    token: signToken(result.user.id),
+    usuario: safeAuthenticatedUser(result.user),
+  });
+  return res.status(result.kind === "created" ? 201 : 200).json(response);
+});
+
 router.post("/auth/login", authLimit, async (req, res) => {
   const { email, password } = req.body ?? {};
   const [found] = await db.select().from(users).where(and(eq(users.email, String(email ?? "").trim().toLowerCase()), eq(users.activo, true))).limit(1);
@@ -280,8 +458,8 @@ router.post("/auth/password-recovery/request", passwordRecoveryLimiter, async (r
   const email = parsed.data.email.trim().toLowerCase();
   try {
     await createPasswordRecovery(email, `${req.protocol}://${req.get("host")}`);
-  } catch (error) {
-    console.error("No se pudo enviar el correo de recuperación.", error);
+  } catch {
+    req.log.error({ code: "password_recovery_email_delivery_failed" }, "No se pudo enviar el correo de recuperación");
     return res.status(503).json({ error: "No pudimos enviar el correo de recuperación. Intentá nuevamente en unos minutos." });
   }
 
