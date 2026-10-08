@@ -5,21 +5,6 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
-export interface PartnerStatusUpdate {
-  activo: boolean;
-  /**
-     * @minLength 1
-     * @maxLength 500
-     */
-  motivo: string;
-}
-
-export interface PartnerStatusResult {
-  partnerId: number;
-  activo: boolean;
-  changed: boolean;
-}
-
 export interface HealthStatus {
   status: string;
 }
