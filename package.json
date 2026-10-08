@@ -9,7 +9,7 @@
     "typecheck": "pnpm run typecheck:libs && pnpm -r --filter \"./artifacts/**\" --filter \"./scripts\" --if-present run typecheck",
     "build:worky": "pnpm run validate:artifact-config && pnpm --filter @workspace/api-spec run codegen && pnpm --filter @workspace/api-client-react run build",
     "validate:artifact-config": "pnpm --filter @workspace/scripts test && pnpm --filter @workspace/scripts exec tsx src/validate-artifact-config.ts",
-    "validate:worky": "pnpm run validate:artifact-config && pnpm --filter @workspace/api-spec run codegen && pnpm --filter @workspace/api-client-react run build && pnpm --filter @workspace/api-server run test:privacy && pnpm --filter @workspace/api-server run test:location && pnpm --filter @workspace/api-server run test:account-settings && pnpm --filter @workspace/worky run validate"
+    "validate:worky": "pnpm run validate:artifact-config && pnpm --filter @workspace/api-spec run codegen && pnpm --filter @workspace/api-client-react run build && pnpm --filter @workspace/api-server run test:privacy && pnpm --filter @workspace/api-server run test:location && pnpm --filter @workspace/api-server run test:partner-visibility && pnpm --filter @workspace/api-server run test:account-settings && pnpm --filter @workspace/worky run validate"
   },
   "private": true,
   "dependencies": {
