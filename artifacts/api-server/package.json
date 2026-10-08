@@ -16,7 +16,9 @@
     "test:role-switch": "tsx test/worky-role-switch.test.ts",
     "test:admin": "tsx test/worky-admin.test.ts",
     "test:admin-role-grant": "tsx test/worky-admin-role-grant.test.ts",
-    "test:admin-signup": "tsx test/worky-admin-signup-helpers.test.ts"
+    "test:admin-signup": "tsx test/worky-admin-signup-helpers.test.ts && pnpm run test:admin-signup:routes",
+    "test:admin-signup:routes": "node test/run-admin-signup-routes.mjs",
+    "test:admin-signup:typecheck": "tsc --noEmit --target ES2022 --lib ES2022 --module ESNext --moduleResolution Bundler --esModuleInterop --skipLibCheck --strict src/app.ts test/worky-admin-signup-routes.test.ts"
   },
   "dependencies": {
     "@google-cloud/storage": "^7.22.0",
@@ -34,6 +36,7 @@
     "sharp": "^0.35.3"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "^0.5.8",
     "@types/cookie-parser": "^1.4.10",
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.6",
