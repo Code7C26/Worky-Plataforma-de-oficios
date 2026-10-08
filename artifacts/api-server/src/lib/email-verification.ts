@@ -24,7 +24,7 @@ export function emailVerificationFailureDetails(error: unknown) {
     : { reason: "internal_error" };
 }
 
-export function verificationMailConfig() {
+function verificationMailConfig() {
   const apiKey = process.env.RESEND_API_KEY;
   if (!apiKey) throw new EmailVerificationDeliveryError("missing_api_key");
   const configuredSender = process.env.RESEND_FROM_EMAIL?.trim();
