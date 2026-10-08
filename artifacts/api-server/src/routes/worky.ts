@@ -24,6 +24,7 @@ function removeNotificationSubscriber(usuarioId: number, subscribers: Set<Notifi
 const authLimit = rateLimit({ windowMs: 15 * 60 * 1000, limit: 30, standardHeaders: true, legacyHeaders: false });
 const passwordRecoveryLimiter = rateLimit({ windowMs: 15 * 60 * 1000, limit: 5, standardHeaders: true, legacyHeaders: false });
 const categories = ["Plomería", "Electricidad", "Gas", "Albañilería", "Otro"] as const;
+const publicHouseholdCategories = ["Plomería", "Electricidad", "Gas", "Albañilería"] as const;
 const statuses = ["publicada", "aceptada", "en_curso", "finalizada", "cancelada"] as const;
 export const LIVE_LOCATION_MAX_AGE_MS = 5 * 60 * 1000;
 export const PROFESSIONAL_LOCATION_MAX_AGE_MS = LIVE_LOCATION_MAX_AGE_MS;
@@ -605,6 +606,9 @@ router.get("/profesionales", async (req, res) => {
   const search = String(req.query.search ?? "").trim();
   const rows = await db.select({ profile: professionalProfiles, user: users }).from(professionalProfiles).innerJoin(users, eq(users.id, professionalProfiles.usuarioId)).where(and(
     eq(users.activo, true),
+    eq(users.rol, "profesional"),
+    eq(professionalProfiles.disponible, true),
+    inArray(professionalProfiles.categoria, publicHouseholdCategories),
     category && categories.includes(category as typeof categories[number]) ? eq(professionalProfiles.categoria, category as typeof categories[number]) : undefined,
     search ? or(ilike(users.nombre, `%${search}%`), ilike(professionalProfiles.oficio, `%${search}%`), ilike(sql<string>`${professionalProfiles.categoria}::text`, `%${search}%`)) : undefined,
   )).orderBy(desc(professionalProfiles.verificado), desc(sql`coalesce((select avg(r.rating) from worky_reviews r where r.profesional_id = ${professionalProfiles.usuarioId}), 0)`), desc(sql`(select count(*) from worky_jobs j where j.profesional_id = ${professionalProfiles.usuarioId} and j.estado = 'finalizada')`)).limit(limit).offset((page - 1) * limit);
