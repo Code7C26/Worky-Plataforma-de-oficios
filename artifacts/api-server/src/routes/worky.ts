@@ -44,6 +44,12 @@ async function requireAdmin(req: Request, res: Response) {
   }
   return true;
 }
+const publicPartnerCondition = () => and(
+  eq(users.rol, "profesional"),
+  eq(users.activo, true),
+  eq(professionalProfiles.verificado, true),
+  eq(professionalProfiles.estadoVerificacion, "verified"),
+);
 const missing = (values: Record<string, unknown>) => Object.keys(values).filter((key) => values[key] === undefined || values[key] === null || values[key] === "");
 const safeUser = (user: typeof users.$inferSelect) => ({
   id: user.id, nombre: user.nombre, email: user.email, telefono: user.telefono, rol: user.rol, ubicacion: user.ubicacion,
@@ -556,6 +562,33 @@ router.patch("/admin/verificaciones/:id", requireAuth, async (req, res) => {
   return res.json({ ...updated, profileStatus });
 });
 
+router.patch("/admin/partners/:profesionalId/estado", requireAuth, async (req, res) => {
+  if (!(await requireAdmin(req, res))) return;
+  const partnerId = numberValue(req.params.profesionalId);
+  const activo = req.body?.activo;
+  const motivo = typeof req.body?.motivo === "string" ? req.body.motivo.trim().slice(0, 500) : "";
+  if (!Number.isSafeInteger(partnerId) || partnerId <= 0) return res.status(400).json({ error: "Indicá un Partner válido." });
+  if (typeof activo !== "boolean" || !motivo) return res.status(400).json({ error: "Indicá si habilitás o deshabilitás al Partner y el motivo." });
+
+  const result = await db.transaction(async (tx) => {
+    const [partner] = await tx.select({ id: users.id, rol: users.rol, activo: users.activo })
+      .from(users).where(eq(users.id, partnerId)).for("update").limit(1);
+    if (!partner || partner.rol !== "profesional") return { kind: "not_found" as const };
+    const [profile] = await tx.select({ id: professionalProfiles.id }).from(professionalProfiles)
+      .where(eq(professionalProfiles.usuarioId, partnerId)).limit(1);
+    if (!profile) return { kind: "not_found" as const };
+    if (partner.activo === activo) return { kind: "unchanged" as const, activo: partner.activo };
+
+    await tx.update(users).set({ activo, updatedAt: new Date() }).where(eq(users.id, partnerId));
+    await tx.insert(workyAuditEvents).values({
+      usuarioId: userId(req), entidad: "partner", entidadId: partnerId, accion: activo ? "enabled" : "disabled",
+      estadoAnterior: partner.activo ? "activo" : "inactivo", estadoNuevo: activo ? "activo" : "inactivo", metadata: { motivo },
+    });
+    return { kind: "updated" as const, activo };
+  });
+  if (result.kind === "not_found") return res.status(404).json({ error: "Partner no encontrado." });
+  return res.json({ partnerId, activo: result.activo, changed: result.kind === "updated" });
+});
 router.put("/auth/professional-services", requireAuth, async (req, res) => {
   const services = Array.isArray(req.body?.services) ? req.body.services : [];
   if (!services.length || services.length > 10) return res.status(400).json({ error: "Agregá entre 1 y 10 oficios." });
@@ -604,7 +637,7 @@ router.get("/profesionales", async (req, res) => {
   const category = String(req.query.categoria ?? "");
   const search = String(req.query.search ?? "").trim();
   const rows = await db.select({ profile: professionalProfiles, user: users }).from(professionalProfiles).innerJoin(users, eq(users.id, professionalProfiles.usuarioId)).where(and(
-    eq(users.activo, true),
+    publicPartnerCondition(),
     category && categories.includes(category as typeof categories[number]) ? eq(professionalProfiles.categoria, category as typeof categories[number]) : undefined,
     search ? or(ilike(users.nombre, `%${search}%`), ilike(professionalProfiles.oficio, `%${search}%`), ilike(sql<string>`${professionalProfiles.categoria}::text`, `%${search}%`)) : undefined,
   )).orderBy(desc(professionalProfiles.verificado), desc(sql`coalesce((select avg(r.rating) from worky_reviews r where r.profesional_id = ${professionalProfiles.usuarioId}), 0)`), desc(sql`(select count(*) from worky_jobs j where j.profesional_id = ${professionalProfiles.usuarioId} and j.estado = 'finalizada')`)).limit(limit).offset((page - 1) * limit);
@@ -763,8 +796,10 @@ router.post("/reservas", requireAuth, async (req, res) => {
 });
 router.get("/profesionales/:id", async (req, res) => {
   const requestedId = numberValue(req.params.id);
-  const [rowByProfileId] = await db.select({ profile: professionalProfiles, user: users }).from(professionalProfiles).innerJoin(users, eq(users.id, professionalProfiles.usuarioId)).where(eq(professionalProfiles.id, requestedId)).limit(1);
-  const [rowByUserId] = rowByProfileId ? [] : await db.select({ profile: professionalProfiles, user: users }).from(professionalProfiles).innerJoin(users, eq(users.id, professionalProfiles.usuarioId)).where(eq(professionalProfiles.usuarioId, requestedId)).limit(1);
+  const [rowByProfileId] = await db.select({ profile: professionalProfiles, user: users }).from(professionalProfiles).innerJoin(users, eq(users.id, professionalProfiles.usuarioId))
+    .where(and(eq(professionalProfiles.id, requestedId), publicPartnerCondition())).limit(1);
+  const [rowByUserId] = rowByProfileId ? [] : await db.select({ profile: professionalProfiles, user: users }).from(professionalProfiles).innerJoin(users, eq(users.id, professionalProfiles.usuarioId))
+    .where(and(eq(professionalProfiles.usuarioId, requestedId), publicPartnerCondition())).limit(1);
   const row = rowByProfileId || rowByUserId;
   if (!row) return res.status(404).json({ error: "Profesional no encontrado." });
   return res.json(await publicProfileView(row));
@@ -800,10 +835,13 @@ router.put(["/perfil-profesional/mio", "/partner-profile/me"], requireAuth, asyn
 
 router.get("/profesionales/:id/reputacion", async (req, res) => {
   const professionalId = numberValue(req.params.id);
-  const [profileById] = await db.select().from(professionalProfiles).where(eq(professionalProfiles.id, professionalId)).limit(1);
-  const [profileByUserId] = profileById ? [] : await db.select().from(professionalProfiles).where(eq(professionalProfiles.usuarioId, professionalId)).limit(1);
-  const profile = profileById || profileByUserId;
-  if (!profile) return res.status(404).json({ error: "Profesional no encontrado." });
+  const [profileById] = await db.select({ profile: professionalProfiles, user: users }).from(professionalProfiles).innerJoin(users, eq(users.id, professionalProfiles.usuarioId))
+    .where(and(eq(professionalProfiles.id, professionalId), publicPartnerCondition())).limit(1);
+  const [profileByUserId] = profileById ? [] : await db.select({ profile: professionalProfiles, user: users }).from(professionalProfiles).innerJoin(users, eq(users.id, professionalProfiles.usuarioId))
+    .where(and(eq(professionalProfiles.usuarioId, professionalId), publicPartnerCondition())).limit(1);
+  const row = profileById || profileByUserId;
+  if (!row) return res.status(404).json({ error: "Profesional no encontrado." });
+  const profile = row.profile;
   const reputation = await reputationView(profile.usuarioId);
   const rows = await db.select({ review: reviews, author: users }).from(reviews).innerJoin(users, eq(users.id, reviews.clienteId)).where(eq(reviews.profesionalId, profile.usuarioId)).orderBy(desc(reviews.createdAt));
   const publicRecommendations = await db.select({ recommendation: recommendations, author: users }).from(recommendations).innerJoin(users, eq(users.id, recommendations.clienteId)).where(and(eq(recommendations.profesionalId, profile.usuarioId), eq(recommendations.visibilidad, "publica"))).orderBy(desc(recommendations.createdAt));
