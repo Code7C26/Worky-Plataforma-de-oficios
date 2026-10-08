@@ -1,10 +1,16 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
-import { isRegistrationEntryPath } from "../src/lib/auth-entry.js";
+import {
+  getAuthReturnLocation,
+  isRegistrationEntryPath,
+} from "../src/lib/auth-entry.js";
 
 test("el wizard guarda y recupera los tres pasos para cliente y Partner", async () => {
-  const source = await readFile(new URL("../src/App.tsx", import.meta.url), "utf8");
+  const source = await readFile(
+    new URL("../src/App.tsx", import.meta.url),
+    "utf8",
+  );
   assert.match(source, /REGISTRATION_DRAFT_KEY/);
   assert.match(source, /readRegistrationDraft/);
   assert.match(source, /saveRegistrationDraft/);
@@ -41,4 +47,31 @@ test("la ruta pública de registro abre el alta y las demás rutas conservan el 
   assert.equal(isRegistrationEntryPath("/worky/registro"), true);
   assert.equal(isRegistrationEntryPath("/"), false);
   assert.equal(isRegistrationEntryPath("/home"), false);
+});
+
+test("el acceso y el registro conservan el perfil profesional público elegido", async () => {
+  const selectedProfile = "/professional/42";
+  assert.equal(getAuthReturnLocation(selectedProfile), selectedProfile);
+  assert.equal(
+    getAuthReturnLocation(`${selectedProfile}?origin=public-search#reviews`),
+    selectedProfile,
+  );
+  assert.equal(getAuthReturnLocation("/registro"), "/home");
+  assert.equal(getAuthReturnLocation("/professional/42/settings"), "/home");
+  assert.equal(
+    getAuthReturnLocation("https://malicious.example/professional/42"),
+    "/home",
+  );
+
+  const source = await readFile(new URL("../src/App.tsx", import.meta.url), "utf8");
+  const authPage = source.slice(
+    source.indexOf("function AuthPage("),
+    source.indexOf("function ProfessionalCard("),
+  );
+  assert.match(source, /<Route path="\/professional\/:id"/);
+  assert.equal(
+    authPage.match(/setLocation\(getAuthReturnLocation\(location\)\)/g)?.length,
+    2,
+    "el inicio de sesión y el alta deben volver al profesional elegido",
+  );
 });
