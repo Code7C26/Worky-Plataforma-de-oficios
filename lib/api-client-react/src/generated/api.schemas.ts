@@ -543,6 +543,32 @@ export interface EmailVerificationResult {
   verified: boolean;
 }
 
+export interface AdminSignupRequest {
+  /** @maxLength 320 */
+  email: string;
+}
+
+export interface AdminSignupRequestResult {
+  message: string;
+}
+
+export interface AdminSignupCompletion {
+  /**
+     * @minLength 2
+     * @maxLength 100
+     */
+  nombre: string;
+  /** @maxLength 320 */
+  email: string;
+  /**
+     * @minLength 6
+     * @maxLength 200
+     */
+  password: string;
+  /** @pattern ^[0-9]{6}$ */
+  codigo: string;
+}
+
 export type AccountRol = typeof AccountRol[keyof typeof AccountRol];
 
 

@@ -66,6 +66,20 @@ export const emailVerificationTokens = pgTable("worky_email_verification_tokens"
   index("worky_email_verification_email_purpose_idx").on(table.email, table.purpose, table.createdAt),
 ]);
 
+export const adminSignupTokens = pgTable("worky_admin_signup_tokens", {
+  id: serial("id").primaryKey(),
+  email: text("email").notNull(),
+  codeHash: text("code_hash").notNull(),
+  codeSalt: text("code_salt").notNull(),
+  attempts: integer("attempts").notNull().default(0),
+  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+  usedAt: timestamp("used_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+}, (table) => [
+  uniqueIndex("worky_admin_signup_email_idx").on(table.email),
+  uniqueIndex("worky_admin_signup_code_hash_idx").on(table.codeHash),
+]);
+
 export const professionalProfiles = pgTable("worky_professional_profiles", {
   id: serial("id").primaryKey(),
   usuarioId: integer("usuario_id").notNull().unique().references(() => users.id),

@@ -505,6 +505,54 @@ paths:
         "400": { description: "Invalid, expired, or already used code" }
         "401": { description: Authentication required }
         "429": { description: Too many attempts }
+  /auth/admin-signup/request:
+    post:
+      operationId: requestAdminSignupCode
+      tags: [auth]
+      summary: Request a verification code for an allowlisted administrator email
+      description: Sends a one-time code only when the email is in the server-side allowlist. The response does not reveal allowlist membership.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AdminSignupRequest" }
+      responses:
+        "202":
+          description: Generic response whether or not a code was sent
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AdminSignupRequestResult" }
+        "400": { description: Invalid email }
+        "429": { description: Too many attempts }
+        "503": { description: Admin signup is not configured or email delivery is unavailable }
+  /auth/admin-signup/complete:
+    post:
+      operationId: completeAdminSignup
+      tags: [auth]
+      summary: Create or promote an account after email verification
+      description: Requires an allowlisted email, a valid one-time code, and the existing password when the Worky account already exists.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AdminSignupCompletion" }
+      responses:
+        "200":
+          description: Existing account promoted or already administrator
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AuthSession" }
+        "201":
+          description: New administrator account created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AuthSession" }
+        "400": { description: Invalid or expired code or invalid input }
+        "401": { description: Existing account password did not match }
+        "409": { description: Existing account cannot be activated by this flow }
+        "422": { description: New administrator password must have at least 12 characters }
+        "429": { description: Too many attempts }
+        "503": { description: Admin signup is not configured }
   /auth/login:
     post:
       operationId: loginAccount
@@ -1513,6 +1561,27 @@ components:
       required: [verified]
       properties:
         verified: { type: boolean }
+    AdminSignupRequest:
+      type: object
+      additionalProperties: false
+      required: [email]
+      properties:
+        email: { type: string, maxLength: 320 }
+    AdminSignupRequestResult:
+      type: object
+      additionalProperties: false
+      required: [message]
+      properties:
+        message: { type: string }
+    AdminSignupCompletion:
+      type: object
+      additionalProperties: false
+      required: [nombre, email, password, codigo]
+      properties:
+        nombre: { type: string, minLength: 2, maxLength: 100 }
+        email: { type: string, maxLength: 320 }
+        password: { type: string, minLength: 6, maxLength: 200 }
+        codigo: { type: string, pattern: "^[0-9]{6}$" }
     AuthSession:
       type: object
       required: [token, usuario]

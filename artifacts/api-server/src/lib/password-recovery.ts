@@ -14,18 +14,9 @@ function recoveryUrl(origin: string, token: string) {
   return url.toString();
 }
 
-async function sendRecoveryEmail({
-  email,
-  name,
-  url,
-}: {
-  email: string;
-  name: string;
-  url: string;
-}) {
+async function sendRecoveryEmail({ email, name, url }: { email: string; name: string; url: string }) {
   const apiKey = process.env.RESEND_API_KEY;
   if (!apiKey) throw new Error("RESEND_API_KEY no está configurado.");
-
   const response = await fetch("https://api.resend.com/emails", {
     method: "POST",
     headers: {
@@ -40,11 +31,7 @@ async function sendRecoveryEmail({
       html: `<p>Hola ${name || "de Worky"}.</p><p>Recibimos un pedido para cambiar tu contraseña. El enlace es válido durante 15 minutos y solo puede usarse una vez.</p><p><a href="${url}">Crear una nueva contraseña</a></p><p>Si no fuiste vos, podés ignorar este correo.</p>`,
     }),
   });
-
-  if (!response.ok) {
-    const detail = await response.text().catch(() => "");
-    throw new Error(`Resend rechazó el correo (${response.status}): ${detail.slice(0, 200)}`);
-  }
+  if (!response.ok) throw new Error(`El proveedor de recuperación rechazó el correo (${response.status}).`);
 }
 
 export async function createPasswordRecovery(email: string, origin: string) {

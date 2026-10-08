@@ -14,7 +14,12 @@
     "test:account-settings": "tsx test/worky-account-settings.test.ts",
     "test:email-verification": "tsx test/worky-email-verification.test.ts",
     "test:role-switch": "tsx test/worky-role-switch.test.ts",
-    "test:admin": "tsx test/worky-admin.test.ts"
+    "test:admin": "tsx test/worky-admin.test.ts",
+    "test:admin-role-grant": "tsx test/worky-admin-role-grant.test.ts",
+    "test:admin-signup": "tsx test/worky-admin-signup-helpers.test.ts && pnpm run test:admin-signup:routes",
+    "test:admin-signup:routes": "node test/run-admin-signup-routes.mjs",
+    "test:admin-signup:typecheck": "tsc --noEmit --target ES2022 --lib ES2022 --module ESNext --moduleResolution Bundler --esModuleInterop --skipLibCheck --strict src/app.ts test/worky-admin-signup-routes.test.ts",
+    "test:admin-email": "tsx test/worky-admin-email.test.ts"
   },
   "dependencies": {
     "@google-cloud/storage": "^7.22.0",
@@ -27,16 +32,19 @@
     "express": "^5.2.1",
     "express-rate-limit": "^8.2.1",
     "jsonwebtoken": "^9.0.2",
+    "nodemailer": "^10.0.16",
     "pino": "^9.14.0",
     "pino-http": "^10.5.0",
     "sharp": "^0.35.3"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "^0.5.8",
     "@types/cookie-parser": "^1.4.10",
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.6",
     "@types/jsonwebtoken": "^9.0.10",
     "@types/node": "catalog:",
+    "@types/nodemailer": "^8.0.2",
     "esbuild": "0.27.3",
     "esbuild-plugin-pino": "^2.3.3",
     "pino-pretty": "^13.1.3",

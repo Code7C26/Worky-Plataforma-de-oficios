@@ -741,6 +741,70 @@ export const ConfirmAccountEmailVerificationResponse = zod.object({
 
 
 /**
+ * Sends a one-time code only when the email is in the server-side allowlist. The response does not reveal allowlist membership.
+ * @summary Request a verification code for an allowlisted administrator email
+ */
+export const requestAdminSignupCodeBodyEmailMax = 320;
+
+
+
+export const RequestAdminSignupCodeBody = zod.object({
+  "email": zod.string().max(requestAdminSignupCodeBodyEmailMax)
+})
+
+export const RequestAdminSignupCodeResponse = zod.object({
+  "message": zod.string()
+})
+
+
+/**
+ * Requires an allowlisted email, a valid one-time code, and the existing password when the Worky account already exists.
+ * @summary Create or promote an account after email verification
+ */
+export const completeAdminSignupBodyNombreMin = 2;
+export const completeAdminSignupBodyNombreMax = 100;
+
+export const completeAdminSignupBodyEmailMax = 320;
+
+export const completeAdminSignupBodyPasswordMin = 6;
+export const completeAdminSignupBodyPasswordMax = 200;
+
+export const completeAdminSignupBodyCodigoRegExp = new RegExp('^[0-9]{6}$');
+
+
+export const CompleteAdminSignupBody = zod.object({
+  "nombre": zod.string().min(completeAdminSignupBodyNombreMin).max(completeAdminSignupBodyNombreMax),
+  "email": zod.string().max(completeAdminSignupBodyEmailMax),
+  "password": zod.string().min(completeAdminSignupBodyPasswordMin).max(completeAdminSignupBodyPasswordMax),
+  "codigo": zod.string().regex(completeAdminSignupBodyCodigoRegExp)
+})
+
+export const CompleteAdminSignupResponse = zod.object({
+  "token": zod.string(),
+  "usuario": zod.object({
+  "id": zod.number(),
+  "nombre": zod.string(),
+  "email": zod.string(),
+  "emailVerifiedAt": zod.coerce.date().nullable(),
+  "telefono": zod.string().nullish(),
+  "edad": zod.number().nullish(),
+  "fotoObjectPath": zod.string().nullish(),
+  "rol": zod.enum(['cliente', 'profesional', 'admin']),
+  "ubicacion": zod.union([zod.object({
+  "direccionTexto": zod.string().optional(),
+  "ciudad": zod.string().optional(),
+  "provincia": zod.string().optional(),
+  "zona": zod.string().optional(),
+  "capturedAt": zod.coerce.date().nullish(),
+  "coordinates": zod.array(zod.number()).optional()
+}),zod.null()]).optional(),
+  "onboardingEstado": zod.string().optional(),
+  "onboardingPaso": zod.number().optional()
+})
+})
+
+
+/**
  * @summary Sign in to an account
  */
 export const loginAccountBodyEmailMax = 320;
