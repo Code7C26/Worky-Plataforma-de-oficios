@@ -6,7 +6,22 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { JobUpdateEstado } from './jobUpdateEstado';
+import type { JobUpdatePaymentMethod } from './jobUpdatePaymentMethod';
+import type { UserLocation } from './userLocation';
 
 export interface JobUpdate {
-  estado: JobUpdateEstado;
+  estado?: JobUpdateEstado;
+  ubicacion?: UserLocation;
+  /** @minLength 2 */
+  categoria?: string;
+  /** @minimum 0 */
+  precioOfrecido?: number;
+  /**
+     * @minLength 3
+     * @nullable
+     */
+  detalle?: string | null;
+  /** @nullable */
+  profesionalId?: number | null;
+  paymentMethod?: JobUpdatePaymentMethod;
 }

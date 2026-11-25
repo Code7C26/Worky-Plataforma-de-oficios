@@ -1,35 +1,59 @@
 import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from "react";
-import { useQueryClient, type UseQueryResult } from "@tanstack/react-query";
+import { useQuery, useQueryClient, type UseQueryResult } from "@tanstack/react-query";
 import {
   Activity, BadgeCheck, Banknote, BriefcaseBusiness, CalendarDays,
   Check, ChevronLeft, ChevronRight, CircleAlert, Eye, EyeOff, FileText, Filter,
   LayoutDashboard, LockKeyhole, Menu, Package, RefreshCw, Search, Shield, ShieldAlert,
-  Star, Users, X,
+  Star, UserRoundCheck, Users, X,
 } from "lucide-react";
 import {
   getGetAdminDashboardQueryKey, getListAdminAccountsQueryKey, getListAdminActivityQueryKey,
   getListAdminBookingsQueryKey, getListAdminCatalogQueryKey, getListAdminJobsQueryKey,
   getListAdminPartnersQueryKey, getListAdminPaymentsQueryKey, getListAdminRecommendationsQueryKey,
   getListAdminResourcesQueryKey, getListAdminReviewsQueryKey, getListAdminSettlementsQueryKey,
-  getListAdminVerificationsQueryKey, useCreateAdminCatalogItem, useGetAdminDashboard,
+  getListAdminVerificationsQueryKey, getListAdminPartnerApplicationsQueryKey, useCreateAdminCatalogItem, useGetAdminDashboard,
   useListAdminAccounts, useListAdminActivity, useListAdminBookings, useListAdminCatalog,
   useListAdminJobs, useListAdminPartners, useListAdminPayments, useListAdminRecommendations,
-  useListAdminResources, useListAdminReviews, useListAdminSettlements, useListAdminVerifications,
+  useListAdminResources, useListAdminReviews, useListAdminSettlements, useListAdminPartnerApplications,
+  getListAdminClientVerificationsQueryKey, useListAdminClientVerifications, useReviewAdminClientVerification,
   useResolveAdminVerification, useUpdateAdminAccountStatus, useUpdateAdminCatalogItem,
   useUpdateAdminPartnerActivation, useUpdateAdminRecommendationVisibility,
-  type AdminAccount, type AdminActivityEvent, type AdminBooking, type AdminCatalogItem, type AdminDashboard,
+  type AdminAccount, type AdminActivityEvent, type AdminBooking, type AdminCatalogItem, type AdminClientIdentityVerification,
+  type AdminClientIdentityVerificationReviewInput, type AdminDashboard,
   type AdminJob, type AdminPartner, type AdminPayment, type AdminRecommendation,
   type AdminResource, type AdminReview, type AdminSettlement, type AdminVerificationDocument,
   type ListAdminPartnersParams, type ListAdminRecommendationsParams,
 } from "@workspace/api-client-react";
-import { fetchWorkyObject } from "@/lib/api";
+import { apiRequest, fetchWorkyApiFile, fetchWorkyObject } from "@/lib/api";
+import { AdminAdminsPanel } from "@/pages/admin-admins";
+import { AdminClientVerificationQueue, type ClientVerificationKind, type ClientVerificationReasonCode } from "@/pages/admin-client-verification-queue";
+import { AdminVerificationQueue } from "@/pages/admin-verification-queue";
 
-type Section = "overview" | "verifications" | "accounts" | "partners" | "jobs" | "bookings" | "payments" | "reviews" | "recommendations" | "catalog" | "resources" | "activity";
+type Section = "overview" | "verifications" | "client-verifications" | "accounts" | "partners" | "jobs" | "bookings" | "payments" | "reviews" | "recommendations" | "ranking" | "catalog" | "resources" | "activity" | "admins";
 type Props = { initialSection?: "overview" | "verifications" };
+type AdminVisitFinance = {
+  id: number; bookingId: number; clientId: number; clientName: string; partnerId: number; partnerName: string;
+  amount: number; commissionAmount: number; partnerAmount: number; method: "mercado_pago" | "efectivo";
+  status: string; issueType: string | null; issueDetail: string | null; completedAt: string | null; releaseAt: string | null;
+  createdAt: string; updatedAt: string;
+};
+type AdminRankingCandidate = {
+  jobId: number; partnerId: number | null; partnerName: string; clientId: number; clientName: string;
+  category: string; updatedAt: string; messageCount: number; acceptedVisitCount: number;
+};
+type AdminRankingIncident = {
+  jobId: number; partnerId: number | null; partnerName: string; clientName: string; category: string;
+  decision: "confirmed" | "dismissed"; reason: string | null; reviewedAt: string;
+};
+type AdminRankingState = {
+  active: boolean; windowDays: number; incidentThreshold?: number; activatedAt?: string | null;
+  activationProvider?: string | null; candidates: AdminRankingCandidate[]; incidents: AdminRankingIncident[];
+};
 const PAGE_SIZE = 20;
 const sections: { id: Section; label: string; icon: typeof LayoutDashboard; group: string }[] = [
   { id: "overview", label: "Resumen", icon: LayoutDashboard, group: "Operación" },
   { id: "verifications", label: "Verificaciones", icon: Shield, group: "Operación" },
+  { id: "client-verifications", label: "Identidad de clientes", icon: UserRoundCheck, group: "Operación" },
   { id: "accounts", label: "Cuentas", icon: Users, group: "Operación" },
   { id: "partners", label: "Partners", icon: BadgeCheck, group: "Operación" },
   { id: "jobs", label: "Trabajos", icon: BriefcaseBusiness, group: "Marketplace" },
@@ -37,9 +61,11 @@ const sections: { id: Section; label: string; icon: typeof LayoutDashboard; grou
   { id: "payments", label: "Pagos y liquidaciones", icon: Banknote, group: "Marketplace" },
   { id: "reviews", label: "Reseñas", icon: Star, group: "Marketplace" },
   { id: "recommendations", label: "Recomendaciones", icon: Eye, group: "Marketplace" },
+  { id: "ranking", label: "Ranking y señales", icon: ShieldAlert, group: "Marketplace" },
   { id: "catalog", label: "Catálogo", icon: Package, group: "Configuración" },
   { id: "resources", label: "Recursos", icon: FileText, group: "Configuración" },
   { id: "activity", label: "Actividad", icon: Activity, group: "Configuración" },
+  { id: "admins", label: "Administradores", icon: Shield, group: "Configuración" },
 ];
 function date(value?: string | null, time = false) {
   if (!value) return "—";
@@ -57,6 +83,8 @@ function bytes(value: number) {
 }
 function label(value?: string | null) {
   if (!value) return "Sin dato";
+  if (value === "trabajo_realizado") return "Pago pendiente";
+  if (value === "cash_commission_settled") return "Comisión saldada";
   return value.replaceAll("_", " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
 }
 function errorText(error: unknown) {
@@ -122,6 +150,9 @@ export function AdminConsolePage({ initialSection = "overview" }: Props) {
   const [docViewer, setDocViewer] = useState<{ url: string; type: string; title: string } | null>(null);
   const [docLoading, setDocLoading] = useState<number | null>(null);
   const [docError, setDocError] = useState("");
+  const [clientDocLoading, setClientDocLoading] = useState<string | null>(null);
+  const [clientDocError, setClientDocError] = useState("");
+  const [rankingMutationBusy, setRankingMutationBusy] = useState(false);
   const is = (target: Section) => section === target;
   const params = useMemo(() => ({ ...(search.trim() ? { search: search.trim() } : {}), page, limit: PAGE_SIZE }), [search, page]);
   const accountParams = useMemo(() => ({ ...params, ...(roleFilter ? { role: roleFilter as "cliente" | "profesional" | "admin" } : {}), ...(status ? { active: status === "active" } : {}) }), [params, roleFilter, status]);
@@ -129,20 +160,35 @@ export function AdminConsolePage({ initialSection = "overview" }: Props) {
   const stateParams = useMemo(() => ({ ...params, ...(status ? { status } : {}) }), [params, status]);
   const recommendationParams = useMemo<ListAdminRecommendationsParams>(() => ({ ...params, ...(status === "publica" || status === "privada" ? { visibility: status } : {}) }), [params, status]);
 
-  const dashboard = useGetAdminDashboard({ query: { queryKey: getGetAdminDashboardQueryKey(), enabled: is("overview"), staleTime: 30_000, refetchOnMount: "always" } });
+  const dashboard = useGetAdminDashboard({ query: { queryKey: getGetAdminDashboardQueryKey(), staleTime: 30_000, refetchOnMount: "always" } });
   const accounts = useListAdminAccounts(accountParams, { query: { queryKey: getListAdminAccountsQueryKey(accountParams), enabled: is("accounts"), staleTime: 15_000, refetchOnMount: "always" } });
   const partners = useListAdminPartners(partnerParams, { query: { queryKey: getListAdminPartnersQueryKey(partnerParams), enabled: is("partners"), staleTime: 15_000, refetchOnMount: "always" } });
   const jobs = useListAdminJobs(stateParams, { query: { queryKey: getListAdminJobsQueryKey(stateParams), enabled: is("jobs"), staleTime: 15_000, refetchOnMount: "always" } });
   const bookings = useListAdminBookings(stateParams, { query: { queryKey: getListAdminBookingsQueryKey(stateParams), enabled: is("bookings"), staleTime: 15_000, refetchOnMount: "always" } });
   const payments = useListAdminPayments(stateParams, { query: { queryKey: getListAdminPaymentsQueryKey(stateParams), enabled: is("payments"), staleTime: 15_000, refetchOnMount: "always" } });
   const settlements = useListAdminSettlements(stateParams, { query: { queryKey: getListAdminSettlementsQueryKey(stateParams), enabled: is("payments"), staleTime: 15_000, refetchOnMount: "always" } });
+  const visitFinance = useQuery<{ items: AdminVisitFinance[]; total: number; page: number; limit: number }>({
+    queryKey: ["admin-visit-payments", status, page],
+    queryFn: () => apiRequest(`/admin/visits?page=${page}&limit=${PAGE_SIZE}${status ? `&status=${encodeURIComponent(status)}` : ""}`),
+    enabled: is("payments"),
+    staleTime: 15_000,
+    refetchOnMount: "always",
+  });
   const reviews = useListAdminReviews(params, { query: { queryKey: getListAdminReviewsQueryKey(params), enabled: is("reviews"), staleTime: 15_000, refetchOnMount: "always" } });
   const recommendations = useListAdminRecommendations(recommendationParams, { query: { queryKey: getListAdminRecommendationsQueryKey(recommendationParams), enabled: is("recommendations"), staleTime: 15_000, refetchOnMount: "always" } });
   const catalog = useListAdminCatalog({ query: { queryKey: getListAdminCatalogQueryKey(), enabled: is("catalog"), staleTime: 15_000, refetchOnMount: "always" } });
   const resources = useListAdminResources(params, { query: { queryKey: getListAdminResourcesQueryKey(params), enabled: is("resources"), staleTime: 15_000, refetchOnMount: "always" } });
   const activityParams = useMemo(() => ({ page, limit: PAGE_SIZE }), [page]);
   const activity = useListAdminActivity(activityParams, { query: { queryKey: getListAdminActivityQueryKey(activityParams), enabled: is("activity"), staleTime: 15_000, refetchOnMount: "always" } });
-  const verifications = useListAdminVerifications({ estado: "pending_verification" }, { query: { queryKey: getListAdminVerificationsQueryKey({ estado: "pending_verification" }), enabled: is("verifications"), staleTime: 10_000, refetchOnMount: "always" } });
+  const verifications = useListAdminPartnerApplications(params, { query: { queryKey: getListAdminPartnerApplicationsQueryKey(params), enabled: is("verifications"), staleTime: 10_000, refetchInterval: is("verifications") ? 15_000 : false, refetchOnMount: "always" } });
+  const clientVerifications = useListAdminClientVerifications(params, { query: { queryKey: getListAdminClientVerificationsQueryKey(params), enabled: is("client-verifications"), staleTime: 10_000, refetchInterval: is("client-verifications") ? 15_000 : false, refetchOnMount: "always" } });
+  const rankingStatus = useQuery<AdminRankingState>({
+    queryKey: ["admin-ranking"],
+    queryFn: () => apiRequest<AdminRankingState>("/admin/ranking"),
+    staleTime: 15_000,
+    refetchInterval: is("ranking") ? 15_000 : 60_000,
+    refetchOnMount: "always",
+  });
 
   const accountMutation = useUpdateAdminAccountStatus();
   const partnerMutation = useUpdateAdminPartnerActivation();
@@ -150,7 +196,8 @@ export function AdminConsolePage({ initialSection = "overview" }: Props) {
   const createCatalogMutation = useCreateAdminCatalogItem();
   const updateCatalogMutation = useUpdateAdminCatalogItem();
   const verificationMutation = useResolveAdminVerification();
-  const mutationBusy = accountMutation.isPending || partnerMutation.isPending || recommendationMutation.isPending || createCatalogMutation.isPending || updateCatalogMutation.isPending || verificationMutation.isPending;
+  const clientVerificationMutation = useReviewAdminClientVerification();
+  const mutationBusy = accountMutation.isPending || partnerMutation.isPending || recommendationMutation.isPending || createCatalogMutation.isPending || updateCatalogMutation.isPending || verificationMutation.isPending || clientVerificationMutation.isPending || rankingMutationBusy;
 
   useEffect(() => {
     setPage(1);
@@ -181,10 +228,35 @@ export function AdminConsolePage({ initialSection = "overview" }: Props) {
       client.invalidateQueries({ queryKey: getListAdminResourcesQueryKey() }),
       client.invalidateQueries({ queryKey: getListAdminActivityQueryKey() }),
       client.invalidateQueries({ queryKey: getListAdminVerificationsQueryKey() }),
+      client.invalidateQueries({ queryKey: getListAdminPartnerApplicationsQueryKey() }),
+      client.invalidateQueries({ queryKey: getListAdminClientVerificationsQueryKey() }),
+      client.invalidateQueries({ queryKey: ["admin-ranking"] }),
     ]);
   };
   const success = (text: string) => { setNotice({ type: "success", text }); void invalidateOperational(); };
   const failure = (error: unknown) => setNotice({ type: "error", text: errorText(error) });
+  const reviewRankingIncident = (jobId: number, partnerName: string, decision: "confirmed" | "dismissed") => {
+    const confirm = decision === "confirmed";
+    openReason(
+      confirm ? "Confirmar señal operativa" : "Descartar o revertir señal",
+      `Revisá el caso de ${partnerName}. La combinación de una changa cancelada, mensajes y una visita coordinada solo abre una revisión; no demuestra por sí sola que el trabajo se haya hecho fuera de Worky. Registrá evidencia objetiva, sin copiar mensajes privados.`,
+      async (reason) => {
+        setRankingMutationBusy(true);
+        try {
+          await apiRequest(`/admin/ranking/incidents/${jobId}`, {
+            method: "POST",
+            body: JSON.stringify({ decision, reason }),
+          });
+          setReasonDialog(null);
+          success(confirm ? "Señal confirmada y registrada." : "Señal descartada y registrada.");
+        } catch (error) {
+          failure(error);
+        } finally {
+          setRankingMutationBusy(false);
+        }
+      },
+    );
+  };
   const resetFilters = () => { setPage(1); setSearch(""); setStatus(""); setRoleFilter(""); };
   const openReason = (title: string, detail: string, action: (value: string) => void) => {
     setReason(""); setReasonDialog({ title, detail, onSubmit: action });
@@ -197,6 +269,34 @@ export function AdminConsolePage({ initialSection = "overview" }: Props) {
       setDocViewer({ url, type: document.contentType || blob.type, title: `${label(document.tipo)} · ${document.partner.nombre}` });
     } catch (error) { setDocError(errorText(error)); }
     finally { setDocLoading(null); }
+  };
+  const showClientVerificationDocument = async (application: AdminClientIdentityVerification, kind: ClientVerificationKind) => {
+    const key = `${application.id}:${kind}`;
+    setClientDocLoading(key);
+    setClientDocError("");
+    try {
+      const blob = await fetchWorkyApiFile(`/admin/client-verifications/${application.id}/files/${kind}`);
+      const url = URL.createObjectURL(blob);
+      setDocViewer({ url, type: blob.type || "image/webp", title: `${kind === "dni" ? "DNI" : "Selfie"} · ${application.name}` });
+    } catch (error) {
+      setClientDocError(errorText(error));
+    } finally {
+      setClientDocLoading(null);
+    }
+  };
+  const resolveClientVerification = (
+    application: AdminClientIdentityVerification,
+    decision: "verified" | "rejected",
+    reasonCode?: ClientVerificationReasonCode,
+  ) => {
+    const data: AdminClientIdentityVerificationReviewInput = {
+      decision,
+      ...(decision === "rejected" && reasonCode ? { reasonCode } : {}),
+    };
+    clientVerificationMutation.mutate({ id: application.id, data }, {
+      onSuccess: () => success(decision === "verified" ? "Identidad del cliente aprobada; imágenes eliminadas." : "Identidad rechazada; imágenes eliminadas."),
+      onError: failure,
+    });
   };
   const resolveVerification = (doc: AdminVerificationDocument, estado: "verified" | "rejected") => {
     const go = (motivo: string) => verificationMutation.mutate({ id: doc.id, data: { estado, motivo } }, {
@@ -236,7 +336,7 @@ export function AdminConsolePage({ initialSection = "overview" }: Props) {
     {(search || status || roleFilter) && <button onClick={resetFilters} className="rounded-lg border border-[#ded8ca] px-3 py-2 text-sm font-semibold hover:bg-[#f3efe5]" data-testid={`button-clear-filters-${section}`}>Limpiar</button>}
   </div>;
   const paginated = (data: { total: number } | undefined) => <Pager page={page} total={data?.total ?? 0} onPage={setPage} />;
-  const sectionRows = <main className="min-w-0 flex-1 p-4 sm:p-6 lg:p-8">
+  const sectionRows = <main className="min-h-0 min-w-0 flex-1 overflow-y-auto overscroll-contain p-4 sm:p-6 lg:p-8" data-testid="admin-main">
     {pageHeader}<Notice message={notice} onDismiss={() => setNotice(null)} />
     {is("overview") && <Overview query={dashboard} onGo={setSection} />}
     {is("accounts") && <BusyOrError loading={accounts.isLoading} error={accounts.error} retry={() => void accounts.refetch()}>
@@ -251,31 +351,81 @@ export function AdminConsolePage({ initialSection = "overview" }: Props) {
       {!partners.data?.items.length ? <Empty text="No hay Partners para los filtros elegidos." /> : <Table headers={["Partner", "Servicio", "Verificación", "Cuenta", "Perfil", "Documentos", "Control"]} testId="table-admin-partners">{partners.data.items.map((item: AdminPartner) => <tr key={item.userId} data-testid={`row-partner-${item.userId}`}><Cell><div className="font-bold">{item.name}</div><div className="text-xs text-[#748087]">{item.email}</div></Cell><Cell>{item.trade}<div className="text-xs text-[#748087]">{item.category}</div></Cell><Cell><Badge tone={item.verified ? "good" : item.verificationStatus === "rejected" ? "bad" : "warn"}>{label(item.verificationStatus)}</Badge></Cell><Cell><Badge tone={item.accountActive ? "good" : "bad"}>{item.accountActive ? "Activa" : "Suspendida"}</Badge></Cell><Cell><Badge tone={item.enabled ? "good" : "neutral"}>{item.enabled ? "Habilitado" : "Suspendido"}</Badge></Cell><Cell>{item.documents.length} archivo{item.documents.length === 1 ? "" : "s"}</Cell><Cell><button disabled={mutationBusy || (!item.enabled && (!item.verified || !item.accountActive))} onClick={() => openReason(item.enabled ? "Suspender Partner" : "Habilitar Partner", "Solo se habilita con documentación verificada y cuenta activa. El motivo se guarda en la auditoría.", (why) => partnerMutation.mutate({ id: item.userId, data: { enabled: !item.enabled, reason: why } }, { onSuccess: () => { setReasonDialog(null); success(item.enabled ? "Partner suspendido." : "Partner habilitado."); }, onError: failure }))} title={!item.enabled && (!item.verified || !item.accountActive) ? "Requiere documentación verificada y cuenta activa" : ""} className="rounded-lg border border-[#ded8ca] px-3 py-1.5 text-xs font-bold disabled:opacity-40" data-testid={`button-partner-toggle-${item.userId}`}>{item.enabled ? "Suspender" : "Habilitar"}</button></Cell></tr>)}</Table>}{paginated(partners.data)}
       <p className="border-t border-[#eee9de] px-4 py-3 text-xs text-[#68747d]">Habilitar requiere documentos verificados y una cuenta activa. La disponibilidad del Partner no se modifica desde aquí.</p></Panel>
     </BusyOrError>}
-    {is("verifications") && <VerificationQueue query={verifications} busy={mutationBusy || docLoading !== null} docLoading={docLoading} docError={docError} onOpen={showDocument} onResolve={resolveVerification} />}
-    {is("jobs") && <BusyOrError loading={jobs.isLoading} error={jobs.error} retry={() => void jobs.refetch()}><Panel className="overflow-hidden"><div className="p-4">{filterBar(true, [["publicada", "Publicada"], ["aceptada", "Aceptada"], ["en_curso", "En curso"], ["finalizada", "Finalizada"], ["cancelada", "Cancelada"]])}</div>{!jobs.data?.items.length ? <Empty text="No hay trabajos para mostrar." /> : <Table headers={["Trabajo", "Estado", "Cliente", "Partner", "Oferta", "Creado"]} testId="table-admin-jobs">{jobs.data.items.map((item: AdminJob) => <tr key={item.id} data-testid={`row-job-${item.id}`}><Cell><b>#{item.id} · {item.category}</b>{item.detail && <div className="max-w-[260px] truncate text-xs text-[#748087]">{item.detail}</div>}</Cell><Cell><Badge tone={item.status === "completed" || item.status === "finalizada" ? "good" : item.status === "cancelled" || item.status === "cancelada" ? "bad" : "blue"} testId={`status-job-${item.id}`}>{label(item.status)}</Badge></Cell><Cell>{item.clientName}</Cell><Cell>{item.partnerName || "Sin asignar"}</Cell><Cell>{money(item.offeredPrice)}</Cell><Cell>{date(item.createdAt)}</Cell></tr>)}</Table>}{paginated(jobs.data)}</Panel></BusyOrError>}
+    {is("verifications") && <BusyOrError loading={verifications.isLoading} error={verifications.error} retry={() => void verifications.refetch()}>
+      {filterBar(false)}
+      <AdminVerificationQueue applications={verifications.data?.items ?? []} total={verifications.data?.total ?? 0} busy={mutationBusy || docLoading !== null} docLoading={docLoading} docError={docError} onOpen={showDocument} onResolve={resolveVerification} onEnable={(partner) => openReason("Habilitar Partner", `Confirmá la habilitación oficial de ${partner.name}. Se comprobarán nuevamente la cuenta, el email y los documentos en el servidor.`, (reason) => partnerMutation.mutate({ id: partner.userId, data: { enabled: true, reason } }, { onSuccess: () => { setReasonDialog(null); success("Partner habilitado oficialmente."); }, onError: failure }))} />
+      {paginated(verifications.data)}
+    </BusyOrError>}
+    {is("client-verifications") && <BusyOrError loading={clientVerifications.isLoading} error={clientVerifications.error} retry={() => void clientVerifications.refetch()}>
+      {filterBar(false)}
+      <AdminClientVerificationQueue
+        applications={clientVerifications.data?.items ?? []}
+        total={clientVerifications.data?.total ?? 0}
+        busy={mutationBusy || clientDocLoading !== null}
+        docLoading={clientDocLoading}
+        docError={clientDocError}
+        onOpen={showClientVerificationDocument}
+        onResolve={resolveClientVerification}
+      />
+      {paginated(clientVerifications.data)}
+    </BusyOrError>}
+    {is("jobs") && <BusyOrError loading={jobs.isLoading} error={jobs.error} retry={() => void jobs.refetch()}><Panel className="overflow-hidden"><div className="p-4">{filterBar(true, [["publicada", "Publicada"], ["aceptada", "Aceptada"], ["en_curso", "En curso"], ["trabajo_realizado", "Pago pendiente"], ["finalizada", "Finalizada"], ["cancelada", "Cancelada"]])}</div>{!jobs.data?.items.length ? <Empty text="No hay trabajos para mostrar." /> : <Table headers={["Trabajo", "Estado", "Cliente", "Partner", "Oferta", "Creado"]} testId="table-admin-jobs">{jobs.data.items.map((item: AdminJob) => <tr key={item.id} data-testid={`row-job-${item.id}`}><Cell><b>#{item.id} · {item.category}</b>{item.detail && <div className="max-w-[260px] truncate text-xs text-[#748087]">{item.detail}</div>}</Cell><Cell><Badge tone={item.status === "completed" || item.status === "finalizada" ? "good" : item.status === "cancelled" || item.status === "cancelada" ? "bad" : "blue"} testId={`status-job-${item.id}`}>{label(item.status)}</Badge></Cell><Cell>{item.clientName}</Cell><Cell>{item.partnerName || "Sin asignar"}</Cell><Cell>{money(item.offeredPrice)}</Cell><Cell>{date(item.createdAt)}</Cell></tr>)}</Table>}{paginated(jobs.data)}</Panel></BusyOrError>}
     {is("bookings") && <BusyOrError loading={bookings.isLoading} error={bookings.error} retry={() => void bookings.refetch()}><Panel className="overflow-hidden"><div className="p-4">{filterBar(true, [["solicitada", "Solicitada"], ["confirmada", "Confirmada"], ["en_curso", "En curso"], ["completada", "Completada"], ["cancelada", "Cancelada"]])}</div>{!bookings.data?.items.length ? <Empty text="No hay reservas para mostrar." /> : <Table headers={["Reserva", "Estado", "Cliente", "Partner", "Inicio", "Fin"]} testId="table-admin-bookings">{bookings.data.items.map((item: AdminBooking) => <tr key={item.id} data-testid={`row-booking-${item.id}`}><Cell><b>#{item.id}</b><div className="text-xs text-[#748087]">Trabajo #{item.jobId}</div></Cell><Cell><Badge tone="blue" testId={`status-booking-${item.id}`}>{label(item.status)}</Badge></Cell><Cell>{item.clientName}</Cell><Cell>{item.partnerName}</Cell><Cell>{date(item.startsAt, true)}</Cell><Cell>{date(item.endsAt, true)}</Cell></tr>)}</Table>}{paginated(bookings.data)}</Panel></BusyOrError>}
     {is("payments") && <div className="space-y-4">
       <ReadOnlyList title="Pagos" loading={payments.isLoading} error={payments.error} retry={() => void payments.refetch()} empty={!payments.data?.items.length} emptyText="No hay pagos para mostrar." pager={paginated(payments.data)}><Table headers={["Pago", "Trabajo", "Cliente", "Importe", "Estado", "Proveedor", "Actualizado"]} testId="table-admin-payments">{payments.data?.items.map((item: AdminPayment) => <tr key={item.id} data-testid={`row-payment-${item.id}`}><Cell><b>#{item.id}</b></Cell><Cell>#{item.jobId}</Cell><Cell>{item.clientName}</Cell><Cell>{money(item.amount, item.currency)}</Cell><Cell><Badge tone="blue" testId={`status-payment-${item.id}`}>{label(item.status)}</Badge></Cell><Cell>{label(item.provider)}</Cell><Cell>{date(item.updatedAt)}</Cell></tr>)}</Table></ReadOnlyList>
       <ReadOnlyList title="Liquidaciones" loading={settlements.isLoading} error={settlements.error} retry={() => void settlements.refetch()} empty={!settlements.data?.items.length} emptyText="No hay liquidaciones para mostrar." pager={paginated(settlements.data)}><Table headers={["Liquidación", "Trabajo", "Partner", "Importe", "Estado", "Actualizado"]} testId="table-admin-settlements">{settlements.data?.items.map((item: AdminSettlement) => <tr key={item.id} data-testid={`row-settlement-${item.id}`}><Cell><b>#{item.id}</b></Cell><Cell>#{item.jobId}</Cell><Cell>{item.partnerName}</Cell><Cell>{money(item.amount)}</Cell><Cell><Badge tone="blue" testId={`status-settlement-${item.id}`}>{label(item.status)}</Badge></Cell><Cell>{date(item.updatedAt)}</Cell></tr>)}</Table></ReadOnlyList>
-      <p className="flex items-center gap-2 text-xs text-[#68747d]" data-testid="text-payments-readonly"><LockKeyhole size={14} /> Vista de solo lectura. No se modifican pagos ni resultados de liquidación.</p>
+      <BusyOrError loading={visitFinance.isLoading} error={visitFinance.error} retry={() => void visitFinance.refetch()}>
+        <Panel className="overflow-hidden">
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#eee9de] p-4">
+            <div><h2 className="font-bold">Pagos de visitas y reportes</h2><p className="text-xs text-[#68747d]">El saldo retenido se libera por confirmación, a las 24 horas o después de resolver un reporte.</p></div>
+            <select value={status} onChange={(event) => { setStatus(event.target.value); setPage(1); }} className="field h-9 w-auto text-xs" aria-label="Filtrar pagos de visitas">
+              <option value="">Todos los estados</option><option value="under_review">En revisión</option><option value="pending_release">Saldo retenido</option><option value="available">Disponible</option><option value="cash_commission_due">Comisión efectivo</option><option value="cash_commission_settled">Comisión saldada</option>
+            </select>
+          </div>
+          {!visitFinance.data?.items.length ? <Empty text="No hay pagos de visita para mostrar." /> : <Table headers={["Visita", "Cliente", "Partner", "Importe", "15% Worky", "85% Partner", "Estado", "Reporte", "Acción"]} testId="table-admin-visit-payments">
+            {visitFinance.data.items.map((item) => <tr key={item.id} data-testid={`row-visit-finance-${item.id}`}>
+              <Cell><b>#{item.bookingId}</b><div className="text-xs text-[#748087]">{label(item.method)}</div></Cell><Cell>{item.clientName}</Cell><Cell>{item.partnerName}</Cell>
+              <Cell>{money(item.amount)}</Cell><Cell>{money(item.commissionAmount)}</Cell><Cell>{money(item.partnerAmount)}</Cell>
+              <Cell><Badge tone={item.status === "under_review" ? "warn" : item.status === "available" ? "good" : "blue"}>{label(item.status)}</Badge></Cell>
+              <Cell className="max-w-56"><span className="text-xs">{item.issueType ? `${label(item.issueType)}: ${item.issueDetail || ""}` : "—"}</span></Cell>
+              <Cell>{item.status === "under_review" && item.method === "mercado_pago" && !item.completedAt
+                ? <span className="text-xs text-[#8b5b17]">No liberar: gestionar devolución manual en MP</span>
+                : item.status === "under_review" ? <button disabled={mutationBusy} onClick={() => openReason("Resolver reporte de visita", "Revisá la evidencia. La devolución no se ejecuta desde esta acción.", (detail) => {
+                void apiRequest(`/admin/visits/${item.id}/resolver`, { method: "POST", body: JSON.stringify({ detail }) })
+                  .then(() => { setReasonDialog(null); success("Reporte revisado y saldo actualizado."); void visitFinance.refetch(); })
+                  .catch(failure);
+              })} className="rounded-lg bg-[#243b49] px-2.5 py-1.5 text-xs font-bold text-white disabled:opacity-50" data-testid={`button-resolve-visit-${item.id}`}>{item.method === "mercado_pago" ? "Revisar y liberar" : "Resolver revisión"}</button> : "—"}</Cell>
+            </tr>)}
+          </Table>}
+          {visitFinance.data && <Pager page={visitFinance.data.page} total={visitFinance.data.total} onPage={setPage} />}
+          <p className="border-t border-[#eee9de] px-4 py-3 text-xs text-[#68747d]">La devolución al cliente no se ejecuta automáticamente en Worky; los reembolsos confirmados por Mercado Pago se reflejan al recibir su notificación.</p>
+        </Panel>
+      </BusyOrError>
     </div>}
     {is("reviews") && <BusyOrError loading={reviews.isLoading} error={reviews.error} retry={() => void reviews.refetch()}><Panel className="overflow-hidden"><div className="p-4">{filterBar(false)}</div>{!reviews.data?.items.length ? <Empty text="Todavía no hay reseñas para mostrar." /> : <Table headers={["Reseña", "Puntaje", "Cliente", "Partner", "Comentario", "Fecha"]} testId="table-admin-reviews">{reviews.data.items.map((item: AdminReview) => <tr key={item.id} data-testid={`row-review-${item.id}`}><Cell><b>#{item.id}</b><div className="text-xs text-[#748087]">Trabajo #{item.jobId}</div></Cell><Cell><span className="inline-flex items-center gap-1 font-bold"><Star size={14} className="fill-[#df9c35] text-[#df9c35]" />{item.rating}</span></Cell><Cell>{item.clientName}</Cell><Cell>{item.partnerName}</Cell><Cell className="max-w-[260px] truncate">{item.comment || "Sin comentario"}</Cell><Cell>{date(item.createdAt)}</Cell></tr>)}</Table>}{paginated(reviews.data)}<p className="border-t border-[#eee9de] px-4 py-3 text-xs text-[#68747d]">Reseñas en modo lectura. No se muestran adjuntos.</p></Panel></BusyOrError>}
     {is("recommendations") && <BusyOrError loading={recommendations.isLoading} error={recommendations.error} retry={() => void recommendations.refetch()}><Panel className="overflow-hidden"><div className="p-4">{filterBar(true, [["publica", "Pública"], ["privada", "Privada"]])}</div>{!recommendations.data?.items.length ? <Empty text="No hay recomendaciones para mostrar." /> : <Table headers={["Recomendación", "Cliente", "Partner", "Visibilidad", "Texto", "Fecha", "Acción"]} testId="table-admin-recommendations">{recommendations.data.items.map((item: AdminRecommendation) => <tr key={item.id} data-testid={`row-recommendation-${item.id}`}><Cell><b>#{item.id}</b></Cell><Cell>{item.clientName}</Cell><Cell>{item.partnerName}</Cell><Cell><Badge tone={item.visibility === "publica" ? "good" : "neutral"} testId={`status-recommendation-${item.id}`}>{item.visibility === "publica" ? "Pública" : "Privada"}</Badge></Cell><Cell className="max-w-[240px] truncate">{item.comment || "Sin comentario"}</Cell><Cell>{date(item.updatedAt)}</Cell><Cell><button disabled={mutationBusy} onClick={() => openReason(item.visibility === "publica" ? "Ocultar recomendación" : "Publicar recomendación", "El cambio de visibilidad requiere un motivo y se registra en la auditoría.", (why) => recommendationMutation.mutate({ id: item.id, data: { visibility: item.visibility === "publica" ? "privada" : "publica", reason: why } }, { onSuccess: () => { setReasonDialog(null); success("Visibilidad actualizada."); }, onError: failure }))} className="inline-flex items-center gap-1 rounded-lg border border-[#ded8ca] px-2.5 py-1.5 text-xs font-bold" data-testid={`button-recommendation-visibility-${item.id}`}>{item.visibility === "publica" ? <><EyeOff size={13} /> Hacer privada</> : <><Eye size={13} /> Hacer pública</>}</button></Cell></tr>)}</Table>}{paginated(recommendations.data)}</Panel></BusyOrError>}
+    {is("ranking") && <RankingSection
+      query={rankingStatus}
+      busy={rankingMutationBusy}
+      onReview={(candidate, decision) => reviewRankingIncident(candidate.jobId, candidate.partnerName, decision)}
+      onRevoke={(incident) => reviewRankingIncident(incident.jobId, incident.partnerName, "dismissed")}
+    />}
     {is("catalog") && <BusyOrError loading={catalog.isLoading} error={catalog.error} retry={() => void catalog.refetch()}><Panel className="overflow-hidden"><div className="flex flex-col gap-3 border-b border-[#eee9de] p-4 sm:flex-row sm:items-center sm:justify-between"><div><h2 className="font-bold">Servicios y especialidades</h2><p className="text-xs text-[#68747d]">La activación controla la disponibilidad pública en el catálogo.</p></div><button onClick={() => openCatalogForm()} className="inline-flex items-center justify-center rounded-lg bg-[#e87836] px-4 py-2 text-sm font-bold text-white hover:bg-[#d9682c]" data-testid="button-catalog-create">Nuevo servicio</button></div>{!catalog.data?.length ? <Empty text="El catálogo todavía no tiene servicios." /> : <Table headers={["Categoría", "Especialidad", "Estado", "Actualizado", "Acciones"]} testId="table-admin-catalog">{catalog.data.map((item: AdminCatalogItem) => <tr key={item.id} data-testid={`row-catalog-${item.id}`}><Cell><b>{item.category}</b></Cell><Cell>{item.specialty}</Cell><Cell><Badge tone={item.active ? "good" : "neutral"} testId={`status-catalog-${item.id}`}>{item.active ? "Activo" : "Inactivo"}</Badge></Cell><Cell>{date(item.updatedAt)}</Cell><Cell><div className="flex gap-2"><button onClick={() => openCatalogForm(item)} className="rounded-lg border border-[#ded8ca] px-2.5 py-1.5 text-xs font-bold" data-testid={`button-catalog-edit-${item.id}`}>Editar</button><button disabled={mutationBusy} onClick={() => updateCatalogMutation.mutate({ id: item.id, data: { active: !item.active } }, { onSuccess: () => success(item.active ? "Servicio desactivado." : "Servicio activado."), onError: failure })} className="rounded-lg border border-[#ded8ca] px-2.5 py-1.5 text-xs font-bold" data-testid={`button-catalog-toggle-${item.id}`}>{item.active ? "Desactivar" : "Activar"}</button></div></Cell></tr>)}</Table>}</Panel></BusyOrError>}
     {is("resources") && <BusyOrError loading={resources.isLoading} error={resources.error} retry={() => void resources.refetch()}><Panel className="overflow-hidden"><div className="p-4">{filterBar(false)}</div>{!resources.data?.items.length ? <Empty text="No hay recursos cargados." /> : <Table headers={["Recurso", "Propietario", "Tipo", "Formato", "Tamaño", "Fecha"]} testId="table-admin-resources">{resources.data.items.map((item: AdminResource) => <tr key={`${item.kind}-${item.id}`} data-testid={`row-resource-${item.kind}-${item.id}`}><Cell><b>{item.name}</b><div className="text-xs text-[#748087]">Recurso #{item.id}</div></Cell><Cell>{item.ownerName}</Cell><Cell>{item.kind === "portfolio" ? "Portfolio" : "Foto de perfil"}</Cell><Cell>{item.contentType}</Cell><Cell>{item.sizeBytes === null ? "No disponible" : bytes(item.sizeBytes)}</Cell><Cell>{date(item.createdAt)}</Cell></tr>)}</Table>}{paginated(resources.data)}<p className="border-t border-[#eee9de] px-4 py-3 text-xs text-[#68747d]">Solo metadatos. No se muestran ni se abren rutas privadas de archivos.</p></Panel></BusyOrError>}
     {is("activity") && <BusyOrError loading={activity.isLoading} error={activity.error} retry={() => void activity.refetch()}><Panel className="overflow-hidden"><div className="flex items-center justify-between border-b border-[#eee9de] px-4 py-3"><h2 className="font-bold">Registro de auditoría</h2><span className="text-xs text-[#68747d]">Eventos administrativos · lectura</span></div>{!activity.data?.items.length ? <Empty text="No hay eventos de actividad para mostrar." /> : <Table headers={["Momento", "Actor", "Entidad", "Acción", "Cambio"]} testId="table-admin-activity">{activity.data.items.map((item: AdminActivityEvent) => <tr key={item.id} data-testid={`row-activity-${item.id}`}><Cell>{date(item.createdAt, true)}</Cell><Cell>{item.actorName || "Sistema"}</Cell><Cell>{label(item.entity)} <span className="text-xs text-[#748087]">#{item.entityId}</span></Cell><Cell>{label(item.action)}</Cell><Cell>{item.previousState || "—"}{item.previousState && item.nextState ? " → " : ""}{item.nextState || ""}</Cell></tr>)}</Table>}{paginated(activity.data)}<p className="border-t border-[#eee9de] px-4 py-3 text-xs text-[#68747d]">Se omiten detalles internos de metadatos para proteger información sensible.</p></Panel></BusyOrError>}
+    {is("admins") && <AdminAdminsPanel onMessage={(type, text) => setNotice({ type, text })} />}
   </main>;
 
-  return <div className="min-h-[100dvh] bg-[#f5f2e9] text-[#293a44]" data-testid="admin-console">
-    <header className="sticky top-0 z-30 flex h-14 items-center justify-between border-b border-[#e4dfd2] bg-[#fbf9f2]/95 px-4 backdrop-blur sm:hidden">
+  return <div className="flex h-dvh flex-col overflow-hidden bg-[#f5f2e9] text-[#293a44]" data-testid="admin-console">
+    <header className="sticky top-0 z-30 flex h-14 shrink-0 items-center justify-between border-b border-[#e4dfd2] bg-[#fbf9f2]/95 px-4 backdrop-blur sm:hidden">
       <div className="flex items-center gap-2 font-bold tracking-tight"><span className="grid h-8 w-8 place-items-center rounded-lg bg-[#233a49] text-[#f3b252]">W</span> Worky <span className="text-xs font-medium text-[#7b8589]">Admin</span></div>
       <button onClick={() => setMobileNav(!mobileNav)} aria-label="Abrir navegación" data-testid="button-mobile-nav" className="rounded-lg border border-[#ded8ca] p-2"><Menu size={18} /></button>
     </header>
-    <div className="mx-auto flex min-h-[100dvh] max-w-[1680px]">
-      <aside className={`${mobileNav ? "fixed inset-y-14 left-0 z-40 flex shadow-xl" : "hidden"} w-[268px] shrink-0 flex-col bg-[#243b49] px-4 pb-5 pt-5 text-[#e9eee9] sm:sticky sm:top-0 sm:flex sm:h-[100dvh]`}>
+    <div className="mx-auto flex min-h-0 w-full max-w-[1680px] flex-1">
+      <aside data-testid="admin-sidebar" className={`${mobileNav ? "fixed bottom-0 left-0 top-14 z-40 flex shadow-xl" : "hidden"} w-[268px] shrink-0 flex-col overflow-y-auto overscroll-contain bg-[#243b49] px-4 pb-5 pt-5 text-[#e9eee9] [scrollbar-width:thin] [&>*]:shrink-0 sm:static sm:flex sm:h-full`}>
         <div className="mb-8 hidden items-center gap-3 px-2 sm:flex"><div className="grid h-10 w-10 place-items-center rounded-xl bg-[#e87836] font-bold text-[#253b48]">W</div><div><div className="font-bold tracking-tight">Worky</div><div className="text-[10px] uppercase tracking-[.18em] text-[#aebdbd]">Control desk</div></div></div>
         <div className="mb-2 px-3 text-[10px] font-bold uppercase tracking-[.16em] text-[#9eafae]">Consola interna</div>
-        {["Operación", "Marketplace", "Configuración"].map((group) => <div key={group} className="mb-4"><div className="mb-1 px-3 text-[10px] font-bold uppercase tracking-[.15em] text-[#819594]">{group}</div>{sections.filter((item) => item.group === group).map((item) => { const Icon = item.icon; return <button key={item.id} onClick={() => { setSection(item.id); setMobileNav(false); }} className={`mb-0.5 flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-[13px] font-semibold transition-colors ${is(item.id) ? "bg-[#e87836] text-[#243b49]" : "text-[#d8e1dd] hover:bg-[#ffffff12]"}`} data-testid={`nav-admin-${item.id}`}><Icon size={16} />{item.label}{item.id === "verifications" && dashboard.data?.partnersPendingReview ? <span className="ml-auto rounded-full bg-[#f1ba64] px-2 py-0.5 text-[10px] font-bold text-[#293a44]">{dashboard.data.partnersPendingReview}</span> : null}</button>; })}</div>)}
+        {["Operación", "Marketplace", "Configuración"].map((group) => <div key={group} className="mb-4"><div className="mb-1 px-3 text-[10px] font-bold uppercase tracking-[.15em] text-[#819594]">{group}</div>{sections.filter((item) => item.group === group).map((item) => { const Icon = item.icon; return <button key={item.id} onClick={() => { setSection(item.id); setMobileNav(false); }} className={`mb-0.5 flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-[13px] font-semibold transition-colors ${is(item.id) ? "bg-[#e87836] text-[#243b49]" : "text-[#d8e1dd] hover:bg-[#ffffff12]"}`} data-testid={`nav-admin-${item.id}`}><Icon size={16} />{item.label}{item.id === "verifications" && dashboard.data?.partnersPendingReview ? <span data-testid="badge-admin-pending-review" className="ml-auto rounded-full bg-[#f1ba64] px-2 py-0.5 text-[10px] font-bold text-[#293a44]">{dashboard.data.partnersPendingReview}</span> : null}</button>; })}</div>)}
         <div className="mt-auto rounded-xl border border-[#ffffff1c] bg-[#ffffff08] p-3"><div className="flex items-center gap-2 text-xs font-bold"><Shield size={14} className="text-[#edaa55]" /> Acceso de administración</div><p className="mt-1 text-[11px] leading-relaxed text-[#aebdbd]">Las decisiones críticas requieren un motivo y quedan auditadas.</p></div>
       </aside>
       {sectionRows}
@@ -316,15 +466,76 @@ function Metric({ label: name, value, caption, accent, onClick }: { label: strin
   const content = <><div className="text-xs font-semibold text-[#68747d]">{name}</div><div className="mt-2 text-3xl font-bold tracking-[-.05em]">{value.toLocaleString("es-AR")}</div><div className="mt-1 text-[11px] text-[#748087]">{caption}</div></>;
   return onClick ? <button onClick={onClick} className={`rounded-2xl border border-[#e4dfd2] border-t-[3px] ${accents[accent]} bg-[#fffdf8] p-4 text-left shadow-[0_6px_20px_rgba(34,48,59,.035)] hover:-translate-y-0.5`} data-testid={`metric-${name.toLowerCase().replaceAll(" ", "-")}`}>{content}</button> : <div className={`rounded-2xl border border-[#e4dfd2] border-t-[3px] ${accents[accent]} bg-[#fffdf8] p-4 shadow-[0_6px_20px_rgba(34,48,59,.035)]`} data-testid={`metric-${name.toLowerCase().replaceAll(" ", "-")}`}>{content}</div>;
 }
-function VerificationQueue({ query, busy, docLoading, docError, onOpen, onResolve }: { query: UseQueryResult<AdminVerificationDocument[]>; busy: boolean; docLoading: number | null; docError: string; onOpen: (doc: AdminVerificationDocument) => void; onResolve: (doc: AdminVerificationDocument, estado: "verified" | "rejected") => void }) {
-  return <BusyOrError loading={query.isLoading} error={query.error} retry={() => void query.refetch()}>
-    <Panel className="overflow-hidden"><div className="flex flex-col justify-between gap-2 border-b border-[#eee9de] px-4 py-4 sm:flex-row sm:items-center"><div><h2 className="font-bold">Documentación pendiente</h2><p className="text-xs text-[#68747d]">Los archivos privados se consultan con la sesión autenticada y no exponen sus rutas.</p></div><Badge tone="warn">{query.data?.length ?? 0} en cola</Badge></div>
-      {docError && <div role="alert" data-testid="text-document-error" className="mx-4 mt-4 rounded-lg bg-[#fbebe8] px-3 py-2 text-xs font-semibold text-[#963d34]">{docError}</div>}
-      {!query.data?.length ? <Empty text="La cola está al día. No hay documentos pendientes." /> : <div className="divide-y divide-[#eee9de]">{query.data.map((doc: AdminVerificationDocument) => <article key={doc.id} className="p-4 sm:p-5" data-testid={`card-verification-${doc.id}`}><div className="flex flex-col justify-between gap-4 lg:flex-row lg:items-center"><div className="flex min-w-0 items-start gap-3"><div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-[#f2ede1] text-[#b86636]"><FileText size={19} /></div><div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><h3 className="font-bold">{doc.partner.nombre}</h3><Badge tone="warn">{label(doc.estado)}</Badge></div><div className="mt-0.5 text-xs text-[#68747d]">{doc.partner.email} · {doc.perfil ? `${doc.perfil.oficio} · ${doc.perfil.categoria}` : "Perfil no disponible"}</div><div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-[#56646c]"><span className="font-semibold">{label(doc.tipo)}</span><span>{doc.nombre}</span><span>{bytes(doc.sizeBytes)}</span><span>{date(doc.createdAt)}</span></div></div></div><div className="flex shrink-0 flex-wrap gap-2"><button disabled={docLoading !== null} onClick={() => onOpen(doc)} className="inline-flex items-center gap-2 rounded-lg border border-[#d8d2c4] px-3 py-2 text-xs font-bold hover:bg-[#f3efe5] disabled:opacity-50" data-testid={`button-open-document-${doc.id}`}>{docLoading === doc.id ? "Abriendo…" : <><Eye size={14} /> Abrir documento</>}</button><button disabled={busy} onClick={() => onResolve(doc, "verified")} className="inline-flex items-center gap-1.5 rounded-lg bg-[#2f7552] px-3 py-2 text-xs font-bold text-white disabled:opacity-50" data-testid={`button-approve-document-${doc.id}`}><Check size={14} /> Aprobar</button><button disabled={busy} onClick={() => onResolve(doc, "rejected")} className="inline-flex items-center gap-1.5 rounded-lg border border-[#e1c1bb] px-3 py-2 text-xs font-bold text-[#a23f35] disabled:opacity-50" data-testid={`button-reject-document-${doc.id}`}><X size={14} /> Rechazar</button></div></div></article>)}</div>}
-      <div className="flex items-start gap-2 border-t border-[#eee9de] bg-[#fbf8f0] px-4 py-3 text-xs leading-relaxed text-[#68747d]"><ShieldAlert size={15} className="mt-0.5 shrink-0 text-[#b86636]" />La revisión del documento no habilita por sí sola al Partner. Para activarlo también deben estar aprobadas sus verificaciones y su cuenta debe permanecer activa.</div>
-    </Panel>
-  </BusyOrError>;
-}
 function ReadOnlyList({ title, loading, error, retry, empty, emptyText, pager, children }: { title: string; loading: boolean; error: unknown; retry: () => void; empty: boolean; emptyText: string; pager: ReactNode; children: ReactNode }) {
   return <BusyOrError loading={loading} error={error} retry={retry}><Panel className="overflow-hidden"><div className="border-b border-[#eee9de] px-4 py-3 font-bold">{title}</div>{empty ? <Empty text={emptyText} /> : children}{pager}</Panel></BusyOrError>;
+}
+
+function RankingSection({
+  query, busy, onReview, onRevoke,
+}: {
+  query: UseQueryResult<AdminRankingState>;
+  busy: boolean;
+  onReview: (candidate: AdminRankingCandidate, decision: "confirmed" | "dismissed") => void;
+  onRevoke: (incident: AdminRankingIncident) => void;
+}) {
+  const data = query.data;
+  return <BusyOrError loading={query.isLoading} error={query.error} retry={() => void query.refetch()}>
+    {!data?.active ? <Panel className="border-dashed border-[#d9e3e7] bg-[#f6f7f5] p-6" data-testid="admin-ranking-dormant">
+      <div className="flex items-start gap-3"><span className="rounded-xl bg-[#243b49] p-2 text-[#f3b252]"><ShieldAlert size={19} /></span><div>
+        <div className="flex flex-wrap items-center gap-2"><h2 className="font-bold">Ranking futuro preparado, todavía inactivo</h2><Badge tone="neutral">Sin cambios en la búsqueda</Badge></div>
+        <p className="mt-2 max-w-3xl text-sm leading-relaxed text-[#596a72]">Se activará automáticamente cuando exista una changa finalizada con pago real confirmado en producción. Los pagos de prueba, desarrollo, pendientes, rechazados o reembolsados no lo activan.</p>
+        <p className="mt-2 text-xs text-[#68747d]">Hasta entonces se conservan el orden, filtros, pagos y saldos actuales. Una vez activo, las señales operativas necesitan revisión humana y nunca bloquean una cuenta automáticamente.</p>
+      </div></div>
+    </Panel> : <div className="space-y-4" data-testid="admin-ranking-section">
+      <Panel className="border-[#d9e3e7] bg-[#eef3f3] p-5">
+        <div className="flex items-start gap-3">
+          <span className="rounded-xl bg-[#243b49] p-2 text-[#f3b252]"><ShieldAlert size={19} /></span>
+          <div>
+            <div className="flex flex-wrap items-center gap-2"><h2 className="font-bold">Ranking futuro activado</h2><Badge tone="good">Pago real confirmado</Badge></div>
+            <p className="mt-1 text-sm text-[#596a72]">Desde la primera changa finalizada y pagada en producción, la búsqueda considera reseñas, trabajos finalizados, experiencia, recomendaciones públicas, saldos confirmados de visitas y señales revisadas.</p>
+            <p className="mt-2 text-xs text-[#68747d]">Se activó el {date(data.activatedAt, true)} mediante {label(data.activationProvider)}. Las señales revisadas vencen al salir de la ventana móvil de {data.windowDays} días.</p>
+          </div>
+        </div>
+      </Panel>
+
+      <Panel className="overflow-hidden">
+        <div className="border-b border-[#eee9de] px-4 py-3">
+          <h2 className="font-bold">Señales operativas para revisar</h2>
+          <p className="mt-1 text-xs leading-relaxed text-[#68747d]">Solo se sugieren changas canceladas que tuvieron mensajes y una visita aceptada. Esto no demuestra que el trabajo se haya hecho fuera de Worky; no se lee ni se muestra el contenido del chat.</p>
+        </div>
+        {!data.candidates.length ? <Empty text="No hay señales pendientes de revisión." /> : <Table headers={["Trabajo", "Partner", "Cliente", "Mensajes", "Visitas aceptadas", "Cancelada", "Decisión"]} testId="table-admin-ranking-candidates">
+          {data.candidates.map((candidate) => <tr key={candidate.jobId} data-testid={`row-ranking-candidate-${candidate.jobId}`}>
+            <Cell><b>#{candidate.jobId} · {candidate.category}</b></Cell>
+            <Cell>{candidate.partnerName}</Cell>
+            <Cell>{candidate.clientName}</Cell>
+            <Cell>{candidate.messageCount}</Cell>
+            <Cell>{candidate.acceptedVisitCount}</Cell>
+            <Cell>{date(candidate.updatedAt, true)}</Cell>
+            <Cell><div className="flex flex-wrap gap-2">
+              <button disabled={busy} onClick={() => onReview(candidate, "confirmed")} className="rounded-lg bg-[#243b49] px-2.5 py-1.5 text-xs font-bold text-white disabled:opacity-50" data-testid={`button-confirm-ranking-signal-${candidate.jobId}`}>Confirmar señal</button>
+              <button disabled={busy} onClick={() => onReview(candidate, "dismissed")} className="rounded-lg border border-[#ded8ca] px-2.5 py-1.5 text-xs font-bold disabled:opacity-50" data-testid={`button-dismiss-ranking-signal-${candidate.jobId}`}>Descartar</button>
+            </div></Cell>
+          </tr>)}
+        </Table>}
+      </Panel>
+
+      <Panel className="overflow-hidden">
+        <div className="border-b border-[#eee9de] px-4 py-3"><h2 className="font-bold">Historial de revisiones</h2><p className="mt-1 text-xs text-[#68747d]">Solo las señales confirmadas por administración cuentan para el ajuste; dos dentro de {data.windowDays} días aplican una reducción temporal de visibilidad, no un bloqueo.</p></div>
+        {!data.incidents.length ? <Empty text="Todavía no hay revisiones en esta ventana." /> : <Table headers={["Trabajo", "Partner", "Cliente", "Estado", "Motivo registrado", "Revisada", "Acción"]} testId="table-admin-ranking-history">
+          {data.incidents.map((incident) => {
+            const confirmed = incident.decision === "confirmed";
+            return <tr key={`${incident.jobId}-${incident.reviewedAt}`} data-testid={`row-ranking-incident-${incident.jobId}`}>
+              <Cell><b>#{incident.jobId} · {incident.category}</b></Cell>
+              <Cell>{incident.partnerName}</Cell>
+              <Cell>{incident.clientName}</Cell>
+              <Cell><Badge tone={confirmed ? "warn" : "neutral"}>{confirmed ? "Señal confirmada" : "Descartada"}</Badge></Cell>
+              <Cell className="max-w-[260px]">{incident.reason || "Sin motivo detallado"}</Cell>
+              <Cell>{date(incident.reviewedAt, true)}</Cell>
+              <Cell>{confirmed ? <button disabled={busy} onClick={() => onRevoke(incident)} className="rounded-lg border border-[#ded8ca] px-2.5 py-1.5 text-xs font-bold disabled:opacity-50" data-testid={`button-revoke-ranking-signal-${incident.jobId}`}>Revertir</button> : "—"}</Cell>
+            </tr>;
+          })}
+        </Table>}
+      </Panel>
+    </div>}
+  </BusyOrError>;
 }

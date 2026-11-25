@@ -1,0 +1,59 @@
+@import url("https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap");
+
+.worky-sidebar {
+  --background: 37 43% 96%;
+  --foreground: 222 43% 16%;
+  --border: 35 22% 86%;
+  --primary: 27 91% 55%;
+  --primary-foreground: 222 43% 16%;
+  --secondary: 215 45% 23%;
+  --accent: 42 92% 66%;
+  --sidebar: 215 45% 23%;
+  --sidebar-foreground: 39 44% 95%;
+  --sidebar-accent: 215 36% 30%;
+  min-height: 100vh;
+  background: hsl(var(--background));
+  color: hsl(var(--foreground));
+  font-family: "DM Sans", sans-serif;
+}
+
+.worky-sidebar *,
+.worky-sidebar *::before,
+.worky-sidebar *::after {
+  box-sizing: border-box;
+}
+
+.worky-sidebar aside {
+  height: 100dvh;
+  overflow: hidden;
+  padding-bottom: 1.5rem;
+  background:
+    radial-gradient(circle at 12% 4%, hsl(218 76% 54% / .2), transparent 15rem),
+    linear-gradient(175deg, hsl(222 52% 24%), hsl(224 55% 18%));
+  box-shadow: 12px 0 38px hsl(222 50% 10% / .08);
+}
+
+.worky-sidebar aside > * {
+  flex-shrink: 0;
+}
+
+.worky-sidebar aside > nav {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+  scrollbar-width: none;
+}
+
+.worky-sidebar aside > nav::-webkit-scrollbar {
+  display: none;
+}
+
+.worky-sidebar .brand-surface img {
+  filter: none;
+}
+
+.worky-sidebar .focus-ring:focus-visible {
+  outline: 3px solid hsl(var(--accent));
+  outline-offset: 3px;
+}

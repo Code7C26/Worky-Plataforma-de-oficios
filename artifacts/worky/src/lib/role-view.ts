@@ -2,9 +2,26 @@ export type WebRole = 'client' | 'professional' | 'admin';
 export type AccountRole = 'cliente' | 'profesional' | 'admin' | undefined;
 export type SwitchableRole = Exclude<WebRole, 'admin'>;
 
+export function shouldShowProfessionalSearch(activeRole: SwitchableRole): boolean {
+  return activeRole === 'client';
+}
+
 export function hasDualRoleAccount(accountRole: AccountRole, professionalProfile: unknown): boolean {
   if (accountRole === 'profesional') return true;
-  return accountRole === 'cliente' && Boolean(professionalProfile);
+  return (accountRole === 'cliente' || accountRole === 'admin') && Boolean(professionalProfile);
+}
+
+export function shouldShowPartnerSignupCta(
+  activeRole: SwitchableRole,
+  accountRole: AccountRole,
+  professionalProfile: unknown,
+  profileLoading: boolean,
+  profileError: boolean,
+): boolean {
+  return activeRole === 'client'
+    && !profileLoading
+    && !profileError
+    && !hasDualRoleAccount(accountRole, professionalProfile);
 }
 
 export function resolveEffectiveRole(
@@ -12,12 +29,10 @@ export function resolveEffectiveRole(
   selectedRole: WebRole,
   hasSavedPreference: boolean,
   hasProfessionalAccount: boolean,
-): WebRole {
-  if (accountRole === 'admin') return 'admin';
-
+): SwitchableRole {
   const requestedRole = hasSavedPreference
     ? selectedRole
-    : accountRole === 'profesional'
+    : accountRole === 'profesional' || (accountRole === 'admin' && hasProfessionalAccount)
       ? 'professional'
       : selectedRole;
 

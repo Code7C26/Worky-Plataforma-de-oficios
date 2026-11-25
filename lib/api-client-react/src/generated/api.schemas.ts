@@ -5,6 +5,85 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
+export type ClientIdentityVerificationStatusStatus = typeof ClientIdentityVerificationStatusStatus[keyof typeof ClientIdentityVerificationStatusStatus];
+
+
+export const ClientIdentityVerificationStatusStatus = {
+  not_requested: 'not_requested',
+  pending_verification: 'pending_verification',
+  verified: 'verified',
+  rejected: 'rejected',
+} as const;
+
+/**
+ * @nullable
+ */
+export type ClientIdentityVerificationStatusReasonCode = typeof ClientIdentityVerificationStatusReasonCode[keyof typeof ClientIdentityVerificationStatusReasonCode] | null;
+
+
+export const ClientIdentityVerificationStatusReasonCode = {
+  dni_unreadable: 'dni_unreadable',
+  selfie_unusable: 'selfie_unusable',
+  identity_mismatch: 'identity_mismatch',
+} as const;
+
+export interface ClientIdentityVerificationStatus {
+  status: ClientIdentityVerificationStatusStatus;
+  /** @nullable */
+  submittedAt: string | null;
+  /** @nullable */
+  reviewedAt: string | null;
+  /** @nullable */
+  reasonCode: ClientIdentityVerificationStatusReasonCode;
+}
+
+export interface SubmitClientIdentityVerificationInput {
+  /** @minimum 1 */
+  dniUploadId: number;
+  /** @minimum 1 */
+  selfieUploadId: number;
+  consent: true;
+}
+
+export interface AdminClientIdentityVerification {
+  id: number;
+  userId: number;
+  name: string;
+  email: string;
+  submittedAt: string;
+  hasDni: boolean;
+  hasSelfie: boolean;
+}
+
+export interface AdminClientIdentityVerificationPage {
+  items: AdminClientIdentityVerification[];
+  total: number;
+  page: number;
+  limit: number;
+}
+
+export type AdminClientIdentityVerificationReviewInputDecision = typeof AdminClientIdentityVerificationReviewInputDecision[keyof typeof AdminClientIdentityVerificationReviewInputDecision];
+
+
+export const AdminClientIdentityVerificationReviewInputDecision = {
+  verified: 'verified',
+  rejected: 'rejected',
+} as const;
+
+export type AdminClientIdentityVerificationReviewInputReasonCode = typeof AdminClientIdentityVerificationReviewInputReasonCode[keyof typeof AdminClientIdentityVerificationReviewInputReasonCode];
+
+
+export const AdminClientIdentityVerificationReviewInputReasonCode = {
+  dni_unreadable: 'dni_unreadable',
+  selfie_unusable: 'selfie_unusable',
+  identity_mismatch: 'identity_mismatch',
+} as const;
+
+export interface AdminClientIdentityVerificationReviewInput {
+  decision: AdminClientIdentityVerificationReviewInputDecision;
+  reasonCode?: AdminClientIdentityVerificationReviewInputReasonCode;
+}
+
 export type AdminActivityEventMetadata = { [key: string]: unknown };
 
 export interface AdminActivityEvent {
@@ -84,6 +163,52 @@ export interface AdminAccountStatusInput {
   reason: string;
 }
 
+export interface AdminRoleGrantInput {
+  /** @maxLength 320 */
+  email: string;
+  /**
+     * @minLength 5
+     * @maxLength 500
+     */
+  motivo: string;
+}
+
+export type AdminRoleGrantResultRol = typeof AdminRoleGrantResultRol[keyof typeof AdminRoleGrantResultRol];
+
+
+export const AdminRoleGrantResultRol = {
+  admin: 'admin',
+} as const;
+
+export interface AdminRoleGrantResult {
+  rol: AdminRoleGrantResultRol;
+  changed: boolean;
+}
+
+export interface AdminManagerAccount {
+  id: number;
+  name: string;
+  email: string;
+  /** @nullable */
+  emailVerifiedAt: string | null;
+  createdAt: string;
+}
+
+export interface AdminManagerPage {
+  isPrimaryAdmin: boolean;
+  /** @nullable */
+  primaryAdminId: number | null;
+  items: AdminManagerAccount[];
+}
+
+export interface AdminRoleRevokeInput {
+  /**
+     * @minLength 5
+     * @maxLength 1000
+     */
+  reason: string;
+}
+
 export type AdminVerificationDocumentSummaryType = typeof AdminVerificationDocumentSummaryType[keyof typeof AdminVerificationDocumentSummaryType];
 
 
@@ -91,6 +216,7 @@ export const AdminVerificationDocumentSummaryType = {
   dni_frente: 'dni_frente',
   dni_dorso: 'dni_dorso',
   antecedentes_penales: 'antecedentes_penales',
+  matricula: 'matricula',
 } as const;
 
 export type AdminVerificationDocumentSummaryStatus = typeof AdminVerificationDocumentSummaryStatus[keyof typeof AdminVerificationDocumentSummaryStatus];
@@ -142,6 +268,77 @@ export interface AdminPartner {
 
 export interface AdminPartnerPage {
   items: AdminPartner[];
+  total: number;
+  page: number;
+  limit: number;
+}
+
+export type AdminVerificationDocumentTipo = typeof AdminVerificationDocumentTipo[keyof typeof AdminVerificationDocumentTipo];
+
+
+export const AdminVerificationDocumentTipo = {
+  dni_frente: 'dni_frente',
+  dni_dorso: 'dni_dorso',
+  antecedentes_penales: 'antecedentes_penales',
+  matricula: 'matricula',
+} as const;
+
+export type AdminVerificationDocumentEstado = typeof AdminVerificationDocumentEstado[keyof typeof AdminVerificationDocumentEstado];
+
+
+export const AdminVerificationDocumentEstado = {
+  pending_verification: 'pending_verification',
+  verified: 'verified',
+  rejected: 'rejected',
+} as const;
+
+export type AdminVerificationDocumentPerfilEstadoVerificacion = typeof AdminVerificationDocumentPerfilEstadoVerificacion[keyof typeof AdminVerificationDocumentPerfilEstadoVerificacion];
+
+
+export const AdminVerificationDocumentPerfilEstadoVerificacion = {
+  pending_verification: 'pending_verification',
+  verified: 'verified',
+  rejected: 'rejected',
+} as const;
+
+export type AdminVerificationDocumentPartner = {
+  id: number;
+  nombre: string;
+  email: string;
+};
+
+export type AdminVerificationDocumentPerfil = {
+  oficio: string;
+  categoria: string;
+  estadoVerificacion: AdminVerificationDocumentPerfilEstadoVerificacion;
+} | null;
+
+export interface AdminVerificationDocument {
+  id: number;
+  profesionalId: number;
+  tipo: AdminVerificationDocumentTipo;
+  objectPath: string;
+  nombre: string;
+  contentType: string;
+  sizeBytes: number;
+  estado: AdminVerificationDocumentEstado;
+  createdAt: string;
+  updatedAt: string;
+  partner: AdminVerificationDocumentPartner;
+  perfil: AdminVerificationDocumentPerfil;
+}
+
+export interface AdminPartnerApplication {
+  partner: AdminPartner;
+  /** @nullable */
+  emailVerifiedAt: string | null;
+  /** @nullable */
+  matriculaHabilitante: string | null;
+  documents: AdminVerificationDocument[];
+}
+
+export interface AdminPartnerApplicationPage {
+  items: AdminPartnerApplication[];
   total: number;
   page: number;
   limit: number;
@@ -238,6 +435,68 @@ export interface AdminSettlementPage {
   limit: number;
 }
 
+export type AdminVisitPaymentMethod = typeof AdminVisitPaymentMethod[keyof typeof AdminVisitPaymentMethod];
+
+
+export const AdminVisitPaymentMethod = {
+  mercado_pago: 'mercado_pago',
+  efectivo: 'efectivo',
+} as const;
+
+export type AdminVisitPaymentStatus = typeof AdminVisitPaymentStatus[keyof typeof AdminVisitPaymentStatus];
+
+
+export const AdminVisitPaymentStatus = {
+  checkout_started: 'checkout_started',
+  pending_release: 'pending_release',
+  available: 'available',
+  cash_pending_visit: 'cash_pending_visit',
+  cash_commission_due: 'cash_commission_due',
+  cash_commission_settled: 'cash_commission_settled',
+  under_review: 'under_review',
+  payment_failed: 'payment_failed',
+  refunded: 'refunded',
+} as const;
+
+export interface AdminVisitPayment {
+  id: number;
+  bookingId: number;
+  clientId: number;
+  clientName: string;
+  partnerId: number;
+  partnerName: string;
+  amount: number;
+  commissionAmount: number;
+  partnerAmount: number;
+  method: AdminVisitPaymentMethod;
+  status: AdminVisitPaymentStatus;
+  /** @nullable */
+  issueType: string | null;
+  /** @nullable */
+  issueDetail: string | null;
+  /** @nullable */
+  completedAt: string | null;
+  /** @nullable */
+  releaseAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface AdminVisitPaymentPage {
+  items: AdminVisitPayment[];
+  total: number;
+  page: number;
+  limit: number;
+}
+
+export interface AdminVisitResolutionInput {
+  /**
+     * @minLength 5
+     * @maxLength 1000
+     */
+  detail: string;
+}
+
 export interface AdminReview {
   id: number;
   jobId: number;
@@ -301,6 +560,110 @@ export interface AdminRecommendationVisibilityInput {
      * @maxLength 1000
      */
   reason: string;
+}
+
+export interface AdminRecommendationRankingCandidate {
+  jobId: number;
+  /** @nullable */
+  partnerId: number | null;
+  partnerName: string;
+  clientId: number;
+  clientName: string;
+  category: string;
+  updatedAt: string;
+  messageCount: number;
+  acceptedVisitCount: number;
+}
+
+export type AdminRecommendationIncidentDecision = typeof AdminRecommendationIncidentDecision[keyof typeof AdminRecommendationIncidentDecision];
+
+
+export const AdminRecommendationIncidentDecision = {
+  confirmed: 'confirmed',
+  dismissed: 'dismissed',
+} as const;
+
+export interface AdminRecommendationIncident {
+  jobId: number;
+  /** @nullable */
+  partnerId: number | null;
+  partnerName: string;
+  clientName: string;
+  category: string;
+  decision: AdminRecommendationIncidentDecision;
+  /** @nullable */
+  reason: string | null;
+  reviewedAt: string;
+}
+
+/**
+ * @nullable
+ */
+export type AdminRecommendationRankingActivationProvider = typeof AdminRecommendationRankingActivationProvider[keyof typeof AdminRecommendationRankingActivationProvider] | null;
+
+
+export const AdminRecommendationRankingActivationProvider = {
+  mercado_pago: 'mercado_pago',
+  efectivo: 'efectivo',
+} as const;
+
+export interface AdminRecommendationRanking {
+  active: boolean;
+  windowDays: number;
+  incidentThreshold?: number;
+  /** @nullable */
+  activatedAt?: string | null;
+  /** @nullable */
+  activationProvider?: AdminRecommendationRankingActivationProvider;
+  candidates: AdminRecommendationRankingCandidate[];
+  incidents: AdminRecommendationIncident[];
+}
+
+export type AdminRecommendationIncidentDecisionInputDecision = typeof AdminRecommendationIncidentDecisionInputDecision[keyof typeof AdminRecommendationIncidentDecisionInputDecision];
+
+
+export const AdminRecommendationIncidentDecisionInputDecision = {
+  confirmed: 'confirmed',
+  dismissed: 'dismissed',
+} as const;
+
+export interface AdminRecommendationIncidentDecisionInput {
+  decision: AdminRecommendationIncidentDecisionInputDecision;
+  /**
+     * @minLength 5
+     * @maxLength 1000
+     */
+  reason: string;
+}
+
+export type AdminRecommendationIncidentDecisionResultDecision = typeof AdminRecommendationIncidentDecisionResultDecision[keyof typeof AdminRecommendationIncidentDecisionResultDecision];
+
+
+export const AdminRecommendationIncidentDecisionResultDecision = {
+  confirmed: 'confirmed',
+  dismissed: 'dismissed',
+} as const;
+
+export interface AdminRecommendationIncidentDecisionResult {
+  jobId: number;
+  decision: AdminRecommendationIncidentDecisionResultDecision;
+  unchanged: boolean;
+}
+
+export interface PartnerRecommendationRankingIncident {
+  jobId: number;
+  category: string;
+  reviewedAt: string;
+}
+
+export interface PartnerRecommendationRankingStatus {
+  active: boolean;
+  windowDays?: number;
+  incidentThreshold?: number;
+  confirmedRecentIncidentCount?: number;
+  cashVisitCommissionDue?: number;
+  visibilityAdjusted?: boolean;
+  incidents?: PartnerRecommendationRankingIncident[];
 }
 
 export interface AdminCatalogItem {
@@ -373,60 +736,6 @@ export interface AdminActivityPage {
   limit: number;
 }
 
-export type AdminVerificationDocumentTipo = typeof AdminVerificationDocumentTipo[keyof typeof AdminVerificationDocumentTipo];
-
-
-export const AdminVerificationDocumentTipo = {
-  dni_frente: 'dni_frente',
-  dni_dorso: 'dni_dorso',
-  antecedentes_penales: 'antecedentes_penales',
-} as const;
-
-export type AdminVerificationDocumentEstado = typeof AdminVerificationDocumentEstado[keyof typeof AdminVerificationDocumentEstado];
-
-
-export const AdminVerificationDocumentEstado = {
-  pending_verification: 'pending_verification',
-  verified: 'verified',
-  rejected: 'rejected',
-} as const;
-
-export type AdminVerificationDocumentPartner = {
-  id: number;
-  nombre: string;
-  email: string;
-};
-
-export type AdminVerificationDocumentPerfilEstadoVerificacion = typeof AdminVerificationDocumentPerfilEstadoVerificacion[keyof typeof AdminVerificationDocumentPerfilEstadoVerificacion];
-
-
-export const AdminVerificationDocumentPerfilEstadoVerificacion = {
-  pending_verification: 'pending_verification',
-  verified: 'verified',
-  rejected: 'rejected',
-} as const;
-
-export type AdminVerificationDocumentPerfil = {
-  oficio: string;
-  categoria: string;
-  estadoVerificacion: AdminVerificationDocumentPerfilEstadoVerificacion;
-} | null;
-
-export interface AdminVerificationDocument {
-  id: number;
-  profesionalId: number;
-  tipo: AdminVerificationDocumentTipo;
-  objectPath: string;
-  nombre: string;
-  contentType: string;
-  sizeBytes: number;
-  estado: AdminVerificationDocumentEstado;
-  createdAt: string;
-  updatedAt: string;
-  partner: AdminVerificationDocumentPartner;
-  perfil: AdminVerificationDocumentPerfil;
-}
-
 export type AdminVerificationDecisionInputEstado = typeof AdminVerificationDecisionInputEstado[keyof typeof AdminVerificationDecisionInputEstado];
 
 
@@ -481,15 +790,29 @@ export interface AuthCredentials {
   password: string;
 }
 
-export type AuthRegisterInputRol = typeof AuthRegisterInputRol[keyof typeof AuthRegisterInputRol];
+export interface MobileDeviceLoginRequest {
+  /** @maxLength 320 */
+  email: string;
+  /**
+     * @minLength 1
+     * @maxLength 200
+     */
+  password: string;
+  /**
+     * @minLength 32
+     * @maxLength 128
+     */
+  deviceId: string;
+}
+
+export type AccountRol = typeof AccountRol[keyof typeof AccountRol];
 
 
-export const AuthRegisterInputRol = {
+export const AccountRol = {
   cliente: 'cliente',
   profesional: 'profesional',
+  admin: 'admin',
 } as const;
-
-export type AuthRegisterInputOnboardingRespuestas = {[key: string]: string};
 
 export interface UserLocation {
   direccionTexto?: string;
@@ -500,6 +823,75 @@ export interface UserLocation {
   capturedAt?: string | null;
   coordinates?: number[];
 }
+
+export interface Account {
+  id: number;
+  nombre: string;
+  email: string;
+  /** @nullable */
+  emailVerifiedAt: string | null;
+  /** @nullable */
+  telefono?: string | null;
+  /** @nullable */
+  edad?: number | null;
+  /** @nullable */
+  fotoObjectPath?: string | null;
+  /**
+     * @minLength 3
+     * @maxLength 20
+     * @nullable
+     * @pattern ^[A-Za-z0-9_]{3,20}$
+     */
+  username?: string | null;
+  rol: AccountRol;
+  ubicacion?: UserLocation | null;
+  onboardingEstado?: string;
+  onboardingPaso?: number;
+}
+
+export interface MobileDeviceLoginResult {
+  requiresCode: boolean;
+  challengeId?: number;
+  message?: string;
+  token?: string;
+  usuario?: Account;
+}
+
+export interface MobileDeviceLoginConfirmation {
+  /** @maxLength 320 */
+  email: string;
+  /**
+     * @minLength 32
+     * @maxLength 128
+     */
+  deviceId: string;
+  challengeId: number;
+  /**
+     * @minLength 6
+     * @maxLength 6
+     * @pattern ^[0-9]{6}$
+     */
+  code: string;
+}
+
+export interface MobileTrustedDevice {
+  /** @pattern ^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$ */
+  deviceKey: string;
+  createdAt: string;
+  lastSeenAt: string;
+}
+
+export type MobileTrustedDevices = MobileTrustedDevice[];
+
+export type AuthRegisterInputRol = typeof AuthRegisterInputRol[keyof typeof AuthRegisterInputRol];
+
+
+export const AuthRegisterInputRol = {
+  cliente: 'cliente',
+  profesional: 'profesional',
+} as const;
+
+export type AuthRegisterInputOnboardingRespuestas = {[key: string]: string};
 
 export interface AuthRegisterInput {
   /**
@@ -527,6 +919,22 @@ export interface AuthRegisterInput {
 }
 
 export interface AccountEmailVerificationConfirmation {
+  /**
+     * @minLength 6
+     * @maxLength 6
+     * @pattern ^[0-9]{6}$
+     */
+  code: string;
+}
+
+export interface RegistrationEmailVerificationRequest {
+  /** @maxLength 320 */
+  email: string;
+}
+
+export interface RegistrationEmailVerificationConfirmation {
+  /** @maxLength 320 */
+  email: string;
   /**
      * @minLength 6
      * @maxLength 6
@@ -569,53 +977,34 @@ export interface AdminSignupCompletion {
   codigo: string;
 }
 
-export type AccountRol = typeof AccountRol[keyof typeof AccountRol];
-
-
-export const AccountRol = {
-  cliente: 'cliente',
-  profesional: 'profesional',
-  admin: 'admin',
-} as const;
-
-export interface Account {
-  id: number;
-  nombre: string;
-  email: string;
-  /** @nullable */
-  emailVerifiedAt: string | null;
-  /** @nullable */
-  telefono?: string | null;
-  /** @nullable */
-  edad?: number | null;
-  /** @nullable */
-  fotoObjectPath?: string | null;
-  rol: AccountRol;
-  ubicacion?: UserLocation | null;
-  onboardingEstado?: string;
-  onboardingPaso?: number;
-}
-
 export interface AuthSession {
   token: string;
   usuario: Account;
 }
 
-export interface ProfessionalLocationUpdate {
-  /**
-     * @minItems 2
-     * @maxItems 2
-     */
-  coordinates: number[];
+export interface TwoFactorLoginChallenge {
+  requiresTwoFactor: true;
+  challengeId: number;
+  maskedEmail: string;
 }
 
-export interface ProfessionalLocation {
+export interface TwoFactorLoginVerification {
+  challengeId: number;
+  /** @pattern ^[0-9]{6}$ */
+  code: string;
+}
+
+export interface TwoFactorSecurityStatus {
+  enabled: boolean;
+}
+
+export interface TwoFactorSecurityUpdate {
+  enabled: boolean;
   /**
-     * @minItems 2
-     * @maxItems 2
+     * @minLength 6
+     * @maxLength 200
      */
-  coordinates: number[];
-  capturedAt: string;
+  currentPassword: string;
 }
 
 export type AccountUpdateUbicacion = {
@@ -650,6 +1039,13 @@ export interface AccountUpdate {
      */
   telefono?: string | null;
   /**
+     * @minLength 3
+     * @maxLength 20
+     * @nullable
+     * @pattern ^[A-Za-z0-9_]{3,20}$
+     */
+  username?: string | null;
+  /**
      * @minimum 13
      * @maximum 120
      * @nullable
@@ -661,6 +1057,20 @@ export interface AccountUpdate {
      * @nullable
      */
   currentPassword?: string | null;
+}
+
+export interface ProfilePhotoUpdateInput {
+  /** @minLength 1 */
+  objectPath: string;
+}
+
+export interface ProfilePhotoUpdateResult {
+  fotoObjectPath: string;
+}
+
+export interface ProfilePhotoRemovalResult {
+  /** @nullable */
+  fotoObjectPath: string | null;
 }
 
 export type AccountRoleUpdateRol = typeof AccountRoleUpdateRol[keyof typeof AccountRoleUpdateRol];
@@ -755,6 +1165,8 @@ export interface ParticipantUser {
   /** @nullable */
   fotoObjectPath?: string | null;
   rol: ParticipantUserRol;
+  /** Present only in worker-facing views. */
+  clientVerified?: boolean;
   ubicacion?: UserLocation | null;
 }
 
@@ -767,11 +1179,19 @@ export const ProfessionalProfileEstadoVerificacion = {
   rejected: 'rejected',
 } as const;
 
+export interface ProfessionalFixedLocation {
+  direccionTexto: string;
+  ciudad: string;
+  /** @nullable */
+  provincia: string | null;
+}
+
 export interface ProfessionalProfile {
   id: number;
   usuarioId: number;
   oficio: string;
   categoria: string;
+  ubicacionFija: ProfessionalFixedLocation | null;
   /** @nullable */
   matriculaHabilitante?: string | null;
   verificado: boolean;
@@ -791,10 +1211,39 @@ export interface ProfessionalProfile {
   completedJobs: number;
   recommendationsCount: number;
   /**
-     * Distancia aproximada en kilómetros; es null cuando la ubicación del profesional no tiene un heartbeat vigente (máximo 5 minutos).
+     * Internal ordering tier; 1 means the profile is shown lower in discovery results.
+     * @minimum 0
+     * @maximum 1
+     */
+  visibilityRank?: number;
+  /**
+     * Distancia aproximada entre la ubicación en vivo del cliente y la ubicación fija del taller del profesional.
      * @nullable
      */
   distanceKm?: number | null;
+}
+
+export interface ProfessionalFixedLocationInput {
+  /**
+     * @minLength 3
+     * @maxLength 200
+     */
+  direccionTexto: string;
+  /**
+     * @minLength 2
+     * @maxLength 100
+     */
+  ciudad: string;
+  /**
+     * @maxLength 100
+     * @nullable
+     */
+  provincia?: string | null;
+  /**
+     * @minItems 2
+     * @maxItems 2
+     */
+  coordinates?: number[];
 }
 
 export interface ProfessionalProfileInput {
@@ -803,6 +1252,7 @@ export interface ProfessionalProfileInput {
   categoria: string;
   /** @minimum 0 */
   precioReferencia: number;
+  ubicacionFija: ProfessionalFixedLocationInput;
   /** @minimum 0 */
   experienciaAnios?: number;
   /** @nullable */
@@ -816,6 +1266,20 @@ export interface ProfessionalProfileInput {
 export interface ReputationAuthor {
   id: number;
   nombre: string;
+}
+
+export interface JobReviewInput {
+  changaId: number;
+  /**
+     * @minimum 1
+     * @maximum 5
+     */
+  rating: number;
+  /**
+     * @maxLength 2000
+     * @nullable
+     */
+  comentario?: string | null;
 }
 
 export type ProfessionalReviewAdjuntosItem = {
@@ -857,8 +1321,17 @@ export const JobEstado = {
   publicada: 'publicada',
   aceptada: 'aceptada',
   en_curso: 'en_curso',
+  trabajo_realizado: 'trabajo_realizado',
   finalizada: 'finalizada',
   cancelada: 'cancelada',
+} as const;
+
+export type JobPaymentMethod = typeof JobPaymentMethod[keyof typeof JobPaymentMethod];
+
+
+export const JobPaymentMethod = {
+  mercado_pago: 'mercado_pago',
+  efectivo: 'efectivo',
 } as const;
 
 export interface Job {
@@ -872,12 +1345,85 @@ export interface Job {
   /** @nullable */
   detalle: string | null;
   estado: JobEstado;
+  paymentMethod: JobPaymentMethod;
+  cashConfirmedByClient: boolean;
+  cashConfirmedByProfessional: boolean;
   createdAt: string;
   updatedAt: string;
   cliente: ParticipantUser;
   profesional: ParticipantUser | null;
   calificada: boolean;
 }
+
+export interface PaymentCheckoutInput {
+  /** @minimum 1 */
+  changaId: number;
+}
+
+export type PaymentCheckoutCurrency = typeof PaymentCheckoutCurrency[keyof typeof PaymentCheckoutCurrency];
+
+
+export const PaymentCheckoutCurrency = {
+  ARS: 'ARS',
+} as const;
+
+export type PaymentCheckoutStatus = typeof PaymentCheckoutStatus[keyof typeof PaymentCheckoutStatus];
+
+
+export const PaymentCheckoutStatus = {
+  pendiente: 'pendiente',
+  iniciado: 'iniciado',
+  aprobado: 'aprobado',
+  rechazado: 'rechazado',
+  reembolsado: 'reembolsado',
+} as const;
+
+export interface PaymentCheckout {
+  id: number;
+  changaId: number;
+  amount: number;
+  currency: PaymentCheckoutCurrency;
+  status: PaymentCheckoutStatus;
+  checkoutUrl: string;
+}
+
+export type ClientPaymentCurrency = typeof ClientPaymentCurrency[keyof typeof ClientPaymentCurrency];
+
+
+export const ClientPaymentCurrency = {
+  ARS: 'ARS',
+} as const;
+
+export type ClientPaymentStatus = typeof ClientPaymentStatus[keyof typeof ClientPaymentStatus];
+
+
+export const ClientPaymentStatus = {
+  pendiente: 'pendiente',
+  iniciado: 'iniciado',
+  aprobado: 'aprobado',
+  rechazado: 'rechazado',
+  reembolsado: 'reembolsado',
+} as const;
+
+export interface ClientPayment {
+  id: number;
+  changaId: number;
+  amount: number;
+  currency: ClientPaymentCurrency;
+  status: ClientPaymentStatus;
+  /** @nullable */
+  checkoutUrl: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type JobInputPaymentMethod = typeof JobInputPaymentMethod[keyof typeof JobInputPaymentMethod];
+
+
+export const JobInputPaymentMethod = {
+  mercado_pago: 'mercado_pago',
+  efectivo: 'efectivo',
+} as const;
 
 export interface JobInput {
   ubicacion: UserLocation;
@@ -892,6 +1438,7 @@ export interface JobInput {
   detalle?: string | null;
   /** @nullable */
   profesionalId?: number | null;
+  paymentMethod?: JobInputPaymentMethod;
 }
 
 export type JobUpdateEstado = typeof JobUpdateEstado[keyof typeof JobUpdateEstado];
@@ -901,12 +1448,34 @@ export const JobUpdateEstado = {
   publicada: 'publicada',
   aceptada: 'aceptada',
   en_curso: 'en_curso',
+  trabajo_realizado: 'trabajo_realizado',
   finalizada: 'finalizada',
   cancelada: 'cancelada',
 } as const;
 
+export type JobUpdatePaymentMethod = typeof JobUpdatePaymentMethod[keyof typeof JobUpdatePaymentMethod];
+
+
+export const JobUpdatePaymentMethod = {
+  mercado_pago: 'mercado_pago',
+  efectivo: 'efectivo',
+} as const;
+
 export interface JobUpdate {
-  estado: JobUpdateEstado;
+  estado?: JobUpdateEstado;
+  ubicacion?: UserLocation;
+  /** @minLength 2 */
+  categoria?: string;
+  /** @minimum 0 */
+  precioOfrecido?: number;
+  /**
+     * @minLength 3
+     * @nullable
+     */
+  detalle?: string | null;
+  /** @nullable */
+  profesionalId?: number | null;
+  paymentMethod?: JobUpdatePaymentMethod;
 }
 
 export interface MessageAttachment {
@@ -918,6 +1487,8 @@ export interface ChatMessage {
   id: number;
   changaId: number;
   emisorId: number;
+  /** @nullable */
+  conversacionProfesionalId: number | null;
   texto: string;
   adjuntos: MessageAttachment[];
   leido: boolean;
@@ -933,6 +1504,8 @@ export interface MessageInput {
   texto: string;
   /** @maxItems 5 */
   adjuntos?: MessageAttachment[];
+  /** @nullable */
+  profesionalId?: number | null;
 }
 
 export type UploadUrlRequestPurpose = typeof UploadUrlRequestPurpose[keyof typeof UploadUrlRequestPurpose];
@@ -941,7 +1514,16 @@ export type UploadUrlRequestPurpose = typeof UploadUrlRequestPurpose[keyof typeo
 export const UploadUrlRequestPurpose = {
   profile_photo: 'profile_photo',
   chat_image: 'chat_image',
+  client_verification: 'client_verification',
   file: 'file',
+} as const;
+
+export type UploadUrlRequestDocumentType = typeof UploadUrlRequestDocumentType[keyof typeof UploadUrlRequestDocumentType];
+
+
+export const UploadUrlRequestDocumentType = {
+  dni: 'dni',
+  selfie: 'selfie',
 } as const;
 
 export interface UploadUrlRequest {
@@ -952,7 +1534,9 @@ export interface UploadUrlRequest {
   /** @minLength 1 */
   contentType: string;
   purpose: UploadUrlRequestPurpose;
+  documentType?: UploadUrlRequestDocumentType;
   changaId?: number;
+  profesionalId?: number;
 }
 
 export type UploadUrlResponseMetadata = {
@@ -967,6 +1551,7 @@ export type UploadUrlResponsePurpose = typeof UploadUrlResponsePurpose[keyof typ
 export const UploadUrlResponsePurpose = {
   profile_photo: 'profile_photo',
   chat_image: 'chat_image',
+  client_verification: 'client_verification',
   file: 'file',
 } as const;
 
@@ -989,6 +1574,51 @@ export const AppointmentEstado = {
   cancelada: 'cancelada',
 } as const;
 
+export type VisitPaymentSummaryMethod = typeof VisitPaymentSummaryMethod[keyof typeof VisitPaymentSummaryMethod];
+
+
+export const VisitPaymentSummaryMethod = {
+  mercado_pago: 'mercado_pago',
+  efectivo: 'efectivo',
+} as const;
+
+export type VisitPaymentSummaryStatus = typeof VisitPaymentSummaryStatus[keyof typeof VisitPaymentSummaryStatus];
+
+
+export const VisitPaymentSummaryStatus = {
+  checkout_started: 'checkout_started',
+  pending_release: 'pending_release',
+  available: 'available',
+  cash_pending_visit: 'cash_pending_visit',
+  cash_commission_due: 'cash_commission_due',
+  cash_commission_settled: 'cash_commission_settled',
+  under_review: 'under_review',
+  payment_failed: 'payment_failed',
+  refunded: 'refunded',
+} as const;
+
+export interface VisitPaymentSummary {
+  amount: number;
+  commissionAmount: number;
+  partnerAmount: number;
+  method: VisitPaymentSummaryMethod;
+  status: VisitPaymentSummaryStatus;
+  /** @nullable */
+  partnerArrivedAt: string | null;
+  /** @nullable */
+  completedAt: string | null;
+  /** @nullable */
+  releaseAt: string | null;
+  /** @nullable */
+  clientConfirmedAt: string | null;
+  /** @nullable */
+  issueReportedAt: string | null;
+  /** @nullable */
+  issueType: string | null;
+  /** @nullable */
+  issueDetail: string | null;
+}
+
 export interface Appointment {
   id: number;
   changaId: number;
@@ -997,7 +1627,9 @@ export interface Appointment {
   empiezaAt: string;
   /** @nullable */
   terminaAt: string | null;
+  tarifaVisita: number;
   estado: AppointmentEstado;
+  finanzas: VisitPaymentSummary | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -1006,6 +1638,47 @@ export interface AppointmentInput {
   empiezaAt: string;
   /** @nullable */
   terminaAt?: string | null;
+  /**
+     * @minimum 1
+     * @maximum 10000000
+     */
+  tarifaVisita: number;
+}
+
+export type AcceptAppointmentInputPaymentMethod = typeof AcceptAppointmentInputPaymentMethod[keyof typeof AcceptAppointmentInputPaymentMethod];
+
+
+export const AcceptAppointmentInputPaymentMethod = {
+  mercado_pago: 'mercado_pago',
+  efectivo: 'efectivo',
+} as const;
+
+export interface AcceptAppointmentInput {
+  paymentMethod: AcceptAppointmentInputPaymentMethod;
+}
+
+export interface AcceptAppointmentResult {
+  appointment: Appointment;
+  /** @nullable */
+  checkoutUrl: string | null;
+}
+
+export type VisitIssueInputIssueType = typeof VisitIssueInputIssueType[keyof typeof VisitIssueInputIssueType];
+
+
+export const VisitIssueInputIssueType = {
+  partner_no_show: 'partner_no_show',
+  client_no_show: 'client_no_show',
+  other: 'other',
+} as const;
+
+export interface VisitIssueInput {
+  issueType: VisitIssueInputIssueType;
+  /**
+     * @minLength 5
+     * @maxLength 1000
+     */
+  detail: string;
 }
 
 export type AppointmentAttemptAccion = typeof AppointmentAttemptAccion[keyof typeof AppointmentAttemptAccion];
@@ -1087,12 +1760,15 @@ export const ConversationEstado = {
   publicada: 'publicada',
   aceptada: 'aceptada',
   en_curso: 'en_curso',
+  trabajo_realizado: 'trabajo_realizado',
   finalizada: 'finalizada',
   cancelada: 'cancelada',
 } as const;
 
 export interface Conversation {
   changaId: number;
+  /** @nullable */
+  profesionalId: number | null;
   estado: ConversationEstado;
   categoria: string;
   /** @nullable */
@@ -1103,8 +1779,31 @@ export interface Conversation {
   ultimoMensaje: ConversationLastMessage | null;
 }
 
+export type NotificationJobContextPaymentMethod = typeof NotificationJobContextPaymentMethod[keyof typeof NotificationJobContextPaymentMethod];
+
+
+export const NotificationJobContextPaymentMethod = {
+  mercado_pago: 'mercado_pago',
+  efectivo: 'efectivo',
+} as const;
+
+export interface NotificationJobContext {
+  changaId: number;
+  price: number;
+  paymentMethod: NotificationJobContextPaymentMethod;
+  paymentStatus: string;
+  /** @nullable */
+  paymentConfirmedAt: string | null;
+  /** @nullable */
+  workerName: string | null;
+  /** @nullable */
+  trade: string | null;
+}
+
 export interface WorkyNotification {
   id: number;
+  /** @nullable */
+  changaId?: number | null;
   tipo: string;
   titulo: string;
   /** @nullable */
@@ -1113,6 +1812,7 @@ export interface WorkyNotification {
   href: string | null;
   leida: boolean;
   createdAt: string;
+  jobContext?: NotificationJobContext | null;
 }
 
 export interface NotificationListResponse {
@@ -1139,6 +1839,54 @@ export interface PartnerDashboardResponse {
   notificacionesNoLeidas: number;
 }
 
+export type PartnerVisitBalanceItemMethod = typeof PartnerVisitBalanceItemMethod[keyof typeof PartnerVisitBalanceItemMethod];
+
+
+export const PartnerVisitBalanceItemMethod = {
+  mercado_pago: 'mercado_pago',
+  efectivo: 'efectivo',
+} as const;
+
+export interface PartnerVisitBalanceItem {
+  bookingId: number;
+  amount: number;
+  commissionAmount: number;
+  partnerAmount: number;
+  method: PartnerVisitBalanceItemMethod;
+  status: string;
+  /** @nullable */
+  releaseAt: string | null;
+  createdAt: string;
+}
+
+export type PartnerCashJobCommissionItemStatus = typeof PartnerCashJobCommissionItemStatus[keyof typeof PartnerCashJobCommissionItemStatus];
+
+
+export const PartnerCashJobCommissionItemStatus = {
+  due: 'due',
+  settled: 'settled',
+} as const;
+
+export interface PartnerCashJobCommissionItem {
+  changaId: number;
+  commissionRate: number;
+  amount: number;
+  remainingAmount: number;
+  status: PartnerCashJobCommissionItemStatus;
+  createdAt: string;
+  /** @nullable */
+  settledAt: string | null;
+}
+
+export interface PartnerVisitBalance {
+  availableAmount: number;
+  pendingAmount: number;
+  cashCommissionDue: number;
+  cashJobCommissionDue: number;
+  items: PartnerVisitBalanceItem[];
+  cashJobCommissions: PartnerCashJobCommissionItem[];
+}
+
 export type ListAdminAccountsParams = {
 search?: string;
 role?: ListAdminAccountsRole;
@@ -1162,6 +1910,12 @@ export const ListAdminAccountsRole = {
   profesional: 'profesional',
   admin: 'admin',
 } as const;
+
+export type ListAdminPartnerApplicationsParams = {
+page?: number;
+limit?: number;
+search?: string;
+};
 
 export type ListAdminPartnersParams = {
 search?: string;
@@ -1231,6 +1985,19 @@ limit?: number;
 
 export type ListAdminSettlementsParams = {
 search?: string;
+status?: string;
+/**
+ * @minimum 1
+ */
+page?: number;
+/**
+ * @minimum 1
+ * @maximum 100
+ */
+limit?: number;
+};
+
+export type ListAdminVisitPaymentsParams = {
 status?: string;
 /**
  * @minimum 1
@@ -1317,6 +2084,22 @@ export const ListAdminVerificationsEstado = {
   rejected: 'rejected',
 } as const;
 
+export type ListAdminClientVerificationsParams = {
+/**
+ * @minimum 1
+ */
+page?: number;
+/**
+ * @minimum 1
+ * @maximum 100
+ */
+limit?: number;
+/**
+ * @maxLength 120
+ */
+search?: string;
+};
+
 export type ListProfessionalsParams = {
 categoria?: string;
 search?: string;
@@ -1335,6 +2118,12 @@ latitud?: number;
  * @maximum 180
  */
 longitud?: number;
+};
+
+export type CreateJobReview201 = {
+  id: number;
+  changaId: number;
+  rating: number;
 };
 
 export type ListConversationsParams = {

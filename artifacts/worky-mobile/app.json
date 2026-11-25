@@ -7,10 +7,16 @@
     "icon": "./assets/images/icon.png",
     "scheme": "worky-mobile",
     "userInterfaceStyle": "automatic",
+    "androidStatusBar": {
+      "backgroundColor": "#203655",
+      "barStyle": "light-content",
+      "translucent": true
+    },
     "ios": {
       "supportsTablet": false
     },
     "android": {
+      "package": "com.workyoficios.app",
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/icon.png",
         "backgroundColor": "#042133"
@@ -21,6 +27,20 @@
     },
     "plugins": [
       "expo-router",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Worky necesita acceso a tus fotos para seleccionar la imagen de tu DNI.",
+          "cameraPermission": "Worky necesita usar la cámara para tomar tu selfie de verificación.",
+          "microphonePermission": false
+        }
+      ],
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "Worky usa tu ubicación mientras buscás profesionales o registrás el punto fijo de tu taller."
+        }
+      ],
       [
         "expo-splash-screen",
         {

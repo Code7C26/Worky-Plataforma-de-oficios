@@ -27,7 +27,12 @@ export function signToken(usuarioId: number) {
   return jwt.sign({ usuarioId }, secret(), { expiresIn: "7d" });
 }
 
-export async function requireAuth(req: Request, res: Response, next: NextFunction) {
+async function authenticate(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+  allowUnverifiedEmail: boolean,
+) {
   const header = req.header("authorization");
   if (!header?.startsWith("Bearer ")) return res.status(401).json({ error: "Necesitás iniciar sesión." });
   let usuarioId: number;
@@ -37,11 +42,28 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
     return res.status(401).json({ error: "Tu sesión expiró. Volvé a iniciar sesión." });
   }
   try {
-    const [account] = await db.select({ active: users.activo }).from(users).where(eq(users.id, usuarioId)).limit(1);
+    const [account] = await db.select({
+      active: users.activo,
+      emailVerifiedAt: users.emailVerifiedAt,
+    }).from(users).where(eq(users.id, usuarioId)).limit(1);
     if (!account?.active) return res.status(401).json({ error: "La cuenta no está activa." });
+    if (!allowUnverifiedEmail && !account.emailVerifiedAt) {
+      return res.status(403).json({
+        error: "Verificá tu email para seguir usando Worky.",
+        code: "EMAIL_NOT_VERIFIED",
+      });
+    }
     req.usuarioId = usuarioId;
     return next();
   } catch (error) {
     return next(error);
   }
+}
+
+export function requireAuth(req: Request, res: Response, next: NextFunction) {
+  return authenticate(req, res, next, false);
+}
+
+export function requireAuthAllowingUnverifiedEmail(req: Request, res: Response, next: NextFunction) {
+  return authenticate(req, res, next, true);
 }

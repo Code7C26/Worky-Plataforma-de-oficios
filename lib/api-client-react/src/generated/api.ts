@@ -20,6 +20,8 @@ import type {
 } from '@tanstack/react-query';
 
 import type {
+  AcceptAppointmentInput,
+  AcceptAppointmentResult,
   Account,
   AccountEmailVerificationConfirmation,
   AccountRoleUpdate,
@@ -32,17 +34,27 @@ import type {
   AdminCatalogInput,
   AdminCatalogItem,
   AdminCatalogUpdate,
+  AdminClientIdentityVerificationPage,
+  AdminClientIdentityVerificationReviewInput,
   AdminDashboard,
   AdminJobPage,
+  AdminManagerPage,
   AdminPartner,
   AdminPartnerActivationInput,
+  AdminPartnerApplicationPage,
   AdminPartnerPage,
   AdminPaymentPage,
   AdminRecommendation,
+  AdminRecommendationIncidentDecisionInput,
+  AdminRecommendationIncidentDecisionResult,
   AdminRecommendationPage,
+  AdminRecommendationRanking,
   AdminRecommendationVisibilityInput,
   AdminResourcePage,
   AdminReviewPage,
+  AdminRoleGrantInput,
+  AdminRoleGrantResult,
+  AdminRoleRevokeInput,
   AdminSettlementPage,
   AdminSignupCompletion,
   AdminSignupRequest,
@@ -50,6 +62,9 @@ import type {
   AdminVerificationDecisionInput,
   AdminVerificationDecisionResult,
   AdminVerificationDocument,
+  AdminVisitPayment,
+  AdminVisitPaymentPage,
+  AdminVisitResolutionInput,
   Appointment,
   AppointmentAttempt,
   AppointmentAttemptInput,
@@ -58,17 +73,23 @@ import type {
   AuthRegisterInput,
   AuthSession,
   ChatMessage,
+  ClientIdentityVerificationStatus,
+  ClientPayment,
   Conversation,
+  CreateJobReview201,
   EmailVerificationMessage,
   EmailVerificationResult,
   HealthStatus,
   Job,
   JobInput,
+  JobReviewInput,
   JobUpdate,
   ListAdminAccountsParams,
   ListAdminActivityParams,
   ListAdminBookingsParams,
+  ListAdminClientVerificationsParams,
   ListAdminJobsParams,
+  ListAdminPartnerApplicationsParams,
   ListAdminPartnersParams,
   ListAdminPaymentsParams,
   ListAdminRecommendationsParams,
@@ -76,23 +97,41 @@ import type {
   ListAdminReviewsParams,
   ListAdminSettlementsParams,
   ListAdminVerificationsParams,
+  ListAdminVisitPaymentsParams,
   ListConversationsParams,
   ListProfessionalsParams,
   MessageInput,
+  MobileDeviceLoginConfirmation,
+  MobileDeviceLoginRequest,
+  MobileDeviceLoginResult,
+  MobileTrustedDevices,
   NotificationListResponse,
   OperationResult,
   PartnerDashboardResponse,
+  PartnerRecommendationRankingStatus,
+  PartnerVisitBalance,
   PasswordChange,
   PasswordRecoveryRequest,
   PasswordRecoveryReset,
   PasswordRecoveryResponse,
-  ProfessionalLocation,
-  ProfessionalLocationUpdate,
+  PaymentCheckout,
+  PaymentCheckoutInput,
   ProfessionalProfile,
   ProfessionalProfileInput,
   ProfessionalReputation,
+  ProfilePhotoRemovalResult,
+  ProfilePhotoUpdateInput,
+  ProfilePhotoUpdateResult,
+  RegistrationEmailVerificationConfirmation,
+  RegistrationEmailVerificationRequest,
+  SubmitClientIdentityVerificationInput,
+  TwoFactorLoginChallenge,
+  TwoFactorLoginVerification,
+  TwoFactorSecurityStatus,
+  TwoFactorSecurityUpdate,
   UploadUrlRequest,
   UploadUrlResponse,
+  VisitIssueInput,
   WorkyNotification
 } from './api.schemas';
 
@@ -284,6 +323,155 @@ export function useListAdminAccounts<TData = Awaited<ReturnType<typeof listAdmin
 
 
 
+export const getListAdminManagersUrl = () => {
+
+
+
+
+  return `/api/v1/admin/admins`
+}
+
+/**
+ * @summary List administrator accounts for the primary administrator
+ */
+export const listAdminManagers = async ( options?: Parameters<typeof customFetch>[1]): Promise<AdminManagerPage> => {
+
+  return customFetch<AdminManagerPage>(getListAdminManagersUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListAdminManagersQueryKey = () => {
+    return [
+    `/api/v1/admin/admins`
+    ] as const;
+    }
+
+
+export const getListAdminManagersQueryOptions = <TData = Awaited<ReturnType<typeof listAdminManagers>>, TError = ErrorType<void>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listAdminManagers>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListAdminManagersQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listAdminManagers>>> = ({ signal }) => listAdminManagers({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listAdminManagers>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListAdminManagersQueryResult = NonNullable<Awaited<ReturnType<typeof listAdminManagers>>>
+export type ListAdminManagersQueryError = ErrorType<void>
+
+
+/**
+ * @summary List administrator accounts for the primary administrator
+ */
+
+export function useListAdminManagers<TData = Awaited<ReturnType<typeof listAdminManagers>>, TError = ErrorType<void>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listAdminManagers>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListAdminManagersQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getRevokeAdminRoleUrl = (id: number,) => {
+
+
+
+
+  return `/api/v1/admin/admins/${id}/role`
+}
+
+/**
+ * @summary Remove an administrator role
+ */
+export const revokeAdminRole = async (id: number,
+    adminRoleRevokeInput: AdminRoleRevokeInput, options?: Parameters<typeof customFetch>[1]): Promise<void> => {
+
+  return customFetch<void>(getRevokeAdminRoleUrl(id),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(adminRoleRevokeInput)
+  }
+);}
+
+
+
+
+
+export const getRevokeAdminRoleMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof revokeAdminRole>>, TError,{id: number;data: BodyType<AdminRoleRevokeInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof revokeAdminRole>>, TError,{id: number;data: BodyType<AdminRoleRevokeInput>}, TContext> => {
+
+const mutationKey = ['revokeAdminRole'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof revokeAdminRole>>, {id: number;data: BodyType<AdminRoleRevokeInput>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  revokeAdminRole(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type RevokeAdminRoleMutationResult = NonNullable<Awaited<ReturnType<typeof revokeAdminRole>>>
+    export type RevokeAdminRoleMutationBody = BodyType<AdminRoleRevokeInput>
+    export type RevokeAdminRoleMutationError = ErrorType<void>
+
+    /**
+ * @summary Remove an administrator role
+ */
+export const useRevokeAdminRole = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof revokeAdminRole>>, TError,{id: number;data: BodyType<AdminRoleRevokeInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof revokeAdminRole>>,
+        TError,
+        {id: number;data: BodyType<AdminRoleRevokeInput>},
+        TContext
+      > => {
+      return useMutation(getRevokeAdminRoleMutationOptions(options));
+    }
+
 export const getUpdateAdminAccountStatusUrl = (id: number,) => {
 
 
@@ -355,6 +543,162 @@ export const useUpdateAdminAccountStatus = <TError = ErrorType<void>,
       > => {
       return useMutation(getUpdateAdminAccountStatusMutationOptions(options));
     }
+
+export const getGrantAdminRoleUrl = () => {
+
+
+
+
+  return `/api/v1/admin/cuentas/rol`
+}
+
+/**
+ * Requires the configured primary administrator and records an audit event.
+ * @summary Assign the administrator role to a verified active account
+ */
+export const grantAdminRole = async (adminRoleGrantInput: AdminRoleGrantInput, options?: Parameters<typeof customFetch>[1]): Promise<AdminRoleGrantResult> => {
+
+  return customFetch<AdminRoleGrantResult>(getGrantAdminRoleUrl(),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(adminRoleGrantInput)
+  }
+);}
+
+
+
+
+
+export const getGrantAdminRoleMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof grantAdminRole>>, TError,{data: BodyType<AdminRoleGrantInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof grantAdminRole>>, TError,{data: BodyType<AdminRoleGrantInput>}, TContext> => {
+
+const mutationKey = ['grantAdminRole'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof grantAdminRole>>, {data: BodyType<AdminRoleGrantInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  grantAdminRole(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type GrantAdminRoleMutationResult = NonNullable<Awaited<ReturnType<typeof grantAdminRole>>>
+    export type GrantAdminRoleMutationBody = BodyType<AdminRoleGrantInput>
+    export type GrantAdminRoleMutationError = ErrorType<void>
+
+    /**
+ * @summary Assign the administrator role to a verified active account
+ */
+export const useGrantAdminRole = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof grantAdminRole>>, TError,{data: BodyType<AdminRoleGrantInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof grantAdminRole>>,
+        TError,
+        {data: BodyType<AdminRoleGrantInput>},
+        TContext
+      > => {
+      return useMutation(getGrantAdminRoleMutationOptions(options));
+    }
+
+export const getListAdminPartnerApplicationsUrl = (params?: ListAdminPartnerApplicationsParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/v1/admin/partner-applications?${stringifiedParams}` : `/api/v1/admin/partner-applications`
+}
+
+/**
+ * @summary Solicitudes de habilitación agrupadas por perfil con documentación privada
+ */
+export const listAdminPartnerApplications = async (params?: ListAdminPartnerApplicationsParams, options?: Parameters<typeof customFetch>[1]): Promise<AdminPartnerApplicationPage> => {
+
+  return customFetch<AdminPartnerApplicationPage>(getListAdminPartnerApplicationsUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListAdminPartnerApplicationsQueryKey = (params?: ListAdminPartnerApplicationsParams,) => {
+    return [
+    `/api/v1/admin/partner-applications`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getListAdminPartnerApplicationsQueryOptions = <TData = Awaited<ReturnType<typeof listAdminPartnerApplications>>, TError = ErrorType<void>>(params?: ListAdminPartnerApplicationsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listAdminPartnerApplications>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListAdminPartnerApplicationsQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listAdminPartnerApplications>>> = ({ signal }) => listAdminPartnerApplications(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listAdminPartnerApplications>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListAdminPartnerApplicationsQueryResult = NonNullable<Awaited<ReturnType<typeof listAdminPartnerApplications>>>
+export type ListAdminPartnerApplicationsQueryError = ErrorType<void>
+
+
+/**
+ * @summary Solicitudes de habilitación agrupadas por perfil con documentación privada
+ */
+
+export function useListAdminPartnerApplications<TData = Awaited<ReturnType<typeof listAdminPartnerApplications>>, TError = ErrorType<void>>(
+ params?: ListAdminPartnerApplicationsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listAdminPartnerApplications>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListAdminPartnerApplicationsQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
 
 export const getListAdminPartnersUrl = (params?: ListAdminPartnersParams,) => {
   const normalizedParams = new URLSearchParams();
@@ -848,6 +1192,162 @@ export function useListAdminSettlements<TData = Awaited<ReturnType<typeof listAd
 
 
 
+export const getListAdminVisitPaymentsUrl = (params?: ListAdminVisitPaymentsParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/v1/admin/visits?${stringifiedParams}` : `/api/v1/admin/visits`
+}
+
+/**
+ * @summary Search visit payments and reports
+ */
+export const listAdminVisitPayments = async (params?: ListAdminVisitPaymentsParams, options?: Parameters<typeof customFetch>[1]): Promise<AdminVisitPaymentPage> => {
+
+  return customFetch<AdminVisitPaymentPage>(getListAdminVisitPaymentsUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListAdminVisitPaymentsQueryKey = (params?: ListAdminVisitPaymentsParams,) => {
+    return [
+    `/api/v1/admin/visits`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getListAdminVisitPaymentsQueryOptions = <TData = Awaited<ReturnType<typeof listAdminVisitPayments>>, TError = ErrorType<void>>(params?: ListAdminVisitPaymentsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listAdminVisitPayments>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListAdminVisitPaymentsQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listAdminVisitPayments>>> = ({ signal }) => listAdminVisitPayments(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listAdminVisitPayments>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListAdminVisitPaymentsQueryResult = NonNullable<Awaited<ReturnType<typeof listAdminVisitPayments>>>
+export type ListAdminVisitPaymentsQueryError = ErrorType<void>
+
+
+/**
+ * @summary Search visit payments and reports
+ */
+
+export function useListAdminVisitPayments<TData = Awaited<ReturnType<typeof listAdminVisitPayments>>, TError = ErrorType<void>>(
+ params?: ListAdminVisitPaymentsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listAdminVisitPayments>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListAdminVisitPaymentsQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getResolveAdminVisitPaymentUrl = (id: number,) => {
+
+
+
+
+  return `/api/v1/admin/visits/${id}/resolver`
+}
+
+/**
+ * @summary Release a held visit balance after review
+ */
+export const resolveAdminVisitPayment = async (id: number,
+    adminVisitResolutionInput: AdminVisitResolutionInput, options?: Parameters<typeof customFetch>[1]): Promise<AdminVisitPayment> => {
+
+  return customFetch<AdminVisitPayment>(getResolveAdminVisitPaymentUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(adminVisitResolutionInput)
+  }
+);}
+
+
+
+
+
+export const getResolveAdminVisitPaymentMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof resolveAdminVisitPayment>>, TError,{id: number;data: BodyType<AdminVisitResolutionInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof resolveAdminVisitPayment>>, TError,{id: number;data: BodyType<AdminVisitResolutionInput>}, TContext> => {
+
+const mutationKey = ['resolveAdminVisitPayment'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof resolveAdminVisitPayment>>, {id: number;data: BodyType<AdminVisitResolutionInput>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  resolveAdminVisitPayment(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ResolveAdminVisitPaymentMutationResult = NonNullable<Awaited<ReturnType<typeof resolveAdminVisitPayment>>>
+    export type ResolveAdminVisitPaymentMutationBody = BodyType<AdminVisitResolutionInput>
+    export type ResolveAdminVisitPaymentMutationError = ErrorType<void>
+
+    /**
+ * @summary Release a held visit balance after review
+ */
+export const useResolveAdminVisitPayment = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof resolveAdminVisitPayment>>, TError,{id: number;data: BodyType<AdminVisitResolutionInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof resolveAdminVisitPayment>>,
+        TError,
+        {id: number;data: BodyType<AdminVisitResolutionInput>},
+        TContext
+      > => {
+      return useMutation(getResolveAdminVisitPaymentMutationOptions(options));
+    }
+
 export const getListAdminReviewsUrl = (params?: ListAdminReviewsParams,) => {
   const normalizedParams = new URLSearchParams();
 
@@ -1086,6 +1586,156 @@ export const useUpdateAdminRecommendationVisibility = <TError = ErrorType<void>,
         TContext
       > => {
       return useMutation(getUpdateAdminRecommendationVisibilityMutationOptions(options));
+    }
+
+export const getGetAdminRecommendationRankingUrl = () => {
+
+
+
+
+  return `/api/v1/admin/ranking`
+}
+
+/**
+ * Returns no signals until a real, confirmed job payment exists in the production environment.
+ * @summary Get the production-gated recommendation ranking review queue
+ */
+export const getAdminRecommendationRanking = async ( options?: Parameters<typeof customFetch>[1]): Promise<AdminRecommendationRanking> => {
+
+  return customFetch<AdminRecommendationRanking>(getGetAdminRecommendationRankingUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetAdminRecommendationRankingQueryKey = () => {
+    return [
+    `/api/v1/admin/ranking`
+    ] as const;
+    }
+
+
+export const getGetAdminRecommendationRankingQueryOptions = <TData = Awaited<ReturnType<typeof getAdminRecommendationRanking>>, TError = ErrorType<void>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getAdminRecommendationRanking>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetAdminRecommendationRankingQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getAdminRecommendationRanking>>> = ({ signal }) => getAdminRecommendationRanking({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getAdminRecommendationRanking>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetAdminRecommendationRankingQueryResult = NonNullable<Awaited<ReturnType<typeof getAdminRecommendationRanking>>>
+export type GetAdminRecommendationRankingQueryError = ErrorType<void>
+
+
+/**
+ * @summary Get the production-gated recommendation ranking review queue
+ */
+
+export function useGetAdminRecommendationRanking<TData = Awaited<ReturnType<typeof getAdminRecommendationRanking>>, TError = ErrorType<void>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getAdminRecommendationRanking>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetAdminRecommendationRankingQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getReviewAdminRecommendationRankingIncidentUrl = (jobId: number,) => {
+
+
+
+
+  return `/api/v1/admin/ranking/incidents/${jobId}`
+}
+
+/**
+ * @summary Confirm or dismiss a structured activity signal
+ */
+export const reviewAdminRecommendationRankingIncident = async (jobId: number,
+    adminRecommendationIncidentDecisionInput: AdminRecommendationIncidentDecisionInput, options?: Parameters<typeof customFetch>[1]): Promise<AdminRecommendationIncidentDecisionResult> => {
+
+  return customFetch<AdminRecommendationIncidentDecisionResult>(getReviewAdminRecommendationRankingIncidentUrl(jobId),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(adminRecommendationIncidentDecisionInput)
+  }
+);}
+
+
+
+
+
+export const getReviewAdminRecommendationRankingIncidentMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof reviewAdminRecommendationRankingIncident>>, TError,{jobId: number;data: BodyType<AdminRecommendationIncidentDecisionInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof reviewAdminRecommendationRankingIncident>>, TError,{jobId: number;data: BodyType<AdminRecommendationIncidentDecisionInput>}, TContext> => {
+
+const mutationKey = ['reviewAdminRecommendationRankingIncident'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof reviewAdminRecommendationRankingIncident>>, {jobId: number;data: BodyType<AdminRecommendationIncidentDecisionInput>}> = (props) => {
+          const {jobId,data} = props ?? {};
+
+          return  reviewAdminRecommendationRankingIncident(jobId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ReviewAdminRecommendationRankingIncidentMutationResult = NonNullable<Awaited<ReturnType<typeof reviewAdminRecommendationRankingIncident>>>
+    export type ReviewAdminRecommendationRankingIncidentMutationBody = BodyType<AdminRecommendationIncidentDecisionInput>
+    export type ReviewAdminRecommendationRankingIncidentMutationError = ErrorType<void>
+
+    /**
+ * @summary Confirm or dismiss a structured activity signal
+ */
+export const useReviewAdminRecommendationRankingIncident = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof reviewAdminRecommendationRankingIncident>>, TError,{jobId: number;data: BodyType<AdminRecommendationIncidentDecisionInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof reviewAdminRecommendationRankingIncident>>,
+        TError,
+        {jobId: number;data: BodyType<AdminRecommendationIncidentDecisionInput>},
+        TContext
+      > => {
+      return useMutation(getReviewAdminRecommendationRankingIncidentMutationOptions(options));
     }
 
 export const getListAdminCatalogUrl = () => {
@@ -1632,6 +2282,244 @@ export const useResolveAdminVerification = <TError = ErrorType<void>,
       return useMutation(getResolveAdminVerificationMutationOptions(options));
     }
 
+export const getListAdminClientVerificationsUrl = (params?: ListAdminClientVerificationsParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/v1/admin/client-verifications?${stringifiedParams}` : `/api/v1/admin/client-verifications`
+}
+
+/**
+ * @summary List customer identity requests awaiting private review
+ */
+export const listAdminClientVerifications = async (params?: ListAdminClientVerificationsParams, options?: Parameters<typeof customFetch>[1]): Promise<AdminClientIdentityVerificationPage> => {
+
+  return customFetch<AdminClientIdentityVerificationPage>(getListAdminClientVerificationsUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListAdminClientVerificationsQueryKey = (params?: ListAdminClientVerificationsParams,) => {
+    return [
+    `/api/v1/admin/client-verifications`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getListAdminClientVerificationsQueryOptions = <TData = Awaited<ReturnType<typeof listAdminClientVerifications>>, TError = ErrorType<void>>(params?: ListAdminClientVerificationsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listAdminClientVerifications>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListAdminClientVerificationsQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listAdminClientVerifications>>> = ({ signal }) => listAdminClientVerifications(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listAdminClientVerifications>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListAdminClientVerificationsQueryResult = NonNullable<Awaited<ReturnType<typeof listAdminClientVerifications>>>
+export type ListAdminClientVerificationsQueryError = ErrorType<void>
+
+
+/**
+ * @summary List customer identity requests awaiting private review
+ */
+
+export function useListAdminClientVerifications<TData = Awaited<ReturnType<typeof listAdminClientVerifications>>, TError = ErrorType<void>>(
+ params?: ListAdminClientVerificationsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listAdminClientVerifications>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListAdminClientVerificationsQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getReviewAdminClientVerificationUrl = (id: number,) => {
+
+
+
+
+  return `/api/v1/admin/client-verifications/${id}`
+}
+
+/**
+ * @summary Approve or reject a customer identity request and delete its files
+ */
+export const reviewAdminClientVerification = async (id: number,
+    adminClientIdentityVerificationReviewInput: AdminClientIdentityVerificationReviewInput, options?: Parameters<typeof customFetch>[1]): Promise<ClientIdentityVerificationStatus> => {
+
+  return customFetch<ClientIdentityVerificationStatus>(getReviewAdminClientVerificationUrl(id),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(adminClientIdentityVerificationReviewInput)
+  }
+);}
+
+
+
+
+
+export const getReviewAdminClientVerificationMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof reviewAdminClientVerification>>, TError,{id: number;data: BodyType<AdminClientIdentityVerificationReviewInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof reviewAdminClientVerification>>, TError,{id: number;data: BodyType<AdminClientIdentityVerificationReviewInput>}, TContext> => {
+
+const mutationKey = ['reviewAdminClientVerification'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof reviewAdminClientVerification>>, {id: number;data: BodyType<AdminClientIdentityVerificationReviewInput>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  reviewAdminClientVerification(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ReviewAdminClientVerificationMutationResult = NonNullable<Awaited<ReturnType<typeof reviewAdminClientVerification>>>
+    export type ReviewAdminClientVerificationMutationBody = BodyType<AdminClientIdentityVerificationReviewInput>
+    export type ReviewAdminClientVerificationMutationError = ErrorType<void>
+
+    /**
+ * @summary Approve or reject a customer identity request and delete its files
+ */
+export const useReviewAdminClientVerification = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof reviewAdminClientVerification>>, TError,{id: number;data: BodyType<AdminClientIdentityVerificationReviewInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof reviewAdminClientVerification>>,
+        TError,
+        {id: number;data: BodyType<AdminClientIdentityVerificationReviewInput>},
+        TContext
+      > => {
+      return useMutation(getReviewAdminClientVerificationMutationOptions(options));
+    }
+
+export const getGetAdminClientVerificationFileUrl = (id: number,
+    kind: 'dni' | 'selfie',) => {
+
+
+
+
+  return `/api/v1/admin/client-verifications/${id}/files/${kind}`
+}
+
+/**
+ * @summary Stream one private customer identity image to an administrator
+ */
+export const getAdminClientVerificationFile = async (id: number,
+    kind: 'dni' | 'selfie', options?: Parameters<typeof customFetch>[1]): Promise<Blob> => {
+
+  return customFetch<Blob>(getGetAdminClientVerificationFileUrl(id,kind),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetAdminClientVerificationFileQueryKey = (id: number,
+    kind: 'dni' | 'selfie',) => {
+    return [
+    `/api/v1/admin/client-verifications/${id}/files/${kind}`
+    ] as const;
+    }
+
+
+export const getGetAdminClientVerificationFileQueryOptions = <TData = Awaited<ReturnType<typeof getAdminClientVerificationFile>>, TError = ErrorType<void>>(id: number,
+    kind: 'dni' | 'selfie', options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getAdminClientVerificationFile>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetAdminClientVerificationFileQueryKey(id,kind);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getAdminClientVerificationFile>>> = ({ signal }) => getAdminClientVerificationFile(id,kind, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: id !== null && id !== undefined && kind !== null && kind !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getAdminClientVerificationFile>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetAdminClientVerificationFileQueryResult = NonNullable<Awaited<ReturnType<typeof getAdminClientVerificationFile>>>
+export type GetAdminClientVerificationFileQueryError = ErrorType<void>
+
+
+/**
+ * @summary Stream one private customer identity image to an administrator
+ */
+
+export function useGetAdminClientVerificationFile<TData = Awaited<ReturnType<typeof getAdminClientVerificationFile>>, TError = ErrorType<void>>(
+ id: number,
+    kind: 'dni' | 'selfie', options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getAdminClientVerificationFile>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetAdminClientVerificationFileQueryOptions(id,kind,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
 export const getHealthCheckUrl = () => {
 
 
@@ -1790,11 +2678,11 @@ export const getRegisterAccountUrl = () => {
 }
 
 /**
- * @summary Create an account
+ * @summary Create an account and send an email verification code
  */
-export const registerAccount = async (authRegisterInput: AuthRegisterInput, options?: Parameters<typeof customFetch>[1]): Promise<AuthSession> => {
+export const registerAccount = async (authRegisterInput: AuthRegisterInput, options?: Parameters<typeof customFetch>[1]): Promise<EmailVerificationMessage> => {
 
-  return customFetch<AuthSession>(getRegisterAccountUrl(),
+  return customFetch<EmailVerificationMessage>(getRegisterAccountUrl(),
   {
     ...options,
     method: 'POST',
@@ -1839,7 +2727,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type RegisterAccountMutationError = ErrorType<void>
 
     /**
- * @summary Create an account
+ * @summary Create an account and send an email verification code
  */
 export const useRegisterAccount = <TError = ErrorType<void>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof registerAccount>>, TError,{data: BodyType<AuthRegisterInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
@@ -1850,6 +2738,148 @@ export const useRegisterAccount = <TError = ErrorType<void>,
         TContext
       > => {
       return useMutation(getRegisterAccountMutationOptions(options));
+    }
+
+export const getRequestRegistrationEmailVerificationUrl = () => {
+
+
+
+
+  return `/api/v1/auth/email-verification/registration/request`
+}
+
+/**
+ * @summary Resend a registration email verification code
+ */
+export const requestRegistrationEmailVerification = async (registrationEmailVerificationRequest: RegistrationEmailVerificationRequest, options?: Parameters<typeof customFetch>[1]): Promise<EmailVerificationMessage> => {
+
+  return customFetch<EmailVerificationMessage>(getRequestRegistrationEmailVerificationUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(registrationEmailVerificationRequest)
+  }
+);}
+
+
+
+
+
+export const getRequestRegistrationEmailVerificationMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof requestRegistrationEmailVerification>>, TError,{data: BodyType<RegistrationEmailVerificationRequest>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof requestRegistrationEmailVerification>>, TError,{data: BodyType<RegistrationEmailVerificationRequest>}, TContext> => {
+
+const mutationKey = ['requestRegistrationEmailVerification'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof requestRegistrationEmailVerification>>, {data: BodyType<RegistrationEmailVerificationRequest>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  requestRegistrationEmailVerification(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type RequestRegistrationEmailVerificationMutationResult = NonNullable<Awaited<ReturnType<typeof requestRegistrationEmailVerification>>>
+    export type RequestRegistrationEmailVerificationMutationBody = BodyType<RegistrationEmailVerificationRequest>
+    export type RequestRegistrationEmailVerificationMutationError = ErrorType<void>
+
+    /**
+ * @summary Resend a registration email verification code
+ */
+export const useRequestRegistrationEmailVerification = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof requestRegistrationEmailVerification>>, TError,{data: BodyType<RegistrationEmailVerificationRequest>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof requestRegistrationEmailVerification>>,
+        TError,
+        {data: BodyType<RegistrationEmailVerificationRequest>},
+        TContext
+      > => {
+      return useMutation(getRequestRegistrationEmailVerificationMutationOptions(options));
+    }
+
+export const getConfirmRegistrationEmailVerificationUrl = () => {
+
+
+
+
+  return `/api/v1/auth/email-verification/registration/confirm`
+}
+
+/**
+ * @summary Confirm a registration code and create a session
+ */
+export const confirmRegistrationEmailVerification = async (registrationEmailVerificationConfirmation: RegistrationEmailVerificationConfirmation, options?: Parameters<typeof customFetch>[1]): Promise<AuthSession> => {
+
+  return customFetch<AuthSession>(getConfirmRegistrationEmailVerificationUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(registrationEmailVerificationConfirmation)
+  }
+);}
+
+
+
+
+
+export const getConfirmRegistrationEmailVerificationMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof confirmRegistrationEmailVerification>>, TError,{data: BodyType<RegistrationEmailVerificationConfirmation>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof confirmRegistrationEmailVerification>>, TError,{data: BodyType<RegistrationEmailVerificationConfirmation>}, TContext> => {
+
+const mutationKey = ['confirmRegistrationEmailVerification'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof confirmRegistrationEmailVerification>>, {data: BodyType<RegistrationEmailVerificationConfirmation>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  confirmRegistrationEmailVerification(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ConfirmRegistrationEmailVerificationMutationResult = NonNullable<Awaited<ReturnType<typeof confirmRegistrationEmailVerification>>>
+    export type ConfirmRegistrationEmailVerificationMutationBody = BodyType<RegistrationEmailVerificationConfirmation>
+    export type ConfirmRegistrationEmailVerificationMutationError = ErrorType<void>
+
+    /**
+ * @summary Confirm a registration code and create a session
+ */
+export const useConfirmRegistrationEmailVerification = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof confirmRegistrationEmailVerification>>, TError,{data: BodyType<RegistrationEmailVerificationConfirmation>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof confirmRegistrationEmailVerification>>,
+        TError,
+        {data: BodyType<RegistrationEmailVerificationConfirmation>},
+        TContext
+      > => {
+      return useMutation(getConfirmRegistrationEmailVerificationMutationOptions(options));
     }
 
 export const getRequestAccountEmailVerificationUrl = () => {
@@ -2149,9 +3179,9 @@ export const getLoginAccountUrl = () => {
 /**
  * @summary Sign in to an account
  */
-export const loginAccount = async (authCredentials: AuthCredentials, options?: Parameters<typeof customFetch>[1]): Promise<AuthSession> => {
+export const loginAccount = async (authCredentials: AuthCredentials, options?: Parameters<typeof customFetch>[1]): Promise<AuthSession | TwoFactorLoginChallenge> => {
 
-  return customFetch<AuthSession>(getLoginAccountUrl(),
+  return customFetch<AuthSession | TwoFactorLoginChallenge>(getLoginAccountUrl(),
   {
     ...options,
     method: 'POST',
@@ -2207,6 +3237,515 @@ export const useLoginAccount = <TError = ErrorType<void>,
         TContext
       > => {
       return useMutation(getLoginAccountMutationOptions(options));
+    }
+
+export const getVerifyTwoFactorLoginUrl = () => {
+
+
+
+
+  return `/api/v1/auth/login/verify`
+}
+
+/**
+ * @summary Verify an email code for a sign-in
+ */
+export const verifyTwoFactorLogin = async (twoFactorLoginVerification: TwoFactorLoginVerification, options?: Parameters<typeof customFetch>[1]): Promise<AuthSession> => {
+
+  return customFetch<AuthSession>(getVerifyTwoFactorLoginUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(twoFactorLoginVerification)
+  }
+);}
+
+
+
+
+
+export const getVerifyTwoFactorLoginMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof verifyTwoFactorLogin>>, TError,{data: BodyType<TwoFactorLoginVerification>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof verifyTwoFactorLogin>>, TError,{data: BodyType<TwoFactorLoginVerification>}, TContext> => {
+
+const mutationKey = ['verifyTwoFactorLogin'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof verifyTwoFactorLogin>>, {data: BodyType<TwoFactorLoginVerification>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  verifyTwoFactorLogin(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type VerifyTwoFactorLoginMutationResult = NonNullable<Awaited<ReturnType<typeof verifyTwoFactorLogin>>>
+    export type VerifyTwoFactorLoginMutationBody = BodyType<TwoFactorLoginVerification>
+    export type VerifyTwoFactorLoginMutationError = ErrorType<void>
+
+    /**
+ * @summary Verify an email code for a sign-in
+ */
+export const useVerifyTwoFactorLogin = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof verifyTwoFactorLogin>>, TError,{data: BodyType<TwoFactorLoginVerification>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof verifyTwoFactorLogin>>,
+        TError,
+        {data: BodyType<TwoFactorLoginVerification>},
+        TContext
+      > => {
+      return useMutation(getVerifyTwoFactorLoginMutationOptions(options));
+    }
+
+export const getGetTwoFactorSecurityUrl = () => {
+
+
+
+
+  return `/api/v1/auth/security/two-factor`
+}
+
+/**
+ * @summary Get two-factor security status
+ */
+export const getTwoFactorSecurity = async ( options?: Parameters<typeof customFetch>[1]): Promise<TwoFactorSecurityStatus> => {
+
+  return customFetch<TwoFactorSecurityStatus>(getGetTwoFactorSecurityUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetTwoFactorSecurityQueryKey = () => {
+    return [
+    `/api/v1/auth/security/two-factor`
+    ] as const;
+    }
+
+
+export const getGetTwoFactorSecurityQueryOptions = <TData = Awaited<ReturnType<typeof getTwoFactorSecurity>>, TError = ErrorType<void>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getTwoFactorSecurity>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetTwoFactorSecurityQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getTwoFactorSecurity>>> = ({ signal }) => getTwoFactorSecurity({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getTwoFactorSecurity>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetTwoFactorSecurityQueryResult = NonNullable<Awaited<ReturnType<typeof getTwoFactorSecurity>>>
+export type GetTwoFactorSecurityQueryError = ErrorType<void>
+
+
+/**
+ * @summary Get two-factor security status
+ */
+
+export function useGetTwoFactorSecurity<TData = Awaited<ReturnType<typeof getTwoFactorSecurity>>, TError = ErrorType<void>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getTwoFactorSecurity>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetTwoFactorSecurityQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getUpdateTwoFactorSecurityUrl = () => {
+
+
+
+
+  return `/api/v1/auth/security/two-factor`
+}
+
+/**
+ * @summary Enable or disable email two-factor verification
+ */
+export const updateTwoFactorSecurity = async (twoFactorSecurityUpdate: TwoFactorSecurityUpdate, options?: Parameters<typeof customFetch>[1]): Promise<TwoFactorSecurityStatus> => {
+
+  return customFetch<TwoFactorSecurityStatus>(getUpdateTwoFactorSecurityUrl(),
+  {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(twoFactorSecurityUpdate)
+  }
+);}
+
+
+
+
+
+export const getUpdateTwoFactorSecurityMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateTwoFactorSecurity>>, TError,{data: BodyType<TwoFactorSecurityUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateTwoFactorSecurity>>, TError,{data: BodyType<TwoFactorSecurityUpdate>}, TContext> => {
+
+const mutationKey = ['updateTwoFactorSecurity'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateTwoFactorSecurity>>, {data: BodyType<TwoFactorSecurityUpdate>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  updateTwoFactorSecurity(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateTwoFactorSecurityMutationResult = NonNullable<Awaited<ReturnType<typeof updateTwoFactorSecurity>>>
+    export type UpdateTwoFactorSecurityMutationBody = BodyType<TwoFactorSecurityUpdate>
+    export type UpdateTwoFactorSecurityMutationError = ErrorType<void>
+
+    /**
+ * @summary Enable or disable email two-factor verification
+ */
+export const useUpdateTwoFactorSecurity = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateTwoFactorSecurity>>, TError,{data: BodyType<TwoFactorSecurityUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateTwoFactorSecurity>>,
+        TError,
+        {data: BodyType<TwoFactorSecurityUpdate>},
+        TContext
+      > => {
+      return useMutation(getUpdateTwoFactorSecurityMutationOptions(options));
+    }
+
+export const getRequestMobileDeviceLoginUrl = () => {
+
+
+
+
+  return `/api/v1/auth/mobile-login/request`
+}
+
+/**
+ * @summary Sign in on a trusted mobile installation or request a one-time code
+ */
+export const requestMobileDeviceLogin = async (mobileDeviceLoginRequest: MobileDeviceLoginRequest, options?: Parameters<typeof customFetch>[1]): Promise<MobileDeviceLoginResult> => {
+
+  return customFetch<MobileDeviceLoginResult>(getRequestMobileDeviceLoginUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(mobileDeviceLoginRequest)
+  }
+);}
+
+
+
+
+
+export const getRequestMobileDeviceLoginMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof requestMobileDeviceLogin>>, TError,{data: BodyType<MobileDeviceLoginRequest>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof requestMobileDeviceLogin>>, TError,{data: BodyType<MobileDeviceLoginRequest>}, TContext> => {
+
+const mutationKey = ['requestMobileDeviceLogin'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof requestMobileDeviceLogin>>, {data: BodyType<MobileDeviceLoginRequest>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  requestMobileDeviceLogin(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type RequestMobileDeviceLoginMutationResult = NonNullable<Awaited<ReturnType<typeof requestMobileDeviceLogin>>>
+    export type RequestMobileDeviceLoginMutationBody = BodyType<MobileDeviceLoginRequest>
+    export type RequestMobileDeviceLoginMutationError = ErrorType<void>
+
+    /**
+ * @summary Sign in on a trusted mobile installation or request a one-time code
+ */
+export const useRequestMobileDeviceLogin = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof requestMobileDeviceLogin>>, TError,{data: BodyType<MobileDeviceLoginRequest>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof requestMobileDeviceLogin>>,
+        TError,
+        {data: BodyType<MobileDeviceLoginRequest>},
+        TContext
+      > => {
+      return useMutation(getRequestMobileDeviceLoginMutationOptions(options));
+    }
+
+export const getConfirmMobileDeviceLoginUrl = () => {
+
+
+
+
+  return `/api/v1/auth/mobile-login/confirm`
+}
+
+/**
+ * @summary Confirm a one-time code and trust the mobile installation
+ */
+export const confirmMobileDeviceLogin = async (mobileDeviceLoginConfirmation: MobileDeviceLoginConfirmation, options?: Parameters<typeof customFetch>[1]): Promise<AuthSession> => {
+
+  return customFetch<AuthSession>(getConfirmMobileDeviceLoginUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(mobileDeviceLoginConfirmation)
+  }
+);}
+
+
+
+
+
+export const getConfirmMobileDeviceLoginMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof confirmMobileDeviceLogin>>, TError,{data: BodyType<MobileDeviceLoginConfirmation>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof confirmMobileDeviceLogin>>, TError,{data: BodyType<MobileDeviceLoginConfirmation>}, TContext> => {
+
+const mutationKey = ['confirmMobileDeviceLogin'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof confirmMobileDeviceLogin>>, {data: BodyType<MobileDeviceLoginConfirmation>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  confirmMobileDeviceLogin(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ConfirmMobileDeviceLoginMutationResult = NonNullable<Awaited<ReturnType<typeof confirmMobileDeviceLogin>>>
+    export type ConfirmMobileDeviceLoginMutationBody = BodyType<MobileDeviceLoginConfirmation>
+    export type ConfirmMobileDeviceLoginMutationError = ErrorType<void>
+
+    /**
+ * @summary Confirm a one-time code and trust the mobile installation
+ */
+export const useConfirmMobileDeviceLogin = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof confirmMobileDeviceLogin>>, TError,{data: BodyType<MobileDeviceLoginConfirmation>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof confirmMobileDeviceLogin>>,
+        TError,
+        {data: BodyType<MobileDeviceLoginConfirmation>},
+        TContext
+      > => {
+      return useMutation(getConfirmMobileDeviceLoginMutationOptions(options));
+    }
+
+export const getListMyTrustedMobileDevicesUrl = () => {
+
+
+
+
+  return `/api/v1/auth/mobile-devices`
+}
+
+/**
+ * @summary List trusted mobile installations for the current account
+ */
+export const listMyTrustedMobileDevices = async ( options?: Parameters<typeof customFetch>[1]): Promise<MobileTrustedDevices> => {
+
+  return customFetch<MobileTrustedDevices>(getListMyTrustedMobileDevicesUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListMyTrustedMobileDevicesQueryKey = () => {
+    return [
+    `/api/v1/auth/mobile-devices`
+    ] as const;
+    }
+
+
+export const getListMyTrustedMobileDevicesQueryOptions = <TData = Awaited<ReturnType<typeof listMyTrustedMobileDevices>>, TError = ErrorType<void>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listMyTrustedMobileDevices>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListMyTrustedMobileDevicesQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listMyTrustedMobileDevices>>> = ({ signal }) => listMyTrustedMobileDevices({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listMyTrustedMobileDevices>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListMyTrustedMobileDevicesQueryResult = NonNullable<Awaited<ReturnType<typeof listMyTrustedMobileDevices>>>
+export type ListMyTrustedMobileDevicesQueryError = ErrorType<void>
+
+
+/**
+ * @summary List trusted mobile installations for the current account
+ */
+
+export function useListMyTrustedMobileDevices<TData = Awaited<ReturnType<typeof listMyTrustedMobileDevices>>, TError = ErrorType<void>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listMyTrustedMobileDevices>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListMyTrustedMobileDevicesQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getRevokeMyTrustedMobileDeviceUrl = (deviceKey: string,) => {
+
+
+
+
+  return `/api/v1/auth/mobile-devices/${deviceKey}`
+}
+
+/**
+ * @summary Revoke a trusted mobile installation for the current account
+ */
+export const revokeMyTrustedMobileDevice = async (deviceKey: string, options?: Parameters<typeof customFetch>[1]): Promise<void> => {
+
+  return customFetch<void>(getRevokeMyTrustedMobileDeviceUrl(deviceKey),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+
+
+export const getRevokeMyTrustedMobileDeviceMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof revokeMyTrustedMobileDevice>>, TError,{deviceKey: string}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof revokeMyTrustedMobileDevice>>, TError,{deviceKey: string}, TContext> => {
+
+const mutationKey = ['revokeMyTrustedMobileDevice'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof revokeMyTrustedMobileDevice>>, {deviceKey: string}> = (props) => {
+          const {deviceKey} = props ?? {};
+
+          return  revokeMyTrustedMobileDevice(deviceKey,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type RevokeMyTrustedMobileDeviceMutationResult = NonNullable<Awaited<ReturnType<typeof revokeMyTrustedMobileDevice>>>
+
+    export type RevokeMyTrustedMobileDeviceMutationError = ErrorType<void>
+
+    /**
+ * @summary Revoke a trusted mobile installation for the current account
+ */
+export const useRevokeMyTrustedMobileDevice = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof revokeMyTrustedMobileDevice>>, TError,{deviceKey: string}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof revokeMyTrustedMobileDevice>>,
+        TError,
+        {deviceKey: string},
+        TContext
+      > => {
+      return useMutation(getRevokeMyTrustedMobileDeviceMutationOptions(options));
     }
 
 export const getLogoutAccountUrl = () => {
@@ -2278,77 +3817,6 @@ export const useLogoutAccount = <TError = ErrorType<void>,
         TContext
       > => {
       return useMutation(getLogoutAccountMutationOptions(options));
-    }
-
-export const getUpdateProfessionalLocationUrl = () => {
-
-
-
-
-  return `/api/v1/auth/location`
-}
-
-/**
- * @summary Update the current professional's live location
- */
-export const updateProfessionalLocation = async (professionalLocationUpdate: ProfessionalLocationUpdate, options?: Parameters<typeof customFetch>[1]): Promise<ProfessionalLocation> => {
-
-  return customFetch<ProfessionalLocation>(getUpdateProfessionalLocationUrl(),
-  {
-    ...options,
-    method: 'PATCH',
-    headers: { 'Content-Type': 'application/json', ...options?.headers },
-    body: JSON.stringify(professionalLocationUpdate)
-  }
-);}
-
-
-
-
-
-export const getUpdateProfessionalLocationMutationOptions = <TError = ErrorType<void>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateProfessionalLocation>>, TError,{data: BodyType<ProfessionalLocationUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
-): UseMutationOptions<Awaited<ReturnType<typeof updateProfessionalLocation>>, TError,{data: BodyType<ProfessionalLocationUpdate>}, TContext> => {
-
-const mutationKey = ['updateProfessionalLocation'];
-const {mutation: mutationOptions, request: requestOptions} = options ?
-      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
-      options
-      : {...options, mutation: {...options.mutation, mutationKey}}
-      : {mutation: { mutationKey, }, request: undefined};
-
-
-
-
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateProfessionalLocation>>, {data: BodyType<ProfessionalLocationUpdate>}> = (props) => {
-          const {data} = props ?? {};
-
-          return  updateProfessionalLocation(data,requestOptions)
-        }
-
-
-
-
-
-
-  return  { mutationFn, ...mutationOptions }}
-
-    export type UpdateProfessionalLocationMutationResult = NonNullable<Awaited<ReturnType<typeof updateProfessionalLocation>>>
-    export type UpdateProfessionalLocationMutationBody = BodyType<ProfessionalLocationUpdate>
-    export type UpdateProfessionalLocationMutationError = ErrorType<void>
-
-    /**
- * @summary Update the current professional's live location
- */
-export const useUpdateProfessionalLocation = <TError = ErrorType<void>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateProfessionalLocation>>, TError,{data: BodyType<ProfessionalLocationUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
- ): UseMutationResult<
-        Awaited<ReturnType<typeof updateProfessionalLocation>>,
-        TError,
-        {data: BodyType<ProfessionalLocationUpdate>},
-        TContext
-      > => {
-      return useMutation(getUpdateProfessionalLocationMutationOptions(options));
     }
 
 export const getGetMyAccountUrl = () => {
@@ -2497,6 +3965,296 @@ export const useUpdateMyAccount = <TError = ErrorType<void>,
         TContext
       > => {
       return useMutation(getUpdateMyAccountMutationOptions(options));
+    }
+
+export const getGetClientIdentityVerificationStatusUrl = () => {
+
+
+
+
+  return `/api/v1/auth/client-verification`
+}
+
+/**
+ * @summary Read the current customer's identity verification status
+ */
+export const getClientIdentityVerificationStatus = async ( options?: Parameters<typeof customFetch>[1]): Promise<ClientIdentityVerificationStatus> => {
+
+  return customFetch<ClientIdentityVerificationStatus>(getGetClientIdentityVerificationStatusUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetClientIdentityVerificationStatusQueryKey = () => {
+    return [
+    `/api/v1/auth/client-verification`
+    ] as const;
+    }
+
+
+export const getGetClientIdentityVerificationStatusQueryOptions = <TData = Awaited<ReturnType<typeof getClientIdentityVerificationStatus>>, TError = ErrorType<void>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getClientIdentityVerificationStatus>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetClientIdentityVerificationStatusQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getClientIdentityVerificationStatus>>> = ({ signal }) => getClientIdentityVerificationStatus({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getClientIdentityVerificationStatus>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetClientIdentityVerificationStatusQueryResult = NonNullable<Awaited<ReturnType<typeof getClientIdentityVerificationStatus>>>
+export type GetClientIdentityVerificationStatusQueryError = ErrorType<void>
+
+
+/**
+ * @summary Read the current customer's identity verification status
+ */
+
+export function useGetClientIdentityVerificationStatus<TData = Awaited<ReturnType<typeof getClientIdentityVerificationStatus>>, TError = ErrorType<void>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getClientIdentityVerificationStatus>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetClientIdentityVerificationStatusQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getSubmitClientIdentityVerificationUrl = () => {
+
+
+
+
+  return `/api/v1/auth/client-verification`
+}
+
+/**
+ * @summary Submit a DNI photo and selfie for private Worky review
+ */
+export const submitClientIdentityVerification = async (submitClientIdentityVerificationInput: SubmitClientIdentityVerificationInput, options?: Parameters<typeof customFetch>[1]): Promise<ClientIdentityVerificationStatus> => {
+
+  return customFetch<ClientIdentityVerificationStatus>(getSubmitClientIdentityVerificationUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(submitClientIdentityVerificationInput)
+  }
+);}
+
+
+
+
+
+export const getSubmitClientIdentityVerificationMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof submitClientIdentityVerification>>, TError,{data: BodyType<SubmitClientIdentityVerificationInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof submitClientIdentityVerification>>, TError,{data: BodyType<SubmitClientIdentityVerificationInput>}, TContext> => {
+
+const mutationKey = ['submitClientIdentityVerification'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof submitClientIdentityVerification>>, {data: BodyType<SubmitClientIdentityVerificationInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  submitClientIdentityVerification(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type SubmitClientIdentityVerificationMutationResult = NonNullable<Awaited<ReturnType<typeof submitClientIdentityVerification>>>
+    export type SubmitClientIdentityVerificationMutationBody = BodyType<SubmitClientIdentityVerificationInput>
+    export type SubmitClientIdentityVerificationMutationError = ErrorType<void>
+
+    /**
+ * @summary Submit a DNI photo and selfie for private Worky review
+ */
+export const useSubmitClientIdentityVerification = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof submitClientIdentityVerification>>, TError,{data: BodyType<SubmitClientIdentityVerificationInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof submitClientIdentityVerification>>,
+        TError,
+        {data: BodyType<SubmitClientIdentityVerificationInput>},
+        TContext
+      > => {
+      return useMutation(getSubmitClientIdentityVerificationMutationOptions(options));
+    }
+
+export const getUpdateMyProfilePhotoUrl = () => {
+
+
+
+
+  return `/api/v1/auth/profile-photo`
+}
+
+/**
+ * @summary Set the authenticated account profile photo from an uploaded source image
+ */
+export const updateMyProfilePhoto = async (profilePhotoUpdateInput: ProfilePhotoUpdateInput, options?: Parameters<typeof customFetch>[1]): Promise<ProfilePhotoUpdateResult> => {
+
+  return customFetch<ProfilePhotoUpdateResult>(getUpdateMyProfilePhotoUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(profilePhotoUpdateInput)
+  }
+);}
+
+
+
+
+
+export const getUpdateMyProfilePhotoMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateMyProfilePhoto>>, TError,{data: BodyType<ProfilePhotoUpdateInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateMyProfilePhoto>>, TError,{data: BodyType<ProfilePhotoUpdateInput>}, TContext> => {
+
+const mutationKey = ['updateMyProfilePhoto'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateMyProfilePhoto>>, {data: BodyType<ProfilePhotoUpdateInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  updateMyProfilePhoto(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateMyProfilePhotoMutationResult = NonNullable<Awaited<ReturnType<typeof updateMyProfilePhoto>>>
+    export type UpdateMyProfilePhotoMutationBody = BodyType<ProfilePhotoUpdateInput>
+    export type UpdateMyProfilePhotoMutationError = ErrorType<void>
+
+    /**
+ * @summary Set the authenticated account profile photo from an uploaded source image
+ */
+export const useUpdateMyProfilePhoto = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateMyProfilePhoto>>, TError,{data: BodyType<ProfilePhotoUpdateInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateMyProfilePhoto>>,
+        TError,
+        {data: BodyType<ProfilePhotoUpdateInput>},
+        TContext
+      > => {
+      return useMutation(getUpdateMyProfilePhotoMutationOptions(options));
+    }
+
+export const getDeleteMyProfilePhotoUrl = () => {
+
+
+
+
+  return `/api/v1/auth/profile-photo`
+}
+
+/**
+ * @summary Remove the authenticated account profile photo
+ */
+export const deleteMyProfilePhoto = async ( options?: Parameters<typeof customFetch>[1]): Promise<ProfilePhotoRemovalResult> => {
+
+  return customFetch<ProfilePhotoRemovalResult>(getDeleteMyProfilePhotoUrl(),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+
+
+export const getDeleteMyProfilePhotoMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteMyProfilePhoto>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof deleteMyProfilePhoto>>, TError,void, TContext> => {
+
+const mutationKey = ['deleteMyProfilePhoto'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteMyProfilePhoto>>, void> = () => {
+
+
+          return  deleteMyProfilePhoto(requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DeleteMyProfilePhotoMutationResult = NonNullable<Awaited<ReturnType<typeof deleteMyProfilePhoto>>>
+
+    export type DeleteMyProfilePhotoMutationError = ErrorType<void>
+
+    /**
+ * @summary Remove the authenticated account profile photo
+ */
+export const useDeleteMyProfilePhoto = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteMyProfilePhoto>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof deleteMyProfilePhoto>>,
+        TError,
+        void,
+        TContext
+      > => {
+      return useMutation(getDeleteMyProfilePhotoMutationOptions(options));
     }
 
 export const getSwitchAccountRoleUrl = () => {
@@ -3311,6 +5069,225 @@ export const useCreateJob = <TError = ErrorType<unknown>,
       return useMutation(getCreateJobMutationOptions(options));
     }
 
+export const getListMyPaymentsUrl = () => {
+
+
+
+
+  return `/api/v1/pagos`
+}
+
+/**
+ * @summary List the current client's payments
+ */
+export const listMyPayments = async ( options?: Parameters<typeof customFetch>[1]): Promise<ClientPayment[]> => {
+
+  return customFetch<ClientPayment[]>(getListMyPaymentsUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListMyPaymentsQueryKey = () => {
+    return [
+    `/api/v1/pagos`
+    ] as const;
+    }
+
+
+export const getListMyPaymentsQueryOptions = <TData = Awaited<ReturnType<typeof listMyPayments>>, TError = ErrorType<void>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listMyPayments>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListMyPaymentsQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listMyPayments>>> = ({ signal }) => listMyPayments({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listMyPayments>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListMyPaymentsQueryResult = NonNullable<Awaited<ReturnType<typeof listMyPayments>>>
+export type ListMyPaymentsQueryError = ErrorType<void>
+
+
+/**
+ * @summary List the current client's payments
+ */
+
+export function useListMyPayments<TData = Awaited<ReturnType<typeof listMyPayments>>, TError = ErrorType<void>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listMyPayments>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListMyPaymentsQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getCreatePaymentCheckoutUrl = () => {
+
+
+
+
+  return `/api/v1/pagos`
+}
+
+/**
+ * @summary Start or resume payment for a job marked as performed
+ */
+export const createPaymentCheckout = async (paymentCheckoutInput: PaymentCheckoutInput, options?: Parameters<typeof customFetch>[1]): Promise<PaymentCheckout> => {
+
+  return customFetch<PaymentCheckout>(getCreatePaymentCheckoutUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(paymentCheckoutInput)
+  }
+);}
+
+
+
+
+
+export const getCreatePaymentCheckoutMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createPaymentCheckout>>, TError,{data: BodyType<PaymentCheckoutInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createPaymentCheckout>>, TError,{data: BodyType<PaymentCheckoutInput>}, TContext> => {
+
+const mutationKey = ['createPaymentCheckout'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createPaymentCheckout>>, {data: BodyType<PaymentCheckoutInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  createPaymentCheckout(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreatePaymentCheckoutMutationResult = NonNullable<Awaited<ReturnType<typeof createPaymentCheckout>>>
+    export type CreatePaymentCheckoutMutationBody = BodyType<PaymentCheckoutInput>
+    export type CreatePaymentCheckoutMutationError = ErrorType<void>
+
+    /**
+ * @summary Start or resume payment for a job marked as performed
+ */
+export const useCreatePaymentCheckout = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createPaymentCheckout>>, TError,{data: BodyType<PaymentCheckoutInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createPaymentCheckout>>,
+        TError,
+        {data: BodyType<PaymentCheckoutInput>},
+        TContext
+      > => {
+      return useMutation(getCreatePaymentCheckoutMutationOptions(options));
+    }
+
+export const getReceiveMercadoPagoWebhookUrl = () => {
+
+
+
+
+  return `/api/v1/webhooks/mercadopago`
+}
+
+/**
+ * @summary Verify a Mercado Pago payment notification
+ */
+export const receiveMercadoPagoWebhook = async ( options?: Parameters<typeof customFetch>[1]): Promise<void> => {
+
+  return customFetch<void>(getReceiveMercadoPagoWebhookUrl(),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+
+export const getReceiveMercadoPagoWebhookMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof receiveMercadoPagoWebhook>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof receiveMercadoPagoWebhook>>, TError,void, TContext> => {
+
+const mutationKey = ['receiveMercadoPagoWebhook'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof receiveMercadoPagoWebhook>>, void> = () => {
+
+
+          return  receiveMercadoPagoWebhook(requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ReceiveMercadoPagoWebhookMutationResult = NonNullable<Awaited<ReturnType<typeof receiveMercadoPagoWebhook>>>
+
+    export type ReceiveMercadoPagoWebhookMutationError = ErrorType<void>
+
+    /**
+ * @summary Verify a Mercado Pago payment notification
+ */
+export const useReceiveMercadoPagoWebhook = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof receiveMercadoPagoWebhook>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof receiveMercadoPagoWebhook>>,
+        TError,
+        void,
+        TContext
+      > => {
+      return useMutation(getReceiveMercadoPagoWebhookMutationOptions(options));
+    }
+
 export const getListMyJobsUrl = () => {
 
 
@@ -3542,6 +5519,77 @@ export function useListAssignedJobs<TData = Awaited<ReturnType<typeof listAssign
 
 
 
+export const getCreateJobReviewUrl = () => {
+
+
+
+
+  return `/api/v1/reviews`
+}
+
+/**
+ * @summary Review a completed job as its client
+ */
+export const createJobReview = async (jobReviewInput: JobReviewInput, options?: Parameters<typeof customFetch>[1]): Promise<CreateJobReview201> => {
+
+  return customFetch<CreateJobReview201>(getCreateJobReviewUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(jobReviewInput)
+  }
+);}
+
+
+
+
+
+export const getCreateJobReviewMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createJobReview>>, TError,{data: BodyType<JobReviewInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createJobReview>>, TError,{data: BodyType<JobReviewInput>}, TContext> => {
+
+const mutationKey = ['createJobReview'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createJobReview>>, {data: BodyType<JobReviewInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  createJobReview(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateJobReviewMutationResult = NonNullable<Awaited<ReturnType<typeof createJobReview>>>
+    export type CreateJobReviewMutationBody = BodyType<JobReviewInput>
+    export type CreateJobReviewMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Review a completed job as its client
+ */
+export const useCreateJobReview = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createJobReview>>, TError,{data: BodyType<JobReviewInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createJobReview>>,
+        TError,
+        {data: BodyType<JobReviewInput>},
+        TContext
+      > => {
+      return useMutation(getCreateJobReviewMutationOptions(options));
+    }
+
 export const getGetJobUrl = (id: number,) => {
 
 
@@ -3628,7 +5676,7 @@ export const getUpdateJobUrl = (id: number,) => {
 }
 
 /**
- * @summary Update job state
+ * @summary Update a job or its state
  */
 export const updateJob = async (id: number,
     jobUpdate: JobUpdate, options?: Parameters<typeof customFetch>[1]): Promise<Job> => {
@@ -3678,7 +5726,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type UpdateJobMutationError = ErrorType<unknown>
 
     /**
- * @summary Update job state
+ * @summary Update a job or its state
  */
 export const useUpdateJob = <TError = ErrorType<unknown>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateJob>>, TError,{id: number;data: BodyType<JobUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
@@ -3690,6 +5738,230 @@ export const useUpdateJob = <TError = ErrorType<unknown>,
       > => {
       return useMutation(getUpdateJobMutationOptions(options));
     }
+
+export const getDeleteJobUrl = (id: number,) => {
+
+
+
+
+  return `/api/v1/trabajos/${id}`
+}
+
+/**
+ * @summary Delete an inactive published job with no activity
+ */
+export const deleteJob = async (id: number, options?: Parameters<typeof customFetch>[1]): Promise<void> => {
+
+  return customFetch<void>(getDeleteJobUrl(id),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+
+
+export const getDeleteJobMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteJob>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof deleteJob>>, TError,{id: number}, TContext> => {
+
+const mutationKey = ['deleteJob'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteJob>>, {id: number}> = (props) => {
+          const {id} = props ?? {};
+
+          return  deleteJob(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DeleteJobMutationResult = NonNullable<Awaited<ReturnType<typeof deleteJob>>>
+
+    export type DeleteJobMutationError = ErrorType<void>
+
+    /**
+ * @summary Delete an inactive published job with no activity
+ */
+export const useDeleteJob = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteJob>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof deleteJob>>,
+        TError,
+        {id: number},
+        TContext
+      > => {
+      return useMutation(getDeleteJobMutationOptions(options));
+    }
+
+export const getConfirmCashJobPaymentUrl = (id: number,) => {
+
+
+
+
+  return `/api/v1/trabajos/${id}/confirmar-pago-efectivo`
+}
+
+/**
+ * @summary Confirm the cash payment as one job participant
+ */
+export const confirmCashJobPayment = async (id: number, options?: Parameters<typeof customFetch>[1]): Promise<Job> => {
+
+  return customFetch<Job>(getConfirmCashJobPaymentUrl(id),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+
+export const getConfirmCashJobPaymentMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof confirmCashJobPayment>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof confirmCashJobPayment>>, TError,{id: number}, TContext> => {
+
+const mutationKey = ['confirmCashJobPayment'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof confirmCashJobPayment>>, {id: number}> = (props) => {
+          const {id} = props ?? {};
+
+          return  confirmCashJobPayment(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ConfirmCashJobPaymentMutationResult = NonNullable<Awaited<ReturnType<typeof confirmCashJobPayment>>>
+
+    export type ConfirmCashJobPaymentMutationError = ErrorType<void>
+
+    /**
+ * @summary Confirm the cash payment as one job participant
+ */
+export const useConfirmCashJobPayment = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof confirmCashJobPayment>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof confirmCashJobPayment>>,
+        TError,
+        {id: number},
+        TContext
+      > => {
+      return useMutation(getConfirmCashJobPaymentMutationOptions(options));
+    }
+
+export const getGetProfessionalThreadJobUrl = (id: number,
+    profesionalId: number,) => {
+
+
+
+
+  return `/api/v1/trabajos/${id}/hilos/${profesionalId}`
+}
+
+/**
+ * @summary Get a job within a professional conversation
+ */
+export const getProfessionalThreadJob = async (id: number,
+    profesionalId: number, options?: Parameters<typeof customFetch>[1]): Promise<Job> => {
+
+  return customFetch<Job>(getGetProfessionalThreadJobUrl(id,profesionalId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetProfessionalThreadJobQueryKey = (id: number,
+    profesionalId: number,) => {
+    return [
+    `/api/v1/trabajos/${id}/hilos/${profesionalId}`
+    ] as const;
+    }
+
+
+export const getGetProfessionalThreadJobQueryOptions = <TData = Awaited<ReturnType<typeof getProfessionalThreadJob>>, TError = ErrorType<void>>(id: number,
+    profesionalId: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getProfessionalThreadJob>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetProfessionalThreadJobQueryKey(id,profesionalId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getProfessionalThreadJob>>> = ({ signal }) => getProfessionalThreadJob(id,profesionalId, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: id !== null && id !== undefined && profesionalId !== null && profesionalId !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getProfessionalThreadJob>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetProfessionalThreadJobQueryResult = NonNullable<Awaited<ReturnType<typeof getProfessionalThreadJob>>>
+export type GetProfessionalThreadJobQueryError = ErrorType<void>
+
+
+/**
+ * @summary Get a job within a professional conversation
+ */
+
+export function useGetProfessionalThreadJob<TData = Awaited<ReturnType<typeof getProfessionalThreadJob>>, TError = ErrorType<void>>(
+ id: number,
+    profesionalId: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getProfessionalThreadJob>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetProfessionalThreadJobQueryOptions(id,profesionalId,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
 
 export const getAcceptJobUrl = (id: number,) => {
 
@@ -3993,6 +6265,235 @@ export const useCreateMessage = <TError = ErrorType<unknown>,
         TContext
       > => {
       return useMutation(getCreateMessageMutationOptions(options));
+    }
+
+export const getListProfessionalThreadMessagesUrl = (changaId: number,
+    profesionalId: number,) => {
+
+
+
+
+  return `/api/v1/chats/${changaId}/hilos/${profesionalId}/mensajes`
+}
+
+/**
+ * @summary List messages for one professional and one job
+ */
+export const listProfessionalThreadMessages = async (changaId: number,
+    profesionalId: number, options?: Parameters<typeof customFetch>[1]): Promise<ChatMessage[]> => {
+
+  return customFetch<ChatMessage[]>(getListProfessionalThreadMessagesUrl(changaId,profesionalId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListProfessionalThreadMessagesQueryKey = (changaId: number,
+    profesionalId: number,) => {
+    return [
+    `/api/v1/chats/${changaId}/hilos/${profesionalId}/mensajes`
+    ] as const;
+    }
+
+
+export const getListProfessionalThreadMessagesQueryOptions = <TData = Awaited<ReturnType<typeof listProfessionalThreadMessages>>, TError = ErrorType<void>>(changaId: number,
+    profesionalId: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listProfessionalThreadMessages>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListProfessionalThreadMessagesQueryKey(changaId,profesionalId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listProfessionalThreadMessages>>> = ({ signal }) => listProfessionalThreadMessages(changaId,profesionalId, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: changaId !== null && changaId !== undefined && profesionalId !== null && profesionalId !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listProfessionalThreadMessages>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListProfessionalThreadMessagesQueryResult = NonNullable<Awaited<ReturnType<typeof listProfessionalThreadMessages>>>
+export type ListProfessionalThreadMessagesQueryError = ErrorType<void>
+
+
+/**
+ * @summary List messages for one professional and one job
+ */
+
+export function useListProfessionalThreadMessages<TData = Awaited<ReturnType<typeof listProfessionalThreadMessages>>, TError = ErrorType<void>>(
+ changaId: number,
+    profesionalId: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listProfessionalThreadMessages>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListProfessionalThreadMessagesQueryOptions(changaId,profesionalId,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getCreateProfessionalThreadMessageUrl = (changaId: number,
+    profesionalId: number,) => {
+
+
+
+
+  return `/api/v1/chats/${changaId}/hilos/${profesionalId}/mensajes`
+}
+
+/**
+ * @summary Send a message in one professional thread
+ */
+export const createProfessionalThreadMessage = async (changaId: number,
+    profesionalId: number,
+    messageInput: MessageInput, options?: Parameters<typeof customFetch>[1]): Promise<ChatMessage> => {
+
+  return customFetch<ChatMessage>(getCreateProfessionalThreadMessageUrl(changaId,profesionalId),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(messageInput)
+  }
+);}
+
+
+
+
+
+export const getCreateProfessionalThreadMessageMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createProfessionalThreadMessage>>, TError,{changaId: number;profesionalId: number;data: BodyType<MessageInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createProfessionalThreadMessage>>, TError,{changaId: number;profesionalId: number;data: BodyType<MessageInput>}, TContext> => {
+
+const mutationKey = ['createProfessionalThreadMessage'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createProfessionalThreadMessage>>, {changaId: number;profesionalId: number;data: BodyType<MessageInput>}> = (props) => {
+          const {changaId,profesionalId,data} = props ?? {};
+
+          return  createProfessionalThreadMessage(changaId,profesionalId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateProfessionalThreadMessageMutationResult = NonNullable<Awaited<ReturnType<typeof createProfessionalThreadMessage>>>
+    export type CreateProfessionalThreadMessageMutationBody = BodyType<MessageInput>
+    export type CreateProfessionalThreadMessageMutationError = ErrorType<void>
+
+    /**
+ * @summary Send a message in one professional thread
+ */
+export const useCreateProfessionalThreadMessage = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createProfessionalThreadMessage>>, TError,{changaId: number;profesionalId: number;data: BodyType<MessageInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createProfessionalThreadMessage>>,
+        TError,
+        {changaId: number;profesionalId: number;data: BodyType<MessageInput>},
+        TContext
+      > => {
+      return useMutation(getCreateProfessionalThreadMessageMutationOptions(options));
+    }
+
+export const getMarkProfessionalThreadMessagesReadUrl = (changaId: number,
+    profesionalId: number,) => {
+
+
+
+
+  return `/api/v1/chats/${changaId}/hilos/${profesionalId}/leidos`
+}
+
+/**
+ * @summary Mark messages in one professional thread as read
+ */
+export const markProfessionalThreadMessagesRead = async (changaId: number,
+    profesionalId: number, options?: Parameters<typeof customFetch>[1]): Promise<void> => {
+
+  return customFetch<void>(getMarkProfessionalThreadMessagesReadUrl(changaId,profesionalId),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+
+export const getMarkProfessionalThreadMessagesReadMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof markProfessionalThreadMessagesRead>>, TError,{changaId: number;profesionalId: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof markProfessionalThreadMessagesRead>>, TError,{changaId: number;profesionalId: number}, TContext> => {
+
+const mutationKey = ['markProfessionalThreadMessagesRead'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof markProfessionalThreadMessagesRead>>, {changaId: number;profesionalId: number}> = (props) => {
+          const {changaId,profesionalId} = props ?? {};
+
+          return  markProfessionalThreadMessagesRead(changaId,profesionalId,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type MarkProfessionalThreadMessagesReadMutationResult = NonNullable<Awaited<ReturnType<typeof markProfessionalThreadMessagesRead>>>
+
+    export type MarkProfessionalThreadMessagesReadMutationError = ErrorType<void>
+
+    /**
+ * @summary Mark messages in one professional thread as read
+ */
+export const useMarkProfessionalThreadMessagesRead = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof markProfessionalThreadMessagesRead>>, TError,{changaId: number;profesionalId: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof markProfessionalThreadMessagesRead>>,
+        TError,
+        {changaId: number;profesionalId: number},
+        TContext
+      > => {
+      return useMutation(getMarkProfessionalThreadMessagesReadMutationOptions(options));
     }
 
 export const getMarkMessagesReadUrl = (changaId: number,) => {
@@ -4375,14 +6876,15 @@ export const getAcceptAppointmentUrl = (id: number,) => {
 /**
  * @summary Accept an appointment
  */
-export const acceptAppointment = async (id: number, options?: Parameters<typeof customFetch>[1]): Promise<Appointment> => {
+export const acceptAppointment = async (id: number,
+    acceptAppointmentInput: AcceptAppointmentInput, options?: Parameters<typeof customFetch>[1]): Promise<AcceptAppointmentResult> => {
 
-  return customFetch<Appointment>(getAcceptAppointmentUrl(id),
+  return customFetch<AcceptAppointmentResult>(getAcceptAppointmentUrl(id),
   {
     ...options,
-    method: 'POST'
-
-
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(acceptAppointmentInput)
   }
 );}
 
@@ -4391,8 +6893,8 @@ export const acceptAppointment = async (id: number, options?: Parameters<typeof 
 
 
 export const getAcceptAppointmentMutationOptions = <TError = ErrorType<void>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof acceptAppointment>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
-): UseMutationOptions<Awaited<ReturnType<typeof acceptAppointment>>, TError,{id: number}, TContext> => {
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof acceptAppointment>>, TError,{id: number;data: BodyType<AcceptAppointmentInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof acceptAppointment>>, TError,{id: number;data: BodyType<AcceptAppointmentInput>}, TContext> => {
 
 const mutationKey = ['acceptAppointment'];
 const {mutation: mutationOptions, request: requestOptions} = options ?
@@ -4404,10 +6906,10 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof acceptAppointment>>, {id: number}> = (props) => {
-          const {id} = props ?? {};
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof acceptAppointment>>, {id: number;data: BodyType<AcceptAppointmentInput>}> = (props) => {
+          const {id,data} = props ?? {};
 
-          return  acceptAppointment(id,requestOptions)
+          return  acceptAppointment(id,data,requestOptions)
         }
 
 
@@ -4418,18 +6920,18 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
   return  { mutationFn, ...mutationOptions }}
 
     export type AcceptAppointmentMutationResult = NonNullable<Awaited<ReturnType<typeof acceptAppointment>>>
-
+    export type AcceptAppointmentMutationBody = BodyType<AcceptAppointmentInput>
     export type AcceptAppointmentMutationError = ErrorType<void>
 
     /**
  * @summary Accept an appointment
  */
 export const useAcceptAppointment = <TError = ErrorType<void>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof acceptAppointment>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof acceptAppointment>>, TError,{id: number;data: BodyType<AcceptAppointmentInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
  ): UseMutationResult<
         Awaited<ReturnType<typeof acceptAppointment>>,
         TError,
-        {id: number},
+        {id: number;data: BodyType<AcceptAppointmentInput>},
         TContext
       > => {
       return useMutation(getAcceptAppointmentMutationOptions(options));
@@ -4504,6 +7006,291 @@ export const useRejectAppointment = <TError = ErrorType<void>,
         TContext
       > => {
       return useMutation(getRejectAppointmentMutationOptions(options));
+    }
+
+export const getRecordVisitArrivalUrl = (id: number,) => {
+
+
+
+
+  return `/api/v1/citas/${id}/llegada`
+}
+
+/**
+ * @summary Record the Partner's arrival for a paid visit
+ */
+export const recordVisitArrival = async (id: number, options?: Parameters<typeof customFetch>[1]): Promise<Appointment> => {
+
+  return customFetch<Appointment>(getRecordVisitArrivalUrl(id),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+
+export const getRecordVisitArrivalMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof recordVisitArrival>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof recordVisitArrival>>, TError,{id: number}, TContext> => {
+
+const mutationKey = ['recordVisitArrival'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof recordVisitArrival>>, {id: number}> = (props) => {
+          const {id} = props ?? {};
+
+          return  recordVisitArrival(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type RecordVisitArrivalMutationResult = NonNullable<Awaited<ReturnType<typeof recordVisitArrival>>>
+
+    export type RecordVisitArrivalMutationError = ErrorType<void>
+
+    /**
+ * @summary Record the Partner's arrival for a paid visit
+ */
+export const useRecordVisitArrival = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof recordVisitArrival>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof recordVisitArrival>>,
+        TError,
+        {id: number},
+        TContext
+      > => {
+      return useMutation(getRecordVisitArrivalMutationOptions(options));
+    }
+
+export const getCompleteVisitUrl = (id: number,) => {
+
+
+
+
+  return `/api/v1/citas/${id}/completar`
+}
+
+/**
+ * @summary Mark a visit completed and start the 24-hour review window
+ */
+export const completeVisit = async (id: number, options?: Parameters<typeof customFetch>[1]): Promise<Appointment> => {
+
+  return customFetch<Appointment>(getCompleteVisitUrl(id),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+
+export const getCompleteVisitMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof completeVisit>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof completeVisit>>, TError,{id: number}, TContext> => {
+
+const mutationKey = ['completeVisit'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof completeVisit>>, {id: number}> = (props) => {
+          const {id} = props ?? {};
+
+          return  completeVisit(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CompleteVisitMutationResult = NonNullable<Awaited<ReturnType<typeof completeVisit>>>
+
+    export type CompleteVisitMutationError = ErrorType<void>
+
+    /**
+ * @summary Mark a visit completed and start the 24-hour review window
+ */
+export const useCompleteVisit = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof completeVisit>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof completeVisit>>,
+        TError,
+        {id: number},
+        TContext
+      > => {
+      return useMutation(getCompleteVisitMutationOptions(options));
+    }
+
+export const getConfirmVisitUrl = (id: number,) => {
+
+
+
+
+  return `/api/v1/citas/${id}/confirmar-visita`
+}
+
+/**
+ * @summary Confirm a visit and release the online balance early
+ */
+export const confirmVisit = async (id: number, options?: Parameters<typeof customFetch>[1]): Promise<Appointment> => {
+
+  return customFetch<Appointment>(getConfirmVisitUrl(id),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+
+export const getConfirmVisitMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof confirmVisit>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof confirmVisit>>, TError,{id: number}, TContext> => {
+
+const mutationKey = ['confirmVisit'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof confirmVisit>>, {id: number}> = (props) => {
+          const {id} = props ?? {};
+
+          return  confirmVisit(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ConfirmVisitMutationResult = NonNullable<Awaited<ReturnType<typeof confirmVisit>>>
+
+    export type ConfirmVisitMutationError = ErrorType<void>
+
+    /**
+ * @summary Confirm a visit and release the online balance early
+ */
+export const useConfirmVisit = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof confirmVisit>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof confirmVisit>>,
+        TError,
+        {id: number},
+        TContext
+      > => {
+      return useMutation(getConfirmVisitMutationOptions(options));
+    }
+
+export const getReportVisitIssueUrl = (id: number,) => {
+
+
+
+
+  return `/api/v1/citas/${id}/reportar-problema`
+}
+
+/**
+ * @summary Report a visit problem and hold its balance for review
+ */
+export const reportVisitIssue = async (id: number,
+    visitIssueInput: VisitIssueInput, options?: Parameters<typeof customFetch>[1]): Promise<Appointment> => {
+
+  return customFetch<Appointment>(getReportVisitIssueUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(visitIssueInput)
+  }
+);}
+
+
+
+
+
+export const getReportVisitIssueMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof reportVisitIssue>>, TError,{id: number;data: BodyType<VisitIssueInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof reportVisitIssue>>, TError,{id: number;data: BodyType<VisitIssueInput>}, TContext> => {
+
+const mutationKey = ['reportVisitIssue'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof reportVisitIssue>>, {id: number;data: BodyType<VisitIssueInput>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  reportVisitIssue(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ReportVisitIssueMutationResult = NonNullable<Awaited<ReturnType<typeof reportVisitIssue>>>
+    export type ReportVisitIssueMutationBody = BodyType<VisitIssueInput>
+    export type ReportVisitIssueMutationError = ErrorType<void>
+
+    /**
+ * @summary Report a visit problem and hold its balance for review
+ */
+export const useReportVisitIssue = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof reportVisitIssue>>, TError,{id: number;data: BodyType<VisitIssueInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof reportVisitIssue>>,
+        TError,
+        {id: number;data: BodyType<VisitIssueInput>},
+        TContext
+      > => {
+      return useMutation(getReportVisitIssueMutationOptions(options));
     }
 
 export const getListNotificationsUrl = () => {
@@ -4790,6 +7577,161 @@ export function useGetPartnerDashboard<TData = Awaited<ReturnType<typeof getPart
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
   const queryOptions = getGetPartnerDashboardQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getGetPartnerVisitBalanceUrl = () => {
+
+
+
+
+  return `/api/v1/partner/saldo-visitas`
+}
+
+/**
+ * @summary Get the Partner balance and outstanding commissions
+ */
+export const getPartnerVisitBalance = async ( options?: Parameters<typeof customFetch>[1]): Promise<PartnerVisitBalance> => {
+
+  return customFetch<PartnerVisitBalance>(getGetPartnerVisitBalanceUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetPartnerVisitBalanceQueryKey = () => {
+    return [
+    `/api/v1/partner/saldo-visitas`
+    ] as const;
+    }
+
+
+export const getGetPartnerVisitBalanceQueryOptions = <TData = Awaited<ReturnType<typeof getPartnerVisitBalance>>, TError = ErrorType<void>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getPartnerVisitBalance>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetPartnerVisitBalanceQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getPartnerVisitBalance>>> = ({ signal }) => getPartnerVisitBalance({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getPartnerVisitBalance>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetPartnerVisitBalanceQueryResult = NonNullable<Awaited<ReturnType<typeof getPartnerVisitBalance>>>
+export type GetPartnerVisitBalanceQueryError = ErrorType<void>
+
+
+/**
+ * @summary Get the Partner balance and outstanding commissions
+ */
+
+export function useGetPartnerVisitBalance<TData = Awaited<ReturnType<typeof getPartnerVisitBalance>>, TError = ErrorType<void>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getPartnerVisitBalance>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetPartnerVisitBalanceQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getGetPartnerRecommendationRankingUrl = () => {
+
+
+
+
+  return `/api/v1/partner/recommendation-ranking`
+}
+
+/**
+ * Returns active false until a real job payment is confirmed in production.
+ * @summary Get the active recommendation ranking status for the Partner
+ */
+export const getPartnerRecommendationRanking = async ( options?: Parameters<typeof customFetch>[1]): Promise<PartnerRecommendationRankingStatus> => {
+
+  return customFetch<PartnerRecommendationRankingStatus>(getGetPartnerRecommendationRankingUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetPartnerRecommendationRankingQueryKey = () => {
+    return [
+    `/api/v1/partner/recommendation-ranking`
+    ] as const;
+    }
+
+
+export const getGetPartnerRecommendationRankingQueryOptions = <TData = Awaited<ReturnType<typeof getPartnerRecommendationRanking>>, TError = ErrorType<void>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getPartnerRecommendationRanking>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetPartnerRecommendationRankingQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getPartnerRecommendationRanking>>> = ({ signal }) => getPartnerRecommendationRanking({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getPartnerRecommendationRanking>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetPartnerRecommendationRankingQueryResult = NonNullable<Awaited<ReturnType<typeof getPartnerRecommendationRanking>>>
+export type GetPartnerRecommendationRankingQueryError = ErrorType<void>
+
+
+/**
+ * @summary Get the active recommendation ranking status for the Partner
+ */
+
+export function useGetPartnerRecommendationRanking<TData = Awaited<ReturnType<typeof getPartnerRecommendationRanking>>, TError = ErrorType<void>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getPartnerRecommendationRanking>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetPartnerRecommendationRankingQueryOptions(options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 

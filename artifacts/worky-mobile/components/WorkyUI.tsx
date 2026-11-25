@@ -103,16 +103,17 @@ export function ErrorNotice({
 export function Screen({
   children,
   scroll = true,
+  hasHeader = false,
   contentStyle,
   ...props
-}: ScrollViewProps & { scroll?: boolean; contentStyle?: ViewProps['style'] }) {
+}: ScrollViewProps & { scroll?: boolean; hasHeader?: boolean; contentStyle?: ViewProps['style'] }) {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const top = insets.top || (typeof window !== 'undefined' ? 67 : 0);
   const bottom = insets.bottom || (typeof window !== 'undefined' ? 34 : 0);
   const layout = [
     styles.screenContent,
-    { paddingTop: top + 14, paddingBottom: bottom + 112 },
+    { paddingTop: hasHeader ? 14 : top + 14, paddingBottom: bottom + 112 },
     contentStyle,
   ];
 
@@ -300,7 +301,7 @@ export function SuccessNotice({
         noticeStyle,
       ]}
     >
-      <Feather name="check-circle" size={16} color={colors.secondary} />
+      <Feather name="check-circle" size={16} color={colors.foreground} />
       <AppText variant="caption" style={{ color: colors.foreground, flex: 1 }}>{message}</AppText>
     </Animated.View>
   );
@@ -308,16 +309,53 @@ export function SuccessNotice({
 
 export function TextField({
   label,
+  hideLabel = false,
   inverse = false,
+  showPasswordToggle = false,
+  secureTextEntry = false,
   style,
   ...props
-}: TextInputProps & { label: string; inverse?: boolean }) {
+}: TextInputProps & { label: string; hideLabel?: boolean; inverse?: boolean; showPasswordToggle?: boolean }) {
   const colors = useColors();
+  const [passwordVisible, setPasswordVisible] = React.useState(false);
+  if (showPasswordToggle && secureTextEntry) {
+    return (
+      <View style={styles.fieldWrap}>
+        {!hideLabel && <AppText variant="label" onDark={inverse} style={styles.fieldLabel}>{label}</AppText>}
+        <View style={[
+          styles.input,
+          styles.passwordField,
+          {
+            backgroundColor: inverse ? colors.authField : colors.card,
+            borderColor: inverse ? colors.authBorder : colors.border,
+            borderRadius: Math.min(colors.radius, 14),
+          },
+        ]}>
+          <TextInput
+            {...props}
+            secureTextEntry={!passwordVisible}
+            placeholderTextColor={inverse ? colors.authPlaceholder : colors.mutedForeground}
+            style={[styles.passwordText, { color: inverse ? colors.secondaryForeground : colors.foreground }, style]}
+          />
+          <Pressable
+            onPress={() => setPasswordVisible((visible) => !visible)}
+            accessibilityRole="button"
+            accessibilityLabel={passwordVisible ? 'Ocultar contraseña' : 'Mostrar contraseña'}
+            testID="button-toggle-password-visibility"
+            hitSlop={8}
+          >
+            <Feather name={passwordVisible ? 'eye-off' : 'eye'} size={19} color={inverse ? colors.authMuted : colors.mutedForeground} />
+          </Pressable>
+        </View>
+      </View>
+    );
+  }
   return (
     <View style={styles.fieldWrap}>
-      <AppText variant="label" onDark={inverse} style={styles.fieldLabel}>{label}</AppText>
+      {!hideLabel && <AppText variant="label" onDark={inverse} style={styles.fieldLabel}>{label}</AppText>}
       <TextInput
         {...props}
+        secureTextEntry={secureTextEntry}
         placeholderTextColor={inverse ? colors.authPlaceholder : colors.mutedForeground}
         style={[
           styles.input,
@@ -357,15 +395,35 @@ export function PageTitle({
   );
 }
 
-export function BrandHeader({ onDark = false }: { onDark?: boolean }) {
-  return (
-    <View style={styles.brandRow}>
+export function BrandHeader({
+  onDark = false,
+  compact = false,
+  small = false,
+  centered = false,
+  onPress,
+  accessibilityLabel = 'Worky, volver al inicio',
+}: { onDark?: boolean; compact?: boolean; small?: boolean; centered?: boolean; onPress?: () => void; accessibilityLabel?: string }) {
+  const brand = (
+    <View testID="worky-brand-header" style={[styles.brandRow, centered && styles.brandRowCentered]}>
       {onDark ? (
-        <Image source={require('../assets/images/worky-logo.png')} style={styles.brandLogo} resizeMode="contain" />
+        <Image source={require('../assets/images/worky-logo.png')} style={small ? styles.brandLogoSmall : compact ? styles.brandLogoLight : styles.brandLogo} resizeMode="contain" />
       ) : (
-        <Image source={require('../assets/images/worky-logo-light.png')} style={styles.brandLogoLight} resizeMode="contain" />
+        <Image source={require('../assets/images/worky-logo-light.png')} style={small ? styles.brandLogoSmall : styles.brandLogoLight} resizeMode="contain" />
       )}
     </View>
+  );
+  if (!onPress) return brand;
+  return (
+    <Pressable
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={accessibilityLabel}
+      accessibilityHint="Vuelve a la pantalla principal de Worky."
+      testID="button-worky-home"
+      hitSlop={8}
+    >
+      {brand}
+    </Pressable>
   );
 }
 
@@ -384,7 +442,7 @@ export function StateMessage({
   return (
     <View style={styles.stateMessage}>
       <View style={[styles.stateIcon, { backgroundColor: colors.muted }]}>
-        <Feather name={icon} size={22} color={colors.secondary} />
+        <Feather name={icon} size={22} color={colors.foreground} />
       </View>
       <AppText variant="heading" style={{ textAlign: 'center' }}>{title}</AppText>
       <AppText style={{ color: colors.mutedForeground, textAlign: 'center' }}>{message}</AppText>
@@ -518,10 +576,14 @@ const styles = StyleSheet.create({
     fontFamily: 'DMSans_400Regular',
     fontSize: 15,
   },
+  passwordField: { flexDirection: 'row', alignItems: 'center', paddingRight: 14 },
+  passwordText: { flex: 1, minHeight: 48, paddingVertical: 12, fontFamily: 'DMSans_400Regular', fontSize: 15, backgroundColor: 'transparent' },
   titleWrap: { gap: 6, marginBottom: 2 },
   brandRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 2 },
+  brandRowCentered: { justifyContent: 'center' },
   brandLogo: { height: 47, width: 148 },
   brandLogoLight: { width: 112, height: 36 },
+  brandLogoSmall: { width: 76, height: 26 },
   stateMessage: { alignItems: 'center', justifyContent: 'center', paddingVertical: 36, paddingHorizontal: 14, gap: 10 },
   stateIcon: { width: 52, height: 52, borderRadius: 18, alignItems: 'center', justifyContent: 'center', marginBottom: 3 },
 });

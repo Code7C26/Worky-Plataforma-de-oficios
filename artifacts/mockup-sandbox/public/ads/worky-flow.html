@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="es-AR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Worky — Así funciona</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+  <style>
+    * { box-sizing: border-box; }
+    html, body, .ad {
+      width: 100vw;
+      height: 100vh;
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+    }
+    body { background: #D9682C; }
+    .ad {
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      color: #FFF8EC;
+      background: #D9682C;
+      padding: 7.1vh 8.2vw 7.2vh;
+      font-family: 'DM Sans', sans-serif;
+    }
+    .logo {
+      display: block;
+      width: 22vw;
+      height: 11vh;
+      max-width: 22vw;
+      max-height: 11vh;
+      object-fit: contain;
+      object-position: left top;
+    }
+    h1 {
+      margin: auto 0 0;
+      max-width: 82vw;
+      color: #FFF8EC;
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: 12.1vw;
+      font-weight: 700;
+      letter-spacing: -0.075em;
+      line-height: .91;
+    }
+    .benefit {
+      max-width: 76vw;
+      margin: 4.1vh 0 0;
+      color: #FFF8EC;
+      font-size: 4.1vw;
+      font-weight: 500;
+      letter-spacing: -.025em;
+      line-height: 1.27;
+    }
+    .cta {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 7.2vh;
+      margin-top: 5.1vh;
+      padding: 0 7.1vw;
+      border: 0;
+      border-radius: 999vw;
+      background: #FFF8EC;
+      color: #54230F;
+      font-family: 'DM Sans', sans-serif;
+      font-size: 3.7vw;
+      font-weight: 700;
+      letter-spacing: -.015em;
+      line-height: 1;
+      text-decoration: none;
+      cursor: pointer;
+    }
+    @media (min-aspect-ratio: 4/5) {
+      .ad { padding-top: 6.5vh; padding-bottom: 6.6vh; }
+      .logo { width: 19vw; height: 10vh; max-width: 19vw; max-height: 10vh; }
+      h1 { font-size: 10.8vw; }
+      .benefit { max-width: 66vw; font-size: 3.6vw; }
+      .cta { font-size: 3.2vw; }
+    }
+  </style>
+</head>
+<body>
+  <main class="ad" aria-label="Worky: cómo funciona">
+    <img class="logo" src="worky-logo.png" alt="Worky">
+    <h1>Publicá.<br>Elegí.<br>Resolvé.</h1>
+    <p class="benefit">Contá qué necesitás y conectate con quien sabe hacerlo.</p>
+    <a class="cta" href="#como-funciona">Así funciona</a>
+  </main>
+</body>
+</html>

@@ -7,4 +7,6 @@ Worky keeps notifications shared at the account level, while the conversation in
 
 **Why:** The same account can switch between hiring and offering services without fragmenting its professional reputation or losing work. Mixing both chat contexts makes the inbox ambiguous, while notifications should remain a single account-wide stream.
 
-**How to apply:** Change only the active role; preserve the existing professional profile and associated records. When switching to Partner, route the user to complete or review that profile. Preserve the role filter when changing conversation-list queries or cache keys. Do not apply it to `/notificaciones`; that feed remains shared.
+**How to apply:** Change only the active role; preserve the existing professional profile and associated records. When switching to Partner, route the user to complete or review that profile. Preserve the role filter when changing conversation-list queries or cache keys. Do not apply it to `/notificaciones`; that feed remains shared. For a client inbox, hide a new conversation until the assigned Partner sends a message; client-only messages and a newly accepted job must not create a placeholder row.
+
+**Why:** The user explicitly asked for client chats to appear only after the professional replies, not when the client requests a job.

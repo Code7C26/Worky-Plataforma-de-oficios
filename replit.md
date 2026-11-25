@@ -38,6 +38,12 @@ Marketplace que conecta clientes con profesionales de oficios para publicar, ace
 - El cliente invalida las consultas afectadas después de cada mutación para reflejar los cambios al navegar.
 - El flujo de aceptación valida que un trabajo publicado no pueda ser aceptado dos veces.
 
+## Registro de trabajo
+
+- Al completar cada tarea de desarrollo de este proyecto, agregar una entrada fechada a `docs/historial-de-cambios-worky.md`.
+- Incluir el objetivo, el resultado, las pruebas ejecutadas y sus resultados, referencias de commit cuando existan y si el cambio llegó o no a producción.
+- Usar la fecha local de `America/Buenos_Aires`; no presentar como terminada una tarea pendiente ni asignar fechas retrospectivas sin evidencia.
+
 ## Product
 
 Los clientes pueden registrarse, iniciar sesión, buscar profesionales, ver perfiles, publicar changas y conversar. Los profesionales pueden crear su perfil, revisar oportunidades filtradas por categoría, aceptar trabajos de forma atómica y responder mensajes.

@@ -6,6 +6,11 @@ export const ADMIN_SIGNUP_MAX_ATTEMPTS = 5;
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
+export function getPrimaryAdminEmail(raw = process.env.WORKY_ADMIN_PRIMARY_EMAIL) {
+  const email = raw?.trim().toLowerCase();
+  return email && EMAIL_PATTERN.test(email) ? email : null;
+}
+
 export function getAdminSignupAllowlist(raw = process.env.WORKY_ADMIN_SIGNUP_ALLOWED_EMAILS) {
   return new Set(
     (raw ?? "")

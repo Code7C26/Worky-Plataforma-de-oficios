@@ -4,11 +4,12 @@ import { TextDecoder } from "node:util";
 import bcrypt from "bcryptjs";
 import sharp from "sharp";
 import app from "../src/app";
-import { getNotificationSubscriberCount } from "../src/routes/worky";
+import { getNotificationSubscriberCount, releaseMaturedVisitBalances } from "../src/routes/worky";
 import { CHAT_ATTACHMENT_GRACE_PERIOD_MS, cleanupAbandonedChatAttachments, cleanupAbandonedProfilePhotoUploads, PROFILE_PHOTO_GRACE_PERIOD_MS } from "../src/routes/storage";
-import { getObject } from "../src/lib/storage";
-import { and, eq, or } from "drizzle-orm";
-import { chatUploads, db, bookings, jobs, messages, professionalProfiles, profilePhotoUploads, reviews, users, workyAuditEvents, workyNotifications } from "@workspace/db";
+import { beginClientIdentityReview, finalizeClientIdentityReview, getClientIdentityStatus } from "../src/lib/client-verification";
+import { deleteObject, getObject } from "../src/lib/storage";
+import { and, eq, inArray, or } from "drizzle-orm";
+import { chatUploads, clientIdentityVerifications, clientVerificationUploads, db, bookings, jobs, messages, payments, professionalProfiles, profilePhotoUploads, reviews, users, visitPayments, workyAuditEvents, workyNotifications } from "@workspace/db";
 
 const unique = `privacy-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const password = "privacy-test-password";
@@ -119,6 +120,29 @@ async function uploadChatImage(server: http.Server, token: string, participantId
   return objectPath;
 }
 
+async function uploadClientVerificationImage(server: http.Server, token: string, documentType: "dni" | "selfie", image: Buffer) {
+  const prepared = await request(server, `${baseUrl}/storage/uploads/request-url`, {
+    method: "POST",
+    token,
+    body: {
+      name: `${documentType}.png`,
+      size: image.length,
+      contentType: "image/png",
+      purpose: "client_verification",
+      documentType,
+    },
+  });
+  assert.equal(prepared.status, 200);
+  assert.equal(prepared.body.purpose, "client_verification");
+  const uploaded = await fetch(prepared.body.uploadURL, {
+    method: "PUT",
+    headers: { "Content-Type": "image/png", "Content-Length": String(image.length) },
+    body: image,
+  });
+  assert.equal(uploaded.ok, true);
+  return { uploadId: prepared.body.uploadId as number, objectPath: prepared.body.objectPath as string };
+}
+
 async function register(server: http.Server, name: string) {
   const email = `${unique}-${name}@example.test`;
   const passwordHash = await bcrypt.hash(password, 12);
@@ -150,6 +174,8 @@ async function run() {
   let changaId: number | undefined;
   let secondChangaId: number | undefined;
   let streamChangaId: number | undefined;
+  let clientVerificationId: number | undefined;
+  const clientVerificationObjectPaths: string[] = [];
   let partnerStream: NotificationStream | undefined;
   let partnerSurvivorStream: NotificationStream | undefined;
   let outsiderStream: NotificationStream | undefined;
@@ -170,6 +196,124 @@ async function run() {
         background: { r: 35, g: 112, b: 94 },
       },
     }).png().toBuffer();
+    const missingConsent = await request(server, `${baseUrl}/auth/client-verification`, {
+      method: "POST",
+      token: client.token,
+      body: { dniUploadId: 1, selfieUploadId: 2 },
+    });
+    assert.equal(missingConsent.status, 400);
+    assert.match(missingConsent.body.error, /consentimiento/);
+    const dniUpload = await uploadClientVerificationImage(server, client.token, "dni", sourceImage);
+    const selfieUpload = await uploadClientVerificationImage(server, client.token, "selfie", sourceImage);
+    clientVerificationObjectPaths.push(dniUpload.objectPath, selfieUpload.objectPath);
+    const submittedVerification = await request(server, `${baseUrl}/auth/client-verification`, {
+      method: "POST",
+      token: client.token,
+      body: { dniUploadId: dniUpload.uploadId, selfieUploadId: selfieUpload.uploadId, consent: true },
+    });
+    assert.equal(submittedVerification.status, 201);
+    assert.equal(submittedVerification.body.status, "pending_verification");
+    assert.deepEqual(Object.keys(submittedVerification.body).sort(), ["reasonCode", "reviewedAt", "status", "submittedAt"]);
+    const [verificationCase] = await db.select().from(clientIdentityVerifications)
+      .where(eq(clientIdentityVerifications.usuarioId, clientId));
+    assert.ok(verificationCase);
+    clientVerificationId = verificationCase.id;
+    const reviewPaths = [verificationCase.dniObjectPath, verificationCase.selfieObjectPath]
+      .filter((path): path is string => Boolean(path));
+    assert.equal(reviewPaths.length, 2);
+    clientVerificationObjectPaths.push(...reviewPaths);
+    for (const path of reviewPaths) assert.ok(await getObject(path), "la copia privada debe estar disponible solo para revisión");
+    const uploadIds = [dniUpload.uploadId, selfieUpload.uploadId];
+    await db.update(clientVerificationUploads).set({
+      createdAt: new Date(Date.now() - 10 * 60 * 1000),
+    }).where(inArray(clientVerificationUploads.id, uploadIds));
+    assert.ok(await beginClientIdentityReview(clientVerificationId, partnerId, "verified", null));
+    const identityOriginalFetch = globalThis.fetch;
+    let identityFailedDeletes = 0;
+    globalThis.fetch = async (input, init) => {
+      if (init?.method === "DELETE") {
+        identityFailedDeletes += 1;
+        return new Response("temporary storage failure", { status: 503 });
+      }
+      return identityOriginalFetch(input, init);
+    };
+    try {
+      const temporaryFailure = await finalizeClientIdentityReview(clientVerificationId);
+      assert.equal(temporaryFailure.kind, "delete-failed");
+      assert.ok(identityFailedDeletes > 0);
+    } finally {
+      globalThis.fetch = identityOriginalFetch;
+    }
+    const [waitingForCleanup] = await db.select().from(clientIdentityVerifications)
+      .where(eq(clientIdentityVerifications.id, clientVerificationId));
+    assert.equal(waitingForCleanup.estado, "deleting");
+    assert.equal((await db.select({ clientIdentityVerifiedAt: users.clientIdentityVerifiedAt }).from(users)
+      .where(eq(users.id, clientId)))[0]?.clientIdentityVerifiedAt, null);
+    const resolvedVerification = await finalizeClientIdentityReview(clientVerificationId);
+    assert.equal(resolvedVerification.kind, "resolved");
+    assert.equal((await getClientIdentityStatus(clientId)).status, "verified");
+    const [resolvedCase] = await db.select().from(clientIdentityVerifications)
+      .where(eq(clientIdentityVerifications.id, clientVerificationId));
+    assert.equal(resolvedCase.dniObjectPath, null);
+    assert.equal(resolvedCase.selfieObjectPath, null);
+    const resolvedUploads = await db.select().from(clientVerificationUploads)
+      .where(inArray(clientVerificationUploads.id, uploadIds));
+    assert.equal(resolvedUploads.length, 2);
+    assert.ok(resolvedUploads.every((upload) =>
+      upload.estado === "deleted" && upload.objectPath === null && upload.reviewObjectPath === null
+      && upload.contentType === null && upload.sizeBytes === null,
+    ));
+    for (const path of clientVerificationObjectPaths) assert.equal(await getObject(path), null);
+    const [approvalAudit] = await db.select().from(workyAuditEvents).where(and(
+      eq(workyAuditEvents.entidad, "client_identity_verification"),
+      eq(workyAuditEvents.entidadId, clientVerificationId),
+      eq(workyAuditEvents.accion, "client_identity_approved"),
+    ));
+    assert.deepEqual(approvalAudit?.metadata, { reasonCode: null });
+
+    const rejectedDniUpload = await uploadClientVerificationImage(server, outsider.token, "dni", sourceImage);
+    const rejectedSelfieUpload = await uploadClientVerificationImage(server, outsider.token, "selfie", sourceImage);
+    clientVerificationObjectPaths.push(rejectedDniUpload.objectPath, rejectedSelfieUpload.objectPath);
+    const rejectedSubmission = await request(server, `${baseUrl}/auth/client-verification`, {
+      method: "POST",
+      token: outsider.token,
+      body: { dniUploadId: rejectedDniUpload.uploadId, selfieUploadId: rejectedSelfieUpload.uploadId, consent: true },
+    });
+    assert.equal(rejectedSubmission.status, 201);
+    const [rejectedCase] = await db.select().from(clientIdentityVerifications)
+      .where(eq(clientIdentityVerifications.usuarioId, outsiderId));
+    assert.ok(rejectedCase);
+    const rejectedReviewPaths = [rejectedCase.dniObjectPath, rejectedCase.selfieObjectPath]
+      .filter((path): path is string => Boolean(path));
+    clientVerificationObjectPaths.push(...rejectedReviewPaths);
+    await db.update(clientVerificationUploads).set({
+      createdAt: new Date(Date.now() - 10 * 60 * 1000),
+    }).where(inArray(clientVerificationUploads.id, [rejectedDniUpload.uploadId, rejectedSelfieUpload.uploadId]));
+    assert.ok(await beginClientIdentityReview(rejectedCase.id, partner.usuario.id, "rejected", "dni_unreadable"));
+    assert.equal((await finalizeClientIdentityReview(rejectedCase.id)).kind, "resolved");
+    const rejectedStatus = await getClientIdentityStatus(outsiderId);
+    assert.equal(rejectedStatus.status, "rejected");
+    assert.equal(rejectedStatus.reasonCode, "dni_unreadable");
+    assert.equal((await db.select({ clientIdentityVerifiedAt: users.clientIdentityVerifiedAt }).from(users)
+      .where(eq(users.id, outsiderId)))[0]?.clientIdentityVerifiedAt, null);
+    const reuploadDni = await uploadClientVerificationImage(server, outsider.token, "dni", sourceImage);
+    const reuploadSelfie = await uploadClientVerificationImage(server, outsider.token, "selfie", sourceImage);
+    clientVerificationObjectPaths.push(reuploadDni.objectPath, reuploadSelfie.objectPath);
+    const resubmittedVerification = await request(server, `${baseUrl}/auth/client-verification`, {
+      method: "POST",
+      token: outsider.token,
+      body: { dniUploadId: reuploadDni.uploadId, selfieUploadId: reuploadSelfie.uploadId, consent: true },
+    });
+    assert.equal(resubmittedVerification.status, 201);
+    assert.equal(resubmittedVerification.body.status, "pending_verification");
+    const [resubmittedCase] = await db.select().from(clientIdentityVerifications)
+      .where(eq(clientIdentityVerifications.usuarioId, outsiderId));
+    assert.ok(resubmittedCase);
+    clientVerificationObjectPaths.push(
+      ...[resubmittedCase.dniObjectPath, resubmittedCase.selfieObjectPath]
+        .filter((path): path is string => Boolean(path)),
+    );
+
     const uploadUrlResponse = await request(server, `${baseUrl}/storage/uploads/request-url`, {
       method: "POST",
       token: partner.token,
@@ -335,12 +479,27 @@ async function run() {
     const raceCurrentPhotoResponse = await fetch(await absoluteUrl(server, `${baseUrl}/storage/public-objects${raceRenderedPath}`));
     assert.equal(raceCurrentPhotoResponse.status, 200);
 
+    const removedProfilePhoto = await request(server, `${baseUrl}/auth/profile-photo`, {
+      method: "DELETE",
+      token: partner.token,
+    });
+    assert.equal(removedProfilePhoto.status, 200);
+    assert.deepEqual(removedProfilePhoto.body, { fotoObjectPath: null });
+    const removedPhotoPublicResponse = await fetch(await absoluteUrl(server, `${baseUrl}/storage/public-objects${raceRenderedPath}`));
+    assert.equal(removedPhotoPublicResponse.status, 404);
+    const [photoRemovedFromAccount] = await db.select({ fotoObjectPath: users.fotoObjectPath }).from(users).where(eq(users.id, partnerId));
+    assert.equal(photoRemovedFromAccount?.fotoObjectPath, null);
+    const [removedPhotoUpload] = await db.select({ estado: profilePhotoUploads.estado }).from(profilePhotoUploads)
+      .where(eq(profilePhotoUploads.objectPath, raceRenderedPath));
+    assert.equal(removedPhotoUpload?.estado, "deleted");
+
     const profile = await request(server, `${baseUrl}/partner-profile`, {
       method: "POST",
       token: partner.token,
-      body: { oficio: "Gasista de pruebas", categoria: "Gas", precioReferencia: 12000 },
+      body: { oficio: "Gasista de pruebas", categoria: "Gas", precioReferencia: 12000, ubicacionFija: { direccionTexto: "San Martín 45", ciudad: "Alta Gracia" } },
     });
     assert.equal(profile.status, 201);
+    await db.update(users).set({ rol: "profesional" }).where(eq(users.id, partnerId));
     await db.update(professionalProfiles).set({
       verificado: true,
       estadoVerificacion: "verified",
@@ -402,9 +561,13 @@ async function run() {
     assert.equal(partnerNotification.titulo, "Nueva solicitud de changa");
     assert.equal(partnerNotification.detalle, "Un cliente te eligió para una nueva changa.");
     assert.equal(partnerNotification.href, `/chat/${streamChangaId}`);
+    assert.equal(partnerNotification.changaId, streamChangaId);
     assert.equal(typeof partnerNotification.id, "number");
     const storedPartnerNotification = (await notifications(server, partner.token)).items.find((item) => item.id === partnerNotification.id);
-    assert.deepEqual(partnerNotification, storedPartnerNotification);
+    assert.equal(storedPartnerNotification?.changaId, streamChangaId);
+    assert.equal(storedPartnerNotification?.jobContext?.price, 17000);
+    assert.equal(storedPartnerNotification?.jobContext?.workerName, "privacy-partner");
+    assert.equal(storedPartnerNotification?.jobContext?.trade, "Gasista de pruebas");
     assert.equal(await readSseEvent(outsiderStream, 500), null);
 
     const created = await request(server, `${baseUrl}/trabajos`, {
@@ -415,10 +578,12 @@ async function run() {
         categoria: "Gas",
         precioOfrecido: 15000,
         detalle: `${unique} - detalle privado`,
+        paymentMethod: "efectivo",
       },
     });
     assert.equal(created.status, 201);
     changaId = created.body.id;
+    await db.delete(messages).where(eq(messages.changaId, changaId));
     // A failed prior run may leave audit rows after its job is removed. The new
     // job owns this id, so clear only its appointment history before exercising it.
     await db.delete(workyAuditEvents).where(and(
@@ -431,6 +596,11 @@ async function run() {
       token: partner.token,
     });
     assert.equal(accepted.status, 200);
+    assert.deepEqual(await db.select({ id: messages.id, emisorId: messages.emisorId }).from(messages).where(eq(messages.changaId, changaId)), []);
+    const emptyClientInbox = await request(server, `${baseUrl}/conversaciones`, { token: client.token });
+    const emptyPartnerInbox = await request(server, `${baseUrl}/conversaciones`, { token: partner.token });
+    assert.equal(emptyClientInbox.body.some((item: any) => item.changaId === changaId), false, JSON.stringify(emptyClientInbox.body.filter((item: any) => item.changaId === changaId)));
+    assert.equal(emptyPartnerInbox.body.some((item: any) => item.changaId === changaId), false, JSON.stringify(emptyPartnerInbox.body.filter((item: any) => item.changaId === changaId)));
 
     const outsiderPaths = [
       `${baseUrl}/trabajos/${changaId}`,
@@ -454,10 +624,9 @@ async function run() {
     })).status, 201);
     let partnerConversations = await request(server, `${baseUrl}/conversaciones`, { token: partner.token });
     assert.equal(partnerConversations.status, 200);
-    let partnerConversation = partnerConversations.body.find((item: any) => item.changaId === changaId);
-    assert.equal(partnerConversation.unread, 1);
+    assert.equal(partnerConversations.body.some((item: any) => item.changaId === changaId), true);
     let clientConversations = await request(server, `${baseUrl}/conversaciones`, { token: client.token });
-    assert.equal(clientConversations.body.find((item: any) => item.changaId === changaId).unread, 0);
+    assert.equal(clientConversations.body.some((item: any) => item.changaId === changaId), true);
     const partnerRoleConversations = await request(server, `${baseUrl}/conversaciones?rol=profesional`, { token: partner.token });
     assert.equal(partnerRoleConversations.status, 200);
     assert.equal(partnerRoleConversations.body.some((item: any) => item.changaId === changaId), true);
@@ -478,8 +647,16 @@ async function run() {
     assert.equal(partnerSent.status, 201);
     const clientMessages = await request(server, `${baseUrl}/chats/${changaId}/mensajes`, { token: client.token });
     assert.deepEqual(clientMessages.body.map((item: any) => item.texto), [clientMessage, partnerMessage]);
+    partnerConversations = await request(server, `${baseUrl}/conversaciones`, { token: partner.token });
+    const partnerConversation = partnerConversations.body.find((item: any) => item.changaId === changaId);
+    assert.equal(partnerConversation.unread, 1);
     clientConversations = await request(server, `${baseUrl}/conversaciones`, { token: client.token });
+    assert.equal(clientConversations.body.some((item: any) => item.changaId === changaId), true);
     assert.equal(clientConversations.body.find((item: any) => item.changaId === changaId).unread, 1);
+    const partnerRoleInboxAfterReply = await request(server, `${baseUrl}/conversaciones?rol=profesional`, { token: partner.token });
+    assert.equal(partnerRoleInboxAfterReply.body.some((item: any) => item.changaId === changaId), true);
+    const clientRoleInboxAfterReply = await request(server, `${baseUrl}/conversaciones?rol=cliente`, { token: client.token });
+    assert.equal(clientRoleInboxAfterReply.body.some((item: any) => item.changaId === changaId), true);
     assert.equal((await request(server, `${baseUrl}/chats/${changaId}/leidos`, {
       method: "POST", token: client.token,
     })).status, 204);
@@ -489,10 +666,10 @@ async function run() {
     const clientChatImagePath = await uploadChatImage(server, client.token, clientId, changaId, sourceImage, "client-chat-image.png");
     const partnerChatImagePath = await uploadChatImage(server, partner.token, partnerId, changaId, sourceImage, "partner-chat-image.png");
     const trackedUploads = await db.select().from(chatUploads).where(eq(chatUploads.changaId, changaId));
-    assert.deepEqual(trackedUploads.map((upload) => ({ objectPath: upload.objectPath, estado: upload.estado })), [
+    assert.deepEqual(trackedUploads.map((upload) => ({ objectPath: upload.objectPath, estado: upload.estado })).sort((a, b) => a.objectPath.localeCompare(b.objectPath)), [
       { objectPath: clientChatImagePath, estado: "pending" },
       { objectPath: partnerChatImagePath, estado: "pending" },
-    ]);
+    ].sort((a, b) => a.objectPath.localeCompare(b.objectPath)));
     const clientAttachment = { objectPath: clientChatImagePath, nombre: "client-chat-image.png", contentType: "image/png", sizeBytes: sourceImage.length };
     const partnerAttachment = { objectPath: partnerChatImagePath, nombre: "partner-chat-image.png", contentType: "image/png", sizeBytes: sourceImage.length };
 
@@ -684,9 +861,9 @@ async function run() {
 
     const clientNotificationsBeforeProposal = await notifications(server, client.token);
     const partnerNotificationsBeforeProposal = await notifications(server, partner.token);
-    const future = new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString();
+    const future = new Date(Date.now() + 20 * 60 * 1000).toISOString();
     const booking = await request(server, `${baseUrl}/chats/${changaId}/citas`, {
-      method: "POST", token: partner.token, body: { empiezaAt: future },
+      method: "POST", token: partner.token, body: { empiezaAt: future, tarifaVisita: 10000 },
     });
     assert.equal(booking.status, 201);
     // Keep both authenticated clients open: the Partner creates the proposal
@@ -720,13 +897,14 @@ async function run() {
     assert.equal((await notifications(server, outsider.token)).items.some((item) => item.titulo === "Nueva propuesta de visita"), false);
     assert.equal((await notifications(server, partner.token)).items.length, partnerNotificationsBeforeProposal.items.length);
     assert.equal((await request(server, `${baseUrl}/citas/${booking.body.id}/aceptar`, {
-      method: "POST", token: partner.token,
+      method: "POST", token: partner.token, body: { paymentMethod: "efectivo" },
     })).status, 403);
     const acceptedAppointment = await request(server, `${baseUrl}/citas/${booking.body.id}/aceptar`, {
-      method: "POST", token: client.token,
+      method: "POST", token: client.token, body: { paymentMethod: "efectivo" },
     });
     assert.equal(acceptedAppointment.status, 200);
-    assert.equal(acceptedAppointment.body.estado, "confirmada");
+    assert.equal(acceptedAppointment.body.appointment.estado, "confirmada");
+    assert.equal(acceptedAppointment.body.appointment.finanzas.status, "cash_pending_visit");
     // The second session sees the acceptance as a new history record, not
     // merely the stale proposal it loaded before the action.
     const partnerHistoryAfterAcceptance = await request(server, `${baseUrl}/chats/${changaId}/historial-visitas`, {
@@ -748,16 +926,36 @@ async function run() {
     assert.equal(acceptanceNotification.href, `/chat/${changaId}`);
 
     const blockedBooking = await request(server, `${baseUrl}/chats/${changaId}/citas`, {
-      method: "POST", token: partner.token, body: { empiezaAt: new Date(Date.now() + 72 * 60 * 60 * 1000).toISOString() },
+      method: "POST", token: partner.token, body: { empiezaAt: new Date(Date.now() + 72 * 60 * 60 * 1000).toISOString(), tarifaVisita: 10000 },
     });
     assert.equal(blockedBooking.status, 409);
-    const cancelledAppointment = await request(server, `${baseUrl}/citas/${booking.body.id}`, {
+    assert.equal((await request(server, `${baseUrl}/citas/${booking.body.id}/llegada`, { method: "POST", token: partner.token })).status, 200);
+    const completedVisit = await request(server, `${baseUrl}/citas/${booking.body.id}/completar`, { method: "POST", token: partner.token });
+    assert.equal(completedVisit.status, 200);
+    assert.equal(completedVisit.body.finanzas.status, "cash_commission_due");
+    const confirmedVisit = await request(server, `${baseUrl}/citas/${booking.body.id}/confirmar-visita`, { method: "POST", token: client.token });
+    assert.equal(confirmedVisit.status, 200);
+    assert.equal(confirmedVisit.body.finanzas.status, "cash_commission_due");
+    const [visitLedger] = await db.select().from(visitPayments).where(eq(visitPayments.bookingId, booking.body.id));
+    await db.update(visitPayments).set({
+      method: "mercado_pago",
+      status: "pending_release",
+      releaseAt: new Date(Date.now() - 60_000),
+    }).where(eq(visitPayments.id, visitLedger.id));
+    assert.ok(await releaseMaturedVisitBalances() >= 1);
+    const [releasedVisit] = await db.select().from(visitPayments).where(eq(visitPayments.id, visitLedger.id));
+    assert.equal(releasedVisit.status, "available");
+    const cancelableBooking = await request(server, `${baseUrl}/chats/${changaId}/citas`, {
+      method: "POST", token: partner.token, body: { empiezaAt: new Date(Date.now() + 72 * 60 * 60 * 1000).toISOString(), tarifaVisita: 10000 },
+    });
+    assert.equal(cancelableBooking.status, 201);
+    const cancelledAppointment = await request(server, `${baseUrl}/citas/${cancelableBooking.body.id}`, {
       method: "PATCH", token: client.token, body: { accion: "cancelar" },
     });
     assert.equal(cancelledAppointment.status, 200);
     assert.equal(cancelledAppointment.body.estado, "cancelada");
     const rejectedBooking = await request(server, `${baseUrl}/chats/${changaId}/citas`, {
-      method: "POST", token: partner.token, body: { empiezaAt: new Date(Date.now() + 72 * 60 * 60 * 1000).toISOString() },
+      method: "POST", token: partner.token, body: { empiezaAt: new Date(Date.now() + 72 * 60 * 60 * 1000).toISOString(), tarifaVisita: 10000 },
     });
     assert.equal(rejectedBooking.status, 201);
     assert.equal((await request(server, `${baseUrl}/citas/${rejectedBooking.body.id}/rechazar`, {
@@ -798,7 +996,7 @@ async function run() {
     })).status, 403);
     const history = await request(server, `${baseUrl}/chats/${changaId}/historial-visitas`, { token: client.token });
     assert.equal(history.status, 200);
-    assert.equal(history.body.length, 8);
+    assert.equal(history.body.length, 9);
     assert.deepEqual(new Set(history.body.map((attempt: any) => `${attempt.accion}:${attempt.resultado}`)), new Set([
       "rechazar:error_red",
       "proponer:error_validacion",
@@ -829,7 +1027,7 @@ async function run() {
     })).status, 201);
     const clientNotificationsBeforeSecondProposal = await notifications(server, client.token);
     const secondProposal = await request(server, `${baseUrl}/chats/${secondChangaId}/citas`, {
-      method: "POST", token: partner.token, body: { empiezaAt: new Date(Date.now() + 120 * 60 * 60 * 1000).toISOString() },
+      method: "POST", token: partner.token, body: { empiezaAt: new Date(Date.now() + 120 * 60 * 60 * 1000).toISOString(), tarifaVisita: 10000 },
     });
     assert.equal(secondProposal.status, 201);
     const clientNotificationsAfterSecondProposal = await notifications(server, client.token);
@@ -866,13 +1064,34 @@ async function run() {
     })).status, 200);
     assert.equal((await request(server, `${baseUrl}/trabajos/${changaId}`, {
       method: "PATCH", token: partner.token, body: { estado: "finalizada" },
-    })).status, 200);
+    })).status, 409);
     const reviewPayload = {
       changaId,
       rating: 5,
       comentario: "Trabajo excelente.",
       adjuntos: [{ objectPath: "reviews/evidence.jpg", nombre: "evidence.jpg", mimeType: "image/jpeg" }],
     };
+    const workDone = await request(server, `${baseUrl}/trabajos/${changaId}`, {
+      method: "PATCH", token: partner.token, body: { estado: "trabajo_realizado" },
+    });
+    assert.equal(workDone.status, 200);
+    assert.equal(workDone.body.estado, "trabajo_realizado");
+    assert.equal((await request(server, `${baseUrl}/reviews`, {
+      method: "POST", token: client.token, body: reviewPayload,
+    })).status, 409);
+    const clientCashConfirmation = await request(server, `${baseUrl}/trabajos/${changaId}/confirmar-pago-efectivo`, {
+      method: "POST", token: client.token,
+    });
+    assert.equal(clientCashConfirmation.status, 200);
+    assert.equal(clientCashConfirmation.body.estado, "trabajo_realizado");
+    assert.equal(clientCashConfirmation.body.cashConfirmedByClient, true);
+    assert.equal(clientCashConfirmation.body.cashConfirmedByProfessional, false);
+    const professionalCashConfirmation = await request(server, `${baseUrl}/trabajos/${changaId}/confirmar-pago-efectivo`, {
+      method: "POST", token: partner.token,
+    });
+    assert.equal(professionalCashConfirmation.status, 200);
+    assert.equal(professionalCashConfirmation.body.estado, "finalizada");
+    assert.equal((await db.select().from(payments).where(and(eq(payments.changaId, changaId), eq(payments.provider, "efectivo")))).at(0)?.status, "aprobado");
     assert.equal((await request(server, `${baseUrl}/reviews`, {
       method: "POST", token: partner.token, body: reviewPayload,
     })).status, 403);
@@ -899,6 +1118,7 @@ async function run() {
     })).status, 409);
     assert.equal((await db.select().from(reviews).where(eq(reviews.changaId, changaId))).length, 1);
   } finally {
+    await Promise.all(clientVerificationObjectPaths.map((path) => deleteObject(path).catch(() => false)));
     if (partnerStream) await closeNotificationStream(partnerStream);
     if (partnerSurvivorStream) await closeNotificationStream(partnerSurvivorStream);
     if (outsiderStream) await closeNotificationStream(outsiderStream);
@@ -918,6 +1138,7 @@ async function run() {
       await db.delete(messages).where(eq(messages.changaId, secondChangaId));
     }
     if (changaId) {
+      await db.delete(payments).where(eq(payments.changaId, changaId));
       await db.delete(reviews).where(eq(reviews.changaId, changaId));
       await db.delete(bookings).where(eq(bookings.changaId, changaId));
       await db.delete(messages).where(eq(messages.changaId, changaId));
@@ -925,11 +1146,19 @@ async function run() {
     if (streamChangaId) await db.delete(jobs).where(eq(jobs.id, streamChangaId));
     if (secondChangaId) await db.delete(jobs).where(eq(jobs.id, secondChangaId));
     if (changaId) await db.delete(jobs).where(eq(jobs.id, changaId));
+    if (clientVerificationId) {
+      await db.delete(workyAuditEvents).where(and(
+        eq(workyAuditEvents.entidad, "client_identity_verification"),
+        eq(workyAuditEvents.entidadId, clientVerificationId),
+      ));
+      await db.delete(clientIdentityVerifications).where(eq(clientIdentityVerifications.id, clientVerificationId));
+    }
     if (partnerId) {
       await db.delete(professionalProfiles).where(eq(professionalProfiles.usuarioId, partnerId));
       await db.delete(workyNotifications).where(eq(workyNotifications.usuarioId, partnerId));
     }
     if (clientId) await db.delete(workyNotifications).where(eq(workyNotifications.usuarioId, clientId));
+    if (outsiderId) await db.delete(workyNotifications).where(eq(workyNotifications.usuarioId, outsiderId));
     if (outsiderId) await db.delete(users).where(eq(users.id, outsiderId));
     if (partnerId) await db.delete(users).where(eq(users.id, partnerId));
     if (clientId) await db.delete(users).where(eq(users.id, clientId));

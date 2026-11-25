@@ -6,6 +6,7 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { JobEstado } from './jobEstado';
+import type { JobPaymentMethod } from './jobPaymentMethod';
 import type { ParticipantUser } from './participantUser';
 import type { UserLocation } from './userLocation';
 
@@ -20,6 +21,9 @@ export interface Job {
   /** @nullable */
   detalle: string | null;
   estado: JobEstado;
+  paymentMethod: JobPaymentMethod;
+  cashConfirmedByClient: boolean;
+  cashConfirmedByProfessional: boolean;
   createdAt: string;
   updatedAt: string;
   cliente: ParticipantUser;

@@ -15,4 +15,6 @@ export interface MessageInput {
   texto: string;
   /** @maxItems 5 */
   adjuntos?: MessageAttachment[];
+  /** @nullable */
+  profesionalId?: number | null;
 }

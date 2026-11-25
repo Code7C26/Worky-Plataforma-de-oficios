@@ -34,16 +34,33 @@ export default function RegisterScreen() {
     setPending(true);
     setError('');
     try {
+      const normalizedEmail = email.trim().toLowerCase();
       await signUp({
         nombre: name.trim(),
-        email: email.trim().toLowerCase(),
+        email: normalizedEmail,
         password,
         ...(phone.trim() ? { telefono: phone.trim() } : {}),
         rol: role,
       });
-      router.replace('/(tabs)');
+      router.replace({
+        pathname: '/(auth)/verify-email',
+        params: { email: normalizedEmail, codeSent: '1' },
+      });
     } catch (reason) {
-      setError(getRequestError(reason, 'No pudimos crear tu cuenta. Revisá los datos e intentá nuevamente.'));
+      const code = getRequestErrorCode(reason);
+      if (code === 'EMAIL_VERIFICATION_DELIVERY_FAILED' || code === 'EMAIL_VERIFICATION_THROTTLED') {
+        const normalizedEmail = email.trim().toLowerCase();
+        router.replace({
+          pathname: '/(auth)/verify-email',
+          params: {
+            email: normalizedEmail,
+            codeSent: '0',
+            message: getRequestError(reason, 'No pudimos enviar el código. Podés volver a intentarlo.'),
+          },
+        });
+      } else {
+        setError(getRequestError(reason, 'No pudimos crear tu cuenta. Revisá los datos e intentá nuevamente.'));
+      }
     } finally {
       setPending(false);
     }
@@ -89,7 +106,7 @@ export default function RegisterScreen() {
             <TextField label="Nombre y apellido" inverse value={name} onChangeText={setName} placeholder="Tu nombre" autoComplete="name" testID="input-register-name" />
             <TextField label="Email" inverse value={email} onChangeText={setEmail} placeholder="nombre@email.com" keyboardType="email-address" autoCapitalize="none" autoComplete="email" accessibilityLabel="Email" testID="input-register-email" />
             <TextField label="Teléfono (opcional)" inverse value={phone} onChangeText={setPhone} placeholder="11 5555 5555" keyboardType="phone-pad" autoComplete="tel" testID="input-register-phone" />
-            <TextField label="Contraseña" inverse value={password} onChangeText={setPassword} placeholder="Al menos 6 caracteres" secureTextEntry autoComplete="new-password" testID="input-register-password" />
+            <TextField label="Contraseña" inverse value={password} onChangeText={setPassword} placeholder="Al menos 6 caracteres" secureTextEntry showPasswordToggle autoComplete="new-password" testID="input-register-password" />
             {error ? <LiveStatusText variant="caption" role="alert" testID="error-register" style={{ color: colors.destructive }}>{error}</LiveStatusText> : null}
             <Button
               label="Crear cuenta"
@@ -120,6 +137,14 @@ function getRequestError(reason: unknown, fallback: string) {
     if (reason instanceof Error && reason.message) return reason.message;
   }
   return fallback;
+}
+
+function getRequestErrorCode(reason: unknown) {
+  if (!reason || typeof reason !== 'object') return undefined;
+  const data = (reason as { data?: unknown }).data;
+  if (!data || typeof data !== 'object') return undefined;
+  const code = (data as { code?: unknown }).code;
+  return typeof code === 'string' ? code : undefined;
 }
 
 const styles = StyleSheet.create({

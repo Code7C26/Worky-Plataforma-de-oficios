@@ -5,6 +5,7 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
+import type { ProfessionalFixedLocation } from './professionalFixedLocation';
 import type { ProfessionalProfileEstadoVerificacion } from './professionalProfileEstadoVerificacion';
 import type { PublicUser } from './publicUser';
 
@@ -13,6 +14,7 @@ export interface ProfessionalProfile {
   usuarioId: number;
   oficio: string;
   categoria: string;
+  ubicacionFija: ProfessionalFixedLocation | null;
   /** @nullable */
   matriculaHabilitante?: string | null;
   verificado: boolean;
@@ -32,7 +34,13 @@ export interface ProfessionalProfile {
   completedJobs: number;
   recommendationsCount: number;
   /**
-     * Distancia aproximada en kilómetros; es null cuando la ubicación del profesional no tiene un heartbeat vigente (máximo 5 minutos).
+     * Internal ordering tier; 1 means the profile is shown lower in discovery results.
+     * @minimum 0
+     * @maximum 1
+     */
+  visibilityRank?: number;
+  /**
+     * Distancia aproximada entre la ubicación en vivo del cliente y la ubicación fija del taller del profesional.
      * @nullable
      */
   distanceKm?: number | null;

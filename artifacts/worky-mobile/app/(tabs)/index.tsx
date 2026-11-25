@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
-import { Pressable, ScrollView, View } from 'react-native';
+import { Alert, Linking, Platform, Pressable, ScrollView, View } from 'react-native';
 import { router } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
-import { useListProfessionals } from '@workspace/api-client-react';
-import { AppText, Avatar, BrandHeader, FeedbackPressable, Screen, Surface, TextField, StateMessage } from '@/components/WorkyUI';
+import * as Location from 'expo-location';
+import { getListProfessionalsQueryKey, useListProfessionals } from '@workspace/api-client-react';
+import { AppText, Avatar, Button, Screen, Surface, TextField, StateMessage } from '@/components/WorkyUI';
 import { useAuth } from '@/context/AuthContext';
 import { useColors } from '@/hooks/useColors';
 
@@ -14,17 +15,51 @@ export default function DiscoverScreen() {
   const { account } = useAuth();
   const [search, setSearch] = useState('');
   const [activeCategory, setActiveCategory] = useState('Todos');
+  const [clientCoordinates, setClientCoordinates] = useState<[number, number] | null>(null);
+  const [locationError, setLocationError] = useState('');
+  const [locationPermission, requestLocationPermission] = Location.useForegroundPermissions();
   const isPartner = account?.rol === 'profesional';
   const searchTerm = search.trim() || (activeCategory === 'Todos' ? '' : activeCategory);
-  const query = useListProfessionals(
-    searchTerm ? { search: searchTerm, limit: 25 } : { limit: 25 },
-    { query: { queryKey: ['/api/v1/profesionales', searchTerm, 25], staleTime: 30_000, enabled: !isPartner } },
-  );
+  const searchParams = {
+    ...(searchTerm ? { search: searchTerm } : {}),
+    limit: 25,
+    ...(clientCoordinates ? { longitud: clientCoordinates[0], latitud: clientCoordinates[1] } : {}),
+  };
+  const query = useListProfessionals(searchParams, {
+    query: {
+      queryKey: getListProfessionalsQueryKey(searchParams),
+      staleTime: 0,
+      refetchOnMount: 'always',
+      enabled: !isPartner,
+    },
+    request: { cache: 'no-store' },
+  });
   const professionals = query.data ?? [];
+  const requestClientLocation = async () => {
+    setLocationError('');
+    try {
+      let permission = locationPermission;
+      if (!permission?.granted) permission = await requestLocationPermission();
+      if (!permission?.granted) {
+        if (permission && !permission.canAskAgain && Platform.OS !== 'web') {
+          Alert.alert('Ubicación desactivada', 'Permití el acceso a la ubicación desde la configuración para ver la distancia a cada taller.', [
+            { text: 'Ahora no', style: 'cancel' },
+            { text: 'Abrir configuración', onPress: () => { try { void Linking.openSettings(); } catch { /* Settings may not be available */ } } },
+          ]);
+        } else {
+          setLocationError('Podés seguir buscando sin compartir tu ubicación. Para ver distancias, habilitá el permiso.');
+        }
+        return;
+      }
+      const current = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+      setClientCoordinates([current.coords.longitude, current.coords.latitude]);
+    } catch {
+      setLocationError('No pudimos obtener tu ubicación en vivo. Intentá nuevamente.');
+    }
+  };
 
   return (
-    <Screen contentStyle={{ gap: 14 }}>
-      <BrandHeader />
+    <Screen hasHeader contentStyle={{ gap: 14 }}>
 
       {isPartner ? (
         <>
@@ -64,7 +99,7 @@ export default function DiscoverScreen() {
                 backgroundColor: colors.muted,
               }}
             >
-              <Feather name="briefcase" size={19} color={colors.secondary} />
+              <Feather name="briefcase" size={19} color={colors.foreground} />
             </View>
             <View style={{ flex: 1, gap: 2 }}>
               <AppText variant="label">Ver oportunidades</AppText>
@@ -86,7 +121,7 @@ export default function DiscoverScreen() {
                   backgroundColor: colors.muted,
                 }}
               >
-                <Feather name="user-check" size={19} color={colors.secondary} />
+                <Feather name="user-check" size={19} color={colors.foreground} />
               </View>
               <View style={{ flex: 1, gap: 3 }}>
                 <AppText variant="label">Tu perfil profesional</AppText>
@@ -102,12 +137,14 @@ export default function DiscoverScreen() {
         <>
           <TextField
             label="¿Qué necesitás resolver?"
+            hideLabel
+            accessibilityLabel="Buscar profesionales por oficio"
             value={search}
             onChangeText={(value) => {
               setSearch(value);
               setActiveCategory('Todos');
             }}
-            placeholder="Plomería, electricidad, pintura…"
+            placeholder="¿Qué estás buscando?"
             autoCapitalize="none"
             returnKeyType="search"
             testID="input-professional-search"
@@ -115,8 +152,10 @@ export default function DiscoverScreen() {
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
-            contentContainerStyle={{ gap: 8, paddingRight: 20 }}
+            style={{ height: 42, flexGrow: 0, flexShrink: 0 }}
+            contentContainerStyle={{ alignItems: 'center', gap: 8, paddingRight: 20 }}
             accessibilityLabel="Filtrar por oficio"
+            testID="filter-professional-categories"
           >
             {categories.map((category) => {
               const selected = activeCategory === category;
@@ -131,7 +170,8 @@ export default function DiscoverScreen() {
                   accessibilityState={{ selected }}
                   testID={`filter-${category.toLowerCase().replaceAll('í', 'i')}`}
                   style={{
-                    minHeight: 34,
+                    height: 34,
+                    flexShrink: 0,
                     justifyContent: 'center',
                     paddingHorizontal: 13,
                     borderWidth: 1,
@@ -150,50 +190,29 @@ export default function DiscoverScreen() {
               );
             })}
           </ScrollView>
-          <FeedbackPressable
-            onPress={() => router.push('/job/new')}
-            style={({ pressed }) => ({
-              minHeight: 64,
-              backgroundColor: colors.card,
-              borderColor: colors.border,
-              borderWidth: 1,
-              borderRadius: colors.radius,
-              paddingHorizontal: 14,
-              paddingVertical: 10,
-              flexDirection: 'row',
-              alignItems: 'center',
-              gap: 12,
-              opacity: pressed ? 0.82 : 1,
-            })}
-            accessibilityRole="button"
-            testID="button-post-job-home"
-          >
-            <View
-              style={{
-                width: 40,
-                height: 40,
-                borderRadius: 14,
-                backgroundColor: colors.muted,
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}
-            >
-              <Feather name="plus" size={20} color={colors.primary} />
-            </View>
-            <View style={{ flex: 1, gap: 2 }}>
-              <AppText variant="label">Publicar un trabajo</AppText>
-              <AppText variant="caption" style={{ color: colors.mutedForeground }}>
-                Contanos qué necesitás resolver
-              </AppText>
-            </View>
-            <Feather name="chevron-right" size={19} color={colors.mutedForeground} />
-          </FeedbackPressable>
           <View style={{ flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', gap: 8 }}>
             <AppText variant="heading">Profesionales cerca</AppText>
             <AppText variant="caption" style={{ color: colors.mutedForeground }}>
               {professionals.length} {professionals.length === 1 ? 'resultado' : 'resultados'}
             </AppText>
           </View>
+          <Surface style={{ gap: 8 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 9 }}>
+              <Feather name="navigation" size={18} color={colors.primary} />
+              <View style={{ flex: 1, gap: 2 }}>
+                <AppText variant="label">{clientCoordinates ? 'Distancias aproximadas activadas' : 'Ver distancia a cada taller'}</AppText>
+                <AppText variant="caption" style={{ color: colors.mutedForeground }}>Tu ubicación se usa solo mientras buscás y no se guarda.</AppText>
+              </View>
+            </View>
+            <Button
+              label={clientCoordinates ? 'Actualizar mi ubicación' : 'Usar mi ubicación actual'}
+              icon="map-pin"
+              tone="quiet"
+              onPress={() => void requestClientLocation()}
+              testID="button-client-live-location"
+            />
+            {locationError ? <AppText variant="caption" accessibilityRole="alert" style={{ color: colors.destructive }}>{locationError}</AppText> : null}
+          </Surface>
         </>
       )}
 
@@ -209,8 +228,10 @@ export default function DiscoverScreen() {
       ) : professionals.length === 0 ? (
         <StateMessage
           icon="search"
-          title="Todavía no hay resultados"
-          message={search || activeCategory !== 'Todos' ? 'Probá con otro oficio o nombre.' : 'No encontramos perfiles para mostrar por ahora.'}
+          title={search || activeCategory !== 'Todos' ? 'No encontramos ese oficio' : 'Todavía no hay profesionales habilitados'}
+          message={search || activeCategory !== 'Todos'
+            ? 'Probá con otro oficio o nombre.'
+            : 'Los perfiles aparecen acá después de verificar el email y recibir la habilitación administrativa.'}
         />
       ) : !isPartner ? (
         <View style={{ gap: 10 }}>
@@ -252,7 +273,7 @@ export default function DiscoverScreen() {
                     </AppText>
                   ) : null}
                   <View style={{ flex: 1 }} />
-                  <AppText variant="label" style={{ color: colors.secondary }}>Ver perfil</AppText>
+                  <AppText variant="label" style={{ color: colors.foreground }}>Ver perfil</AppText>
                 </View>
               </Surface>
             </Pressable>

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import http from "node:http";
 import bcrypt from "bcryptjs";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { db, users } from "@workspace/db";
 import app from "../src/app";
 
@@ -11,6 +11,7 @@ const newPassword = "account-settings-new-password";
 const firstEmail = `${unique}-first@example.test`;
 const secondEmail = `${unique}-second@example.test`;
 const changedEmail = `${unique}-changed@example.test`;
+const emailChangeEmail = `${unique}-email-change@example.test`;
 const concurrentEmail = `${unique}-concurrent@example.test`;
 const throttledEmail = `${unique}-throttled@example.test`;
 const baseUrl = "/api/v1";
@@ -71,6 +72,7 @@ async function run() {
         nombre: "Cuenta Actualizada",
         email: firstEmail,
         telefono: "351 555 0101",
+        username: "Mateo_Oficios",
         edad: 31,
         ubicacion: {
           direccionTexto: "Nueva dirección 456",
@@ -82,8 +84,24 @@ async function run() {
     assert.equal(updated.status, 200);
     assert.equal(updated.body.nombre, "Cuenta Actualizada");
     assert.equal(updated.body.telefono, "351 555 0101");
+    assert.equal(updated.body.username, "mateo_oficios");
     assert.equal(updated.body.edad, 31);
     assert.equal(updated.body.ubicacion.direccionTexto, "Nueva dirección 456");
+
+    const occupiedUsername = await request(server, `${baseUrl}/auth/me`, {
+      method: "PATCH",
+      token: second.token,
+      body: { username: "MATEO_OFICIOS" },
+    });
+    assert.equal(occupiedUsername.status, 409);
+    assert.equal(occupiedUsername.body.error, "Ese nombre de usuario ya está en uso.");
+
+    const invalidUsername = await request(server, `${baseUrl}/auth/me`, {
+      method: "PATCH",
+      token: second.token,
+      body: { username: "no spaces!" },
+    });
+    assert.equal(invalidUsername.status, 400);
 
     const [storedAfterAddress] = await db.select({ ubicacion: users.ubicacion }).from(users).where(eq(users.id, first.usuario.id));
     assert.deepEqual((storedAfterAddress.ubicacion as { coordinates?: unknown }).coordinates, [-64.1888, -31.4201]);
@@ -104,7 +122,7 @@ async function run() {
     assert.equal(addressOnly.body.edad, 31);
 
     await db.update(users).set({ rol: "profesional" }).where(eq(users.id, first.usuario.id));
-    const [addressRace, locationRace] = await Promise.all([
+    const [addressRace] = await Promise.all([
       request(server, `${baseUrl}/auth/me`, {
         method: "PATCH",
         token: first.token,
@@ -116,14 +134,11 @@ async function run() {
           },
         },
       }),
-      request(server, `${baseUrl}/auth/location`, {
-        method: "PATCH",
-        token: first.token,
-        body: { coordinates: [-64.32, -31.24] },
-      }),
+      db.update(users)
+        .set({ ubicacion: sql`coalesce(${users.ubicacion}, '{}'::jsonb) || ${JSON.stringify({ coordinates: [-64.32, -31.24], capturedAt: new Date().toISOString() })}::jsonb` })
+        .where(eq(users.id, first.usuario.id)),
     ]);
     assert.equal(addressRace.status, 200);
-    assert.equal(locationRace.status, 200);
     const [storedAfterRace] = await db.select({ ubicacion: users.ubicacion }).from(users).where(eq(users.id, first.usuario.id));
     const racedLocation = storedAfterRace.ubicacion as { direccionTexto?: string; coordinates?: number[] };
     assert.equal(racedLocation.direccionTexto, "Dirección concurrente 321");
@@ -142,28 +157,6 @@ async function run() {
       body: { nombre: "Cuenta Actualizada", email: secondEmail, currentPassword: originalPassword },
     });
     assert.equal(occupiedEmail.status, 409);
-
-    const concurrentEmailChanges = await Promise.all([
-      request(server, `${baseUrl}/auth/me`, {
-        method: "PATCH",
-        token: first.token,
-        body: { email: concurrentEmail, currentPassword: originalPassword },
-      }),
-      request(server, `${baseUrl}/auth/me`, {
-        method: "PATCH",
-        token: second.token,
-        body: { email: concurrentEmail, currentPassword: originalPassword },
-      }),
-    ]);
-    assert.deepEqual(concurrentEmailChanges.map(({ status }) => status).sort(), [200, 409]);
-
-    const changed = await request(server, `${baseUrl}/auth/me`, {
-      method: "PATCH",
-      token: first.token,
-      body: { email: changedEmail.toUpperCase(), currentPassword: originalPassword },
-    });
-    assert.equal(changed.status, 200);
-    assert.equal(changed.body.email, changedEmail);
 
     const wrongCurrentPassword = await request(server, `${baseUrl}/auth/password`, {
       method: "PATCH",
@@ -189,15 +182,58 @@ async function run() {
 
     const oldLogin = await request(server, `${baseUrl}/auth/login`, {
       method: "POST",
-      body: { email: changedEmail, password: originalPassword },
+      body: { email: firstEmail, password: originalPassword },
     });
     assert.equal(oldLogin.status, 401);
 
     const newLogin = await request(server, `${baseUrl}/auth/login`, {
       method: "POST",
-      body: { email: changedEmail, password: newPassword },
+      body: { email: firstEmail, password: newPassword },
     });
     assert.equal(newLogin.status, 200);
+
+    const emailChangeAccount = await register(server, "Cuenta con email nuevo", emailChangeEmail);
+    createdUserIds.push(emailChangeAccount.usuario.id);
+    const changed = await request(server, `${baseUrl}/auth/me`, {
+      method: "PATCH",
+      token: emailChangeAccount.token,
+      body: { email: changedEmail.toUpperCase(), currentPassword: originalPassword },
+    });
+    assert.equal(changed.status, 200);
+    assert.equal(changed.body.email, changedEmail);
+    const [emailChangeState] = await db.select({ emailVerifiedAt: users.emailVerifiedAt }).from(users).where(eq(users.id, emailChangeAccount.usuario.id));
+    assert.equal(emailChangeState.emailVerifiedAt, null);
+    const emailChangeAccess = await request(server, `${baseUrl}/auth/me`, { token: emailChangeAccount.token });
+    assert.equal(emailChangeAccess.status, 403);
+    assert.equal(emailChangeAccess.body.code, "EMAIL_NOT_VERIFIED");
+    const emailChangeLogin = await request(server, `${baseUrl}/auth/login`, {
+      method: "POST",
+      body: { email: changedEmail, password: originalPassword },
+    });
+    assert.equal(emailChangeLogin.status, 403);
+    assert.equal(emailChangeLogin.body.code, "EMAIL_NOT_VERIFIED");
+
+    const concurrentEmailChanges = await Promise.all([
+      request(server, `${baseUrl}/auth/me`, {
+        method: "PATCH",
+        token: first.token,
+        body: { email: concurrentEmail, currentPassword: newPassword },
+      }),
+      request(server, `${baseUrl}/auth/me`, {
+        method: "PATCH",
+        token: second.token,
+        body: { email: concurrentEmail, currentPassword: originalPassword },
+      }),
+    ]);
+    assert.deepEqual(concurrentEmailChanges.map(({ status }) => status).sort(), [200, 409]);
+    const changedAccountIndex = concurrentEmailChanges.findIndex(({ status }) => status === 200);
+    const changedAccount = changedAccountIndex === 0 ? first : second;
+    const unchangedAccount = changedAccountIndex === 0 ? second : first;
+    const blockedAccount = await request(server, `${baseUrl}/auth/me`, { token: changedAccount.token });
+    assert.equal(blockedAccount.status, 403);
+    assert.equal(blockedAccount.body.code, "EMAIL_NOT_VERIFIED");
+    const stillVerifiedAccount = await request(server, `${baseUrl}/auth/me`, { token: unchangedAccount.token });
+    assert.equal(stillVerifiedAccount.status, 200);
 
     for (let attempt = 0; attempt < 10; attempt += 1) {
       const wrongPassword = await request(server, `${baseUrl}/auth/password`, {

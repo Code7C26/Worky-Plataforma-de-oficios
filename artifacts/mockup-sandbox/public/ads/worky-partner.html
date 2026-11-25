@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#2F7552">
+  <title>Worky Partner — Encontrá oportunidades cerca</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body,
+    .ad {
+      width: 100vw;
+      height: 100vh;
+      overflow: hidden;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background: #2F7552;
+      color: #FFF9E9;
+      font-family: "DM Sans", sans-serif;
+      -webkit-font-smoothing: antialiased;
+      text-rendering: optimizeLegibility;
+    }
+
+    .ad {
+      position: relative;
+      background: #2F7552;
+    }
+
+    .logo {
+      position: absolute;
+      top: 7.2vh;
+      left: 8vw;
+      display: block;
+      width: 31vw;
+      height: 11vh;
+      max-width: 39vw;
+      max-height: 13vh;
+      object-fit: contain;
+      object-position: left center;
+    }
+
+    .headline {
+      position: absolute;
+      top: 29vh;
+      left: 8vw;
+      width: 83vw;
+      margin: 0;
+      color: #FFF9E9;
+      font-family: "Space Grotesk", sans-serif;
+      font-size: 10.1vw;
+      font-weight: 700;
+      letter-spacing: -0.075em;
+      line-height: 0.99;
+      overflow-wrap: normal;
+    }
+
+    .benefit {
+      position: absolute;
+      top: 65vh;
+      left: 8.3vw;
+      width: 76vw;
+      margin: 0;
+      color: #F4F0D9;
+      font-size: 3.1vw;
+      font-weight: 500;
+      letter-spacing: -0.025em;
+      line-height: 1.28;
+    }
+
+    .cta {
+      position: absolute;
+      top: 78vh;
+      left: 8vw;
+      display: inline-flex;
+      min-height: 8.2vh;
+      align-items: center;
+      justify-content: center;
+      padding: 0 3.3vw;
+      border-radius: 1.05vw;
+      background: #F8D84B;
+      color: #173D2B;
+      font-family: "Space Grotesk", sans-serif;
+      font-size: 3.05vw;
+      font-weight: 700;
+      letter-spacing: -0.035em;
+      line-height: 1;
+      white-space: nowrap;
+    }
+
+    @media (max-aspect-ratio: 3/4) {
+      .logo {
+        top: 7.2vh;
+        width: 35vw;
+      }
+
+      .headline {
+        top: 30vh;
+        width: 84vw;
+        font-size: 10.6vw;
+      }
+
+      .benefit {
+        top: 66vh;
+        width: 79vw;
+        font-size: 3.35vw;
+      }
+
+      .cta {
+        top: 79vh;
+        min-height: 8vh;
+        padding-inline: 4vw;
+        font-size: 3.35vw;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="ad" aria-label="Worky Partner">
+    <img class="logo" src="worky-logo.png" alt="Worky">
+    <h1 class="headline">Tu oficio también encuentra oportunidades.</h1>
+    <p class="benefit">Creá tu perfil Partner y explorá oportunidades cerca.</p>
+    <div class="cta" role="button" aria-label="Sumate a Worky">Sumate a Worky</div>
+  </main>
+</body>
+</html>

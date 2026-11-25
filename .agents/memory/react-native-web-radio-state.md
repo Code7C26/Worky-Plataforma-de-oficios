@@ -1,10 +1,10 @@
 ---
-name: React Native Web radio state
-description: Radio accessibility state can require an explicit ARIA checked prop for correct web output.
+name: React Native Web selection state
+description: Selected and checked states may need explicit ARIA props for correct web output.
 ---
 
-For React Native radio controls, keep `accessibilityState={{ checked: ... }}` for native platforms and also provide `aria-checked` for web. Verify the rendered DOM when a radio's checked state matters; role and label rendering alone do not prove that the selected option is exposed.
+For React Native Web controls with selection semantics, keep `accessibilityState` for native platforms and also provide the matching explicit ARIA state (`aria-checked` for radio roles, `aria-selected` for tab roles). Verify the rendered DOM; role and label rendering alone do not prove that selected state is exposed.
 
-**Why:** In the installed React Native Web renderer, a `Pressable` with `accessibilityRole="radio"` and `accessibilityState.checked` rendered with the radio role but without `aria-checked`. Adding `aria-checked` produced the expected output.
+**Why:** In the installed React Native Web renderer, `Pressable` role/state combinations rendered the role and label but omitted the selected or checked ARIA attribute.
 
-**How to apply:** When using radio roles in shared Expo components, inspect server-rendered web markup or browser accessibility output and retain native `accessibilityState` for Android/iOS.
+**How to apply:** When using radio or tab roles in shared Expo components, inspect browser accessibility output and retain native `accessibilityState` for Android/iOS alongside explicit ARIA state for web.

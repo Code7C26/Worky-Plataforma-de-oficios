@@ -16,3 +16,10 @@ test("la UI conserva el selector de adjuntos y las tres secciones del Partner", 
   assert.match(source, /job\.calificada/);
   assert.match(source, /data-testid=\{`text-review-sent-\$\{job\.id\}`\}/);
 });
+
+test("el perfil propio se muestra desde la consulta autenticada, sin exigir que sea público", async () => {
+  const source = await readFile(new URL("../src/App.tsx", import.meta.url), "utf8");
+
+  assert.match(source, /ProfessionalPageLegacy professionalId=\{profile\.data\.id\} publicOnly initialPerson=\{toProfessional\(profile\.data\)\}/);
+  assert.match(source, /enabled: !initialPerson && Number\.isInteger\(id\)/);
+});

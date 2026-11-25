@@ -3,7 +3,7 @@ import { Pressable, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 import { useGetProfessional, useGetProfessionalReputation } from '@workspace/api-client-react';
-import { AppText, Avatar, Button, Screen, StateMessage, Surface, formatCurrency } from '@/components/WorkyUI';
+import { AppText, Avatar, BrandHeader, Button, Screen, StateMessage, Surface, formatCurrency } from '@/components/WorkyUI';
 import { useAuth } from '@/context/AuthContext';
 import { useColors } from '@/hooks/useColors';
 
@@ -26,6 +26,7 @@ export default function ProfessionalDetailsScreen() {
 
   return (
     <Screen>
+      <BrandHeader onPress={() => router.replace('/')} />
       <Pressable onPress={() => router.back()} style={{ alignSelf: 'flex-start', padding: 7, marginLeft: -7 }} accessibilityRole="button">
         <Feather name="arrow-left" size={22} color={colors.foreground} />
       </Pressable>
@@ -38,7 +39,7 @@ export default function ProfessionalDetailsScreen() {
           <AppText variant="label">{professional.rating.toFixed(1)}</AppText>
           <AppText variant="caption" style={{ color: colors.mutedForeground }}>({professional.reviewsCount} opiniones)</AppText>
         </View>
-        {professional.verificado ? <AppText variant="caption" style={{ color: colors.secondary, marginTop: 4 }}>Identidad verificada</AppText> : null}
+        {professional.verificado ? <AppText variant="caption" style={{ color: colors.foreground, marginTop: 4 }}>Identidad verificada</AppText> : null}
       </Surface>
       {account?.rol !== 'profesional' ? (
         <Button
@@ -52,6 +53,18 @@ export default function ProfessionalDetailsScreen() {
       <Surface>
         <AppText variant="heading">Sobre el profesional</AppText>
         <AppText style={{ color: colors.mutedForeground }}>{professional.about || 'Todavía no agregó una presentación.'}</AppText>
+        {professional.ubicacionFija ? (
+          <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 9, borderTopWidth: 1, borderTopColor: colors.border, paddingTop: 12, marginTop: 3 }}>
+            <Feather name="map-pin" size={17} color={colors.primary} style={{ marginTop: 2 }} />
+            <View style={{ flex: 1, gap: 2 }}>
+              <AppText variant="caption" style={{ color: colors.mutedForeground }}>Taller</AppText>
+              <AppText variant="label">{professional.ubicacionFija.direccionTexto}</AppText>
+              <AppText variant="caption" style={{ color: colors.mutedForeground }}>
+                {[professional.ubicacionFija.ciudad, professional.ubicacionFija.provincia].filter(Boolean).join(', ')}
+              </AppText>
+            </View>
+          </View>
+        ) : null}
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', borderTopWidth: 1, borderTopColor: colors.border, paddingTop: 12, marginTop: 3 }}>
           <View style={{ gap: 3 }}>
             <AppText variant="caption" style={{ color: colors.mutedForeground }}>Experiencia</AppText>

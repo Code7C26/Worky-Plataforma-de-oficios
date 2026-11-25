@@ -1,0 +1,29 @@
+kind = "video"
+videoAspectRatio = "16:9"
+previewPath = "/worky-recorrido-plomero/"
+title = "Worky — encontrar un plomero"
+description = "Animación cinematográfica que recorre cómo una persona usa Worky para buscar un plomero, revisar profesionales, publicar una changa, conversar, coordinar y cerrar el trabajo."
+version = "1.0.0"
+id = "artifacts/worky-recorrido-plomero"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/worky-recorrido-plomero/" ]
+localPort = 20259
+
+[services.development]
+run = "pnpm --filter @workspace/worky-recorrido-plomero run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/worky-recorrido-plomero", "run", "build" ]
+serve = "static"
+publicDir = "artifacts/worky-recorrido-plomero/dist/public"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "20259"
+BASE_PATH = "/worky-recorrido-plomero/"

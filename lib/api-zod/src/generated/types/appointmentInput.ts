@@ -10,4 +10,9 @@ export interface AppointmentInput {
   empiezaAt: Date;
   /** @nullable */
   terminaAt?: Date | null;
+  /**
+     * @minimum 1
+     * @maximum 10000000
+     */
+  tarifaVisita: number;
 }

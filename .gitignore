@@ -33,6 +33,12 @@ node_modules
 /coverage
 /test-results
 /artifacts/worky/test-results/
+/artifacts/worky-mobile/test-results/
+!/artifacts/worky-mobile/test-results/
+!/artifacts/worky-mobile/test-results/tabs-safe-area/
+/artifacts/worky-mobile/test-results/tabs-safe-area/*
+!/artifacts/worky-mobile/test-results/tabs-safe-area/baselines/
+!/artifacts/worky-mobile/test-results/tabs-safe-area/baselines/*.png
 /artifacts/worky/test-results/visual-diff
 /libpeerconnection.log
 npm-debug.log
@@ -50,3 +56,8 @@ Thumbs.db
 # Replit
 .cache/
 .local/
+/generated-artifacts/
+/artifacts/worky-mobile/static-build/
+/artifacts/worky-mobile/android/
+/artifacts/api-server/runtime/
+/artifacts/worky-publicidad-vertical/hyperframes/renders/

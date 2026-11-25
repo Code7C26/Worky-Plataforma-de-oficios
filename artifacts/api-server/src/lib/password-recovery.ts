@@ -1,6 +1,7 @@
 import { createHash, randomBytes } from "node:crypto";
 import { and, eq, gt, isNull } from "drizzle-orm";
 import { db, passwordRecoveryTokens, users } from "@workspace/db";
+import { gmailDeliveryFailureDetails, sendGmailEmail } from "./gmail-mailer";
 
 export const PASSWORD_RECOVERY_TTL_MS = 15 * 60 * 1000;
 
@@ -14,24 +15,37 @@ function recoveryUrl(origin: string, token: string) {
   return url.toString();
 }
 
-async function sendRecoveryEmail({ email, name, url }: { email: string; name: string; url: string }) {
-  const apiKey = process.env.RESEND_API_KEY;
-  if (!apiKey) throw new Error("RESEND_API_KEY no está configurado.");
-  const response = await fetch("https://api.resend.com/emails", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      from: process.env.RESEND_FROM_EMAIL || "Worky <onboarding@resend.dev>",
-      to: [email],
-      subject: "Recuperá tu contraseña de Worky",
-      text: `Hola ${name || "de Worky"}.\n\nRecibimos un pedido para cambiar tu contraseña. Abrí este enlace dentro de los próximos 15 minutos:\n\n${url}\n\nSi no fuiste vos, podés ignorar este correo.`,
-      html: `<p>Hola ${name || "de Worky"}.</p><p>Recibimos un pedido para cambiar tu contraseña. El enlace es válido durante 15 minutos y solo puede usarse una vez.</p><p><a href="${url}">Crear una nueva contraseña</a></p><p>Si no fuiste vos, podés ignorar este correo.</p>`,
-    }),
+async function sendRecoveryEmail({
+  email,
+  name,
+  url,
+}: {
+  email: string;
+  name: string;
+  url: string;
+}) {
+  const greeting = `Hola ${name.trim() || "de Worky"}.`;
+  const safeName = escapeHtml(name.trim() || "de Worky");
+  const safeUrl = escapeHtml(url);
+  const text = `${greeting}\n\nRecibimos un pedido para cambiar tu contraseña. Abrí este enlace dentro de los próximos 15 minutos:\n\n${url}\n\nSi no fuiste vos, podés ignorar este correo.`;
+  const html = `<p>Hola ${safeName}.</p><p>Recibimos un pedido para cambiar tu contraseña. El enlace es válido durante 15 minutos y solo puede usarse una vez.</p><p><a href="${safeUrl}">Crear una nueva contraseña</a></p><p>Si no fuiste vos, podés ignorar este correo.</p>`;
+
+  await sendGmailEmail({
+    to: email,
+    subject: "Recuperá tu contraseña de Worky",
+    text,
+    html,
   });
-  if (!response.ok) throw new Error(`El proveedor de recuperación rechazó el correo (${response.status}).`);
+}
+
+function escapeHtml(value: string) {
+  return value.replace(/[&<>"']/g, (character) => ({
+    "&": "&amp;",
+    "<": "&lt;",
+    ">": "&gt;",
+    '"': "&quot;",
+    "'": "&#39;",
+  })[character] ?? character);
 }
 
 export async function createPasswordRecovery(email: string, origin: string) {
@@ -65,6 +79,10 @@ export async function createPasswordRecovery(email: string, origin: string) {
   }
 
   return { sent: true };
+}
+
+export function passwordRecoveryFailureDetails(error: unknown) {
+  return gmailDeliveryFailureDetails(error);
 }
 
 export function passwordRecoveryTokenHash(token: string) {

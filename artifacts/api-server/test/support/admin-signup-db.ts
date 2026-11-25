@@ -16,8 +16,9 @@ export async function initializeDatabase() {
     CREATE TYPE worky_onboarding_status AS ENUM
       ('registration_started', 'basic_info_completed', 'professional_verification_pending', 'onboarding_completed');
     CREATE TABLE worky_users (
-      id serial PRIMARY KEY, nombre text NOT NULL, email text NOT NULL UNIQUE,
+      id serial PRIMARY KEY, nombre text NOT NULL, email text NOT NULL UNIQUE, username text UNIQUE,
       email_verified_at timestamptz, password_hash text NOT NULL,
+      two_factor_enabled boolean NOT NULL DEFAULT false,
       telefono text, edad integer, foto_object_path text,
       onboarding_estado worky_onboarding_status NOT NULL DEFAULT 'registration_started',
       onboarding_paso integer NOT NULL DEFAULT 1, onboarding_respuestas jsonb NOT NULL DEFAULT '{}',
