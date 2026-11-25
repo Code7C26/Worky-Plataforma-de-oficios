@@ -1,14 +1,17 @@
 import assert from "node:assert/strict";
 import http from "node:http";
 import { eq } from "drizzle-orm";
+import { ReplitConnectors } from "@replit/connectors-sdk";
 import { db, emailVerificationTokens, users } from "@workspace/db";
 import app from "../src/app";
 import { createEmailVerificationChallenge, EmailVerificationDeliveryError, emailVerificationFailureDetails } from "../src/lib/email-verification";
+import { signToken } from "../src/middlewares/auth";
 
 const unique = `email-verification-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const registrationEmail = `${unique}-registration@example.test`;
 const changedEmail = `${unique}-changed@example.test`;
 const failedEmail = `${unique}-failed@example.test`;
+const failedRegistrationEmail = `${unique}-registration-failed@example.test`;
 const registrationPassword = "registration-password";
 const baseUrl = "/api/v1";
 
@@ -36,51 +39,59 @@ async function request(server: http.Server, path: string, options: { method?: st
 }
 
 async function run() {
-  const originalFetch = globalThis.fetch;
-  const originalEnv = {
-    NODE_ENV: process.env.NODE_ENV,
-    RESEND_API_KEY: process.env.RESEND_API_KEY,
-    RESEND_FROM_EMAIL: process.env.RESEND_FROM_EMAIL,
-  };
-  process.env.RESEND_API_KEY = "verification-test-only-key";
-  process.env.RESEND_FROM_EMAIL = "Worky <verify@worky.example.test>";
+  const originalCreateProxyFetch = ReplitConnectors.prototype.createProxyFetch;
   const verificationCodes = new Map<string, string>();
   let deliveryMode: "success" | "rejected" | "network" = "success";
+  let senderProfileMode: "valid" | "missing" = "valid";
   const createdUserIds: number[] = [];
   const server = app.listen(0);
 
-  globalThis.fetch = async (input, init) => {
-    const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
-    if (url === "https://api.resend.com/emails") {
-      const message = JSON.parse(String(init?.body)) as { to: string[]; text: string; from: string };
-      assert.equal(message.from, "Worky <verify@worky.example.test>");
-      assert(init?.signal, "Delivery must have a timeout signal.");
-      if (deliveryMode === "rejected") {
-        return new Response(JSON.stringify({ message: "Provider rejection" }), { status: 403 });
+  ReplitConnectors.prototype.createProxyFetch = function (connectorName) {
+    assert.equal(connectorName, "google-mail");
+    return async (input, init) => {
+      const url = input instanceof Request ? input.url : String(input);
+      const path = new URL(url).pathname;
+      if (path === "/gmail/v1/users/me/profile") {
+        return new Response(JSON.stringify(senderProfileMode === "valid"
+          ? { emailAddress: "worky-sender@example.test" }
+          : {}), { status: 200, headers: { "Content-Type": "application/json" } });
       }
-      if (deliveryMode === "network") throw new TypeError("network failure with sensitive provider details");
-      const code = message.text.match(/\b(\d{6})\b/)?.[1];
-      assert(code, "Verification email should contain a six-digit code.");
-      verificationCodes.set(message.to[0], code);
-      return new Response(JSON.stringify({ id: "email-verification-test" }), { status: 200 });
-    }
-    return originalFetch(input, init);
+      if (path === "/gmail/v1/users/me/messages/send") {
+        if (deliveryMode === "rejected") {
+          return new Response(JSON.stringify({ message: "Provider rejection with private details" }), { status: 403 });
+        }
+        if (deliveryMode === "network") throw new TypeError("network failure with sensitive provider details");
+        const requestBody = JSON.parse(String(init?.body)) as { raw?: string };
+        assert(requestBody.raw, "Gmail API should receive a base64url MIME message.");
+        const message = Buffer.from(requestBody.raw, "base64url").toString("utf8");
+        assert.match(message, /^From: Worky <worky-sender@example\.test>$/m);
+        const recipient = message.match(/^To: ([^\r\n]+)$/m)?.[1];
+        assert(recipient, "Verification email should have one recipient.");
+        const encodedText = message.match(/Content-Type: text\/plain; charset="UTF-8"\r\nContent-Transfer-Encoding: base64\r\n\r\n([A-Za-z0-9+/=\r\n]+?)\r\n--/i)?.[1];
+        assert(encodedText, "Verification email should contain a plain-text body.");
+        const text = Buffer.from(encodedText.replace(/\r\n/g, ""), "base64").toString("utf8");
+        const code = text.match(/\b(\d{6})\b/)?.[1];
+        assert(code, "Verification email should contain a six-digit code.");
+        verificationCodes.set(recipient, code);
+        return new Response(JSON.stringify({ id: "email-verification-test" }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+      throw new Error("Unexpected Gmail API request.");
+    };
   };
 
   try {
     await new Promise<void>((resolve) => server.once("listening", resolve));
 
-    process.env.NODE_ENV = "production";
-    delete process.env.RESEND_FROM_EMAIL;
-    await assert.rejects(createEmailVerificationChallenge({ email: failedEmail, purpose: "account" }),
-      (error: unknown) => error instanceof EmailVerificationDeliveryError && error.reason === "missing_sender");
-    process.env.RESEND_FROM_EMAIL = "Worky <onboarding@resend.dev>";
+    senderProfileMode = "missing";
     await assert.rejects(createEmailVerificationChallenge({ email: failedEmail, purpose: "account" }),
       (error: unknown) => error instanceof EmailVerificationDeliveryError && error.reason === "missing_sender");
     const [noConfiguredChallenge] = await db.select({ id: emailVerificationTokens.id })
       .from(emailVerificationTokens).where(eq(emailVerificationTokens.email, failedEmail));
-    assert.equal(noConfiguredChallenge, undefined, "Missing sender must not create a challenge.");
-    process.env.RESEND_FROM_EMAIL = "Worky <verify@worky.example.test>";
+    assert.equal(noConfiguredChallenge, undefined, "Missing Gmail sender must not create a challenge.");
+    senderProfileMode = "valid";
 
     deliveryMode = "rejected";
     await assert.rejects(createEmailVerificationChallenge({ email: failedEmail, purpose: "account" }),
@@ -104,11 +115,22 @@ async function run() {
       { sent: false, throttled: true });
     assert.deepEqual(emailVerificationFailureDetails(new Error("private details")), { reason: "internal_error" });
 
-    const removedRegistrationVerification = await request(server, `${baseUrl}/auth/email-verification/registration/request`, {
+    const registration = await request(server, `${baseUrl}/auth/register`, {
       method: "POST",
-      body: { email: registrationEmail },
+      body: { nombre: "Registro sin confirmar", email: registrationEmail, password: registrationPassword },
     });
-    assert.equal(removedRegistrationVerification.status, 404);
+    assert.equal(registration.status, 202);
+    assert.equal(typeof registration.body.message, "string");
+    assert.equal(registration.body.token, undefined, "Registration must not issue a session before email confirmation.");
+    assert.equal(registration.body.usuario, undefined);
+    const [createdRegistrationUser] = await db.select({
+      id: users.id,
+      emailVerifiedAt: users.emailVerifiedAt,
+    }).from(users).where(eq(users.email, registrationEmail));
+    assert(createdRegistrationUser);
+    createdUserIds.push(createdRegistrationUser.id);
+    assert.equal(createdRegistrationUser.emailVerifiedAt, null);
+    assert(verificationCodes.has(registrationEmail), "Registration should send its code before creating a session.");
 
     const invalidEmailRegistration = await request(server, `${baseUrl}/auth/register`, {
       method: "POST",
@@ -116,13 +138,18 @@ async function run() {
     });
     assert.equal(invalidEmailRegistration.status, 400);
 
-    const registration = await request(server, `${baseUrl}/auth/register`, {
+    deliveryMode = "rejected";
+    const failedRegistration = await request(server, `${baseUrl}/auth/register`, {
       method: "POST",
-      body: { nombre: "Registro sin confirmar", email: registrationEmail, password: registrationPassword },
+      body: { nombre: "Registro con reintento", email: failedRegistrationEmail, password: registrationPassword },
     });
-    assert.equal(registration.status, 201);
-    createdUserIds.push(registration.body.usuario.id);
-    assert.equal(registration.body.usuario.emailVerifiedAt, null);
+    assert.equal(failedRegistration.status, 503);
+    assert.equal(JSON.stringify(failedRegistration.body).includes("private details"), false);
+    deliveryMode = "success";
+    const [failedRegistrationUser] = await db.select({ id: users.id })
+      .from(users).where(eq(users.email, failedRegistrationEmail));
+    assert(failedRegistrationUser);
+    createdUserIds.push(failedRegistrationUser.id);
 
     const duplicateRegistration = await request(server, `${baseUrl}/auth/register`, {
       method: "POST",
@@ -134,48 +161,76 @@ async function run() {
       method: "POST",
       body: { email: registrationEmail, password: registrationPassword },
     });
-    assert.equal(login.status, 200);
-    assert.equal(login.body.usuario.emailVerifiedAt, null);
-    const accountRequest = await request(server, `${baseUrl}/auth/email-verification/account/request`, {
-      method: "POST",
-      token: login.body.token,
-    });
-    assert.equal(accountRequest.status, 202);
-    const accountCode = verificationCodes.get(registrationEmail);
-    assert(accountCode);
-    const accountConfirmation = await request(server, `${baseUrl}/auth/email-verification/account/confirm`, {
-      method: "POST",
-      token: login.body.token,
-      body: { code: accountCode },
-    });
-    assert.equal(accountConfirmation.status, 200);
-    assert.equal(accountConfirmation.body.verified, true);
+    assert.equal(login.status, 403);
+    assert.equal(login.body.code, "EMAIL_NOT_VERIFIED");
 
-    const me = await request(server, `${baseUrl}/auth/me`, { token: login.body.token });
+    const oldSession = signToken(createdRegistrationUser.id);
+    const blockedOldSession = await request(server, `${baseUrl}/auth/me`, { token: oldSession });
+    assert.equal(blockedOldSession.status, 403);
+    assert.equal(blockedOldSession.body.code, "EMAIL_NOT_VERIFIED");
+
+    const registrationRequest = await request(server, `${baseUrl}/auth/email-verification/registration/request`, {
+      method: "POST",
+      body: { email: failedRegistrationEmail },
+    });
+    assert.equal(registrationRequest.status, 202);
+    assert(verificationCodes.has(failedRegistrationEmail));
+
+    const registrationCode = verificationCodes.get(registrationEmail);
+    assert(registrationCode);
+    const registrationConfirmation = await request(server, `${baseUrl}/auth/email-verification/registration/confirm`, {
+      method: "POST",
+      body: { email: registrationEmail, code: registrationCode },
+    });
+    assert.equal(registrationConfirmation.status, 200);
+    assert(registrationConfirmation.body.token);
+    assert.equal(registrationConfirmation.body.usuario.emailVerifiedAt !== null, true);
+
+    const verifiedLogin = await request(server, `${baseUrl}/auth/login`, {
+      method: "POST",
+      body: { email: registrationEmail, password: registrationPassword },
+    });
+    assert.equal(verifiedLogin.status, 200);
+    assert(verifiedLogin.body.usuario.emailVerifiedAt);
+
+    const me = await request(server, `${baseUrl}/auth/me`, { token: verifiedLogin.body.token });
     assert.equal(me.status, 200);
     assert(me.body.emailVerifiedAt);
 
     const changedEmailResponse = await request(server, `${baseUrl}/auth/me`, {
       method: "PATCH",
-      token: login.body.token,
+      token: verifiedLogin.body.token,
       body: { email: changedEmail, currentPassword: registrationPassword },
     });
     assert.equal(changedEmailResponse.status, 200);
     assert.equal(changedEmailResponse.body.email, changedEmail);
     assert.equal(changedEmailResponse.body.emailVerifiedAt, null);
+
+    const blockedChangedEmailSession = await request(server, `${baseUrl}/auth/me`, { token: verifiedLogin.body.token });
+    assert.equal(blockedChangedEmailSession.status, 403);
+    const changedEmailVerificationRequest = await request(server, `${baseUrl}/auth/email-verification/account/request`, {
+      method: "POST",
+      token: verifiedLogin.body.token,
+    });
+    assert.equal(changedEmailVerificationRequest.status, 202);
+    const changedEmailCode = verificationCodes.get(changedEmail);
+    assert(changedEmailCode);
+    const changedEmailConfirmation = await request(server, `${baseUrl}/auth/email-verification/account/confirm`, {
+      method: "POST",
+      token: verifiedLogin.body.token,
+      body: { code: changedEmailCode },
+    });
+    assert.equal(changedEmailConfirmation.status, 200);
   } finally {
     try {
       await db.delete(emailVerificationTokens).where(eq(emailVerificationTokens.email, registrationEmail));
       await db.delete(emailVerificationTokens).where(eq(emailVerificationTokens.email, changedEmail));
       await db.delete(emailVerificationTokens).where(eq(emailVerificationTokens.email, failedEmail));
+      await db.delete(emailVerificationTokens).where(eq(emailVerificationTokens.email, failedRegistrationEmail));
       for (const id of createdUserIds) await db.delete(users).where(eq(users.id, id));
     } finally {
       await new Promise<void>((resolve) => server.close(() => resolve()));
-      globalThis.fetch = originalFetch;
-      for (const [key, value] of Object.entries(originalEnv)) {
-        if (value === undefined) delete process.env[key];
-        else process.env[key] = value;
-      }
+      ReplitConnectors.prototype.createProxyFetch = originalCreateProxyFetch;
     }
   }
 }

@@ -21,6 +21,13 @@ export interface AccountUpdate {
      */
   telefono?: string | null;
   /**
+     * @minLength 3
+     * @maxLength 20
+     * @nullable
+     * @pattern ^[A-Za-z0-9_]{3,20}$
+     */
+  username?: string | null;
+  /**
      * @minimum 13
      * @maximum 120
      * @nullable

@@ -3,9 +3,12 @@ import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import Animated, { useAnimatedStyle, useReducedMotion, useSharedValue, withSequence, withSpring, withTiming } from 'react-native-reanimated';
-import { Tabs } from 'expo-router';
+import { router, Tabs } from 'expo-router';
+import { StatusBar } from 'expo-status-bar';
+import * as SystemUI from 'expo-system-ui';
 import { getListNotificationsQueryKey, useListConversations, useListNotifications } from '@workspace/api-client-react';
 import { useAuth } from '@/context/AuthContext';
+import { Avatar, BrandHeader } from '@/components/WorkyUI';
 import { useColors } from '@/hooks/useColors';
 import { getConversationInboxQuery, getUnreadConversationCount } from '@/lib/conversation-inbox';
 
@@ -14,7 +17,7 @@ type WorkyTabBarProps = Parameters<NonNullable<React.ComponentProps<typeof Tabs>
 const icons = {
   index: 'search',
   activity: 'activity',
-  jobs: 'briefcase',
+  jobs: 'plus',
   conversations: 'message-circle',
   profile: 'user',
 } as const;
@@ -24,11 +27,13 @@ function AnimatedTabIcon({
   size,
   color,
   focused,
+  testID,
 }: {
   name: React.ComponentProps<typeof Feather>['name'];
   size: number;
   color: string;
   focused: boolean;
+  testID: string;
 }) {
   const reduceMotion = useReducedMotion();
   const scale = useSharedValue(1);
@@ -51,13 +56,13 @@ function AnimatedTabIcon({
   }), [reduceMotion]);
 
   return (
-    <Animated.View style={motionStyle}>
+    <Animated.View testID={testID} style={motionStyle}>
       <Feather name={name} size={size} color={color} />
     </Animated.View>
   );
 }
 
-function WorkyTabBar({ state, descriptors, navigation }: WorkyTabBarProps) {
+function WorkyTabBar({ state, descriptors, emitter, navigateToTab }: WorkyTabBarProps) {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const { account } = useAuth();
@@ -98,18 +103,25 @@ function WorkyTabBar({ state, descriptors, navigation }: WorkyTabBarProps) {
             : route.name === 'conversations'
               ? unreadMessages
               : 0;
-          const color = focused ? colors.primary : colors.mutedForeground;
+          const color = focused ? colors.foreground : colors.mutedForeground;
+          const jobsPlusAction = route.name === 'jobs' && role === 'cliente';
+          const tabAccessibilityLabel = center
+            ? role === 'profesional'
+              ? 'Changas. Ver trabajos asignados y disponibles'
+              : 'Trabajos. Publicar un trabajo'
+            : label;
           const onPress = () => {
-            const event = navigation.emit({ type: 'tabPress', target: route.key, canPreventDefault: true });
-            if (!focused && !event.defaultPrevented) navigation.navigate(route.name);
+            const event = emitter.emit({ type: 'tabPress', target: route.key, canPreventDefault: true });
+            if (!focused && !event.defaultPrevented) navigateToTab(route.key);
           };
           return (
             <Pressable
               key={route.key}
               onPress={onPress}
               accessibilityRole="tab"
-              accessibilityLabel={descriptors[route.key].options.tabBarAccessibilityLabel ?? label}
+              accessibilityLabel={descriptors[route.key].options.tabBarAccessibilityLabel ?? tabAccessibilityLabel}
               accessibilityState={{ selected: focused }}
+              aria-selected={focused}
               testID={`tab-${route.name}`}
               style={({ pressed }) => [styles.item, center && styles.centerItem, { opacity: pressed ? 0.76 : 1 }]}
             >
@@ -118,7 +130,7 @@ function WorkyTabBar({ state, descriptors, navigation }: WorkyTabBarProps) {
                   center ? styles.centerButton : styles.iconButton,
                   {
                     backgroundColor: center
-                      ? focused ? colors.primary : colors.secondary
+                      ? colors.secondary
                       : focused ? colors.muted : 'transparent',
                     borderColor: center ? colors.card : 'transparent',
                     shadowColor: center ? colors.foreground : 'transparent',
@@ -126,10 +138,15 @@ function WorkyTabBar({ state, descriptors, navigation }: WorkyTabBarProps) {
                 ]}
               >
                 <AnimatedTabIcon
-                  name={route.name === 'index' && role === 'profesional' ? 'home' : icons[route.name as keyof typeof icons]}
-                  size={center ? 22 : 20}
+                  name={route.name === 'index' && role === 'profesional'
+                    ? 'home'
+                    : route.name === 'jobs' && role === 'profesional'
+                      ? 'briefcase'
+                      : icons[route.name as keyof typeof icons]}
+                  size={center ? jobsPlusAction ? 28 : 22 : 20}
                   color={center ? colors.secondaryForeground : color}
                   focused={focused}
+                  testID={`tab-${route.name}-icon`}
                 />
                 {unread > 0 ? (
                   <View style={[styles.badge, { backgroundColor: colors.destructive, borderColor: colors.card }]}>
@@ -139,7 +156,7 @@ function WorkyTabBar({ state, descriptors, navigation }: WorkyTabBarProps) {
                   </View>
                 ) : null}
               </View>
-              <Text style={[styles.label, { color: center ? colors.secondary : color }]}>{label}</Text>
+              <Text style={[styles.label, { color: center ? colors.foreground : color }]}>{label}</Text>
             </Pressable>
           );
         })}
@@ -150,22 +167,72 @@ function WorkyTabBar({ state, descriptors, navigation }: WorkyTabBarProps) {
 
 export default function TabLayout() {
   const { account } = useAuth();
+  const colors = useColors();
+  const insets = useSafeAreaInsets();
   const partner = account?.rol === 'profesional';
+  React.useEffect(() => {
+    if (Platform.OS === 'android') {
+      void SystemUI.setBackgroundColorAsync(colors.background);
+    }
+  }, [colors.background]);
   return (
-    <Tabs
-      tabBar={(props) => <WorkyTabBar {...props} />}
-      screenOptions={{ headerShown: false, tabBarHideOnKeyboard: true }}
-    >
-      <Tabs.Screen name="index" options={{ title: 'Buscar' }} />
-      <Tabs.Screen name="activity" options={{ title: partner ? 'Panel' : 'Actividad' }} />
-      <Tabs.Screen name="jobs" options={{ title: partner ? 'Changas' : 'Trabajos' }} />
-      <Tabs.Screen name="conversations" options={{ title: 'Mensajes' }} />
-      <Tabs.Screen name="profile" options={{ title: partner ? 'Más' : 'Perfil' }} />
-    </Tabs>
+    <>
+      <StatusBar style="light" />
+      <View style={[styles.headerSafeArea, { paddingTop: insets.top, backgroundColor: colors.secondary }]}>
+        <View style={styles.headerContent}>
+          <BrandHeader onDark compact onPress={() => router.replace('/')} />
+          {account ? (
+            <Pressable
+              onPress={() => router.push('/(tabs)/profile')}
+              accessibilityRole="button"
+              accessibilityLabel={`Abrir el perfil de ${account.nombre}`}
+              accessibilityHint="Abre tu perfil y configuración."
+              testID="button-header-profile"
+              hitSlop={6}
+              style={({ pressed }) => [
+                styles.headerProfileButton,
+                { borderColor: colors.secondaryForeground, opacity: pressed ? 0.76 : 1 },
+              ]}
+            >
+              <Avatar name={account.nombre} size={36} photoObjectPath={account.fotoObjectPath} />
+            </Pressable>
+          ) : null}
+        </View>
+      </View>
+      <Tabs
+        tabBar={(props) => <WorkyTabBar {...props} />}
+        screenOptions={{
+          headerShown: false,
+          tabBarHideOnKeyboard: true,
+        }}
+      >
+        <Tabs.Screen name="index" options={{ title: 'Buscar' }} />
+        <Tabs.Screen name="activity" options={{ title: partner ? 'Panel' : 'Actividad' }} />
+        <Tabs.Screen name="jobs" options={{ title: partner ? 'Changas' : 'Trabajos' }} />
+        <Tabs.Screen name="conversations" options={{ title: 'Mensajes' }} />
+        <Tabs.Screen name="profile" options={{ title: partner ? 'Más' : 'Perfil' }} />
+      </Tabs>
+    </>
   );
 }
 
 const styles = StyleSheet.create({
+  headerSafeArea: { width: '100%' },
+  headerContent: {
+    height: 56,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 18,
+  },
+  headerProfileButton: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    borderWidth: 2,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   shell: { position: 'absolute', left: 12, right: 12, bottom: 0 },
   bar: {
     minHeight: 70,

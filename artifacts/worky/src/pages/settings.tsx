@@ -1,9 +1,11 @@
 import { useState, useRef, useEffect } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { useGetMyAccount, useUpdateMyAccount, useChangeMyPassword, getGetMyAccountQueryKey } from '@workspace/api-client-react';
 import { queryClient, useAuth } from '@/App';
 import { uploadWorkyFile, apiRequest, confirmAccountEmailVerification, requestAccountEmailVerification } from '@/lib/api';
 import { ShieldCheck, MapPin, LoaderCircle, Check, ImageIcon, Info, ChevronRight, UserRound } from 'lucide-react';
 import { Link } from 'wouter';
+import { PasswordInput } from '@/components/password-input';
 
 // Use same Button as App.tsx but simplified for this page.
 function Button({ children, onClick, type = 'button', variant = 'primary', className = '', disabled = false, testId }: any) {
@@ -244,10 +246,10 @@ function AccountProfileForm({ account }: { account: any }) {
                 <Info size={18} className="shrink-0 text-[hsl(var(--accent))] mt-0.5" />
                 <div className="space-y-3 w-full">
                   <p className="text-sm font-bold text-[hsl(var(--foreground))]">Confirmá el cambio de email</p>
-                  <label className="block space-y-1.5">
-                    <span className="text-[13px] font-semibold">Contraseña actual</span>
-                    <input 
-                      type="password" 
+                  <div className="space-y-1.5">
+                    <label htmlFor="input-settings-current-password" className="block text-[13px] font-semibold">Contraseña actual</label>
+                    <PasswordInput
+                      id="input-settings-current-password"
                       className="field bg-white dark:bg-black" 
                       value={formData.currentPassword} 
                       onChange={(e) => setFormData({ ...formData, currentPassword: e.target.value })} 
@@ -255,7 +257,7 @@ function AccountProfileForm({ account }: { account: any }) {
                       placeholder="Para proteger tu cuenta"
                       data-testid="input-settings-current-password"
                     />
-                  </label>
+                  </div>
                 </div>
               </div>
             </div>
@@ -382,7 +384,7 @@ function AccountLocationForm({ account }: { account: any }) {
   );
 }
 
-function AccountPasswordForm({ account }: { account: any }) {
+export function AccountPasswordForm({ account }: { account: any }) {
   const changePassword = useChangeMyPassword();
   const auth = useAuth();
   const [formData, setFormData] = useState({ currentPassword: '', newPassword: '', confirmPassword: '' });
@@ -394,6 +396,14 @@ function AccountPasswordForm({ account }: { account: any }) {
   const [emailError, setEmailError] = useState('');
   const [emailBusy, setEmailBusy] = useState(false);
   const [verifiedLocally, setVerifiedLocally] = useState(false);
+  const [twoFactorPassword, setTwoFactorPassword] = useState('');
+  const [twoFactorError, setTwoFactorError] = useState('');
+  const [twoFactorMessage, setTwoFactorMessage] = useState('');
+  const [twoFactorBusy, setTwoFactorBusy] = useState(false);
+  const twoFactorStatus = useQuery({
+    queryKey: ['auth-two-factor'],
+    queryFn: () => apiRequest<{ enabled: boolean }>('/auth/security/two-factor'),
+  });
   const emailIsVerified = verifiedLocally || Boolean(account.emailVerifiedAt);
 
   useEffect(() => {
@@ -439,6 +449,29 @@ function AccountPasswordForm({ account }: { account: any }) {
       setEmailError(requestErrorMessage(cause, 'No pudimos verificar el código.'));
     } finally {
       setEmailBusy(false);
+    }
+  };
+  const updateTwoFactor = async () => {
+    const enabled = !twoFactorStatus.data?.enabled;
+    if (!twoFactorPassword) {
+      setTwoFactorError('Ingresá tu contraseña actual para confirmar este cambio.');
+      return;
+    }
+    setTwoFactorBusy(true);
+    setTwoFactorError('');
+    setTwoFactorMessage('');
+    try {
+      const result = await apiRequest<{ enabled: boolean }>('/auth/security/two-factor', {
+        method: 'PUT',
+        body: JSON.stringify({ enabled, currentPassword: twoFactorPassword }),
+      });
+      setTwoFactorPassword('');
+      setTwoFactorMessage(result.enabled ? 'La verificación en dos pasos quedó activada.' : 'La verificación en dos pasos quedó desactivada.');
+      await queryClient.invalidateQueries({ queryKey: ['auth-two-factor'] });
+    } catch (cause) {
+      setTwoFactorError(requestErrorMessage(cause, 'No pudimos actualizar la seguridad.'));
+    } finally {
+      setTwoFactorBusy(false);
     }
   };
 
@@ -530,6 +563,49 @@ function AccountPasswordForm({ account }: { account: any }) {
               )}
             </div>
           </div>
+        </div>
+        <div className="mb-7 rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--muted)/.25)] p-4" data-testid="two-factor-settings">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-start gap-3">
+              <ShieldCheck size={19} className={`mt-0.5 shrink-0 ${twoFactorStatus.data?.enabled ? 'text-[#31825a]' : 'text-[hsl(var(--muted-foreground))]'}`} />
+              <div>
+                <h3 className="text-sm font-bold">Verificación en dos pasos por email</h3>
+                <p className="mt-1 max-w-xl text-xs leading-relaxed text-[hsl(var(--muted-foreground))]">
+                  {twoFactorStatus.data?.enabled
+                    ? 'Al iniciar sesión se enviará un código a tu email. En móvil también se pedirá el código al ingresar.'
+                    : 'Opcional. Al activarla, se pedirá un código enviado a tu email al iniciar sesión.'}
+                </p>
+              </div>
+            </div>
+            <span className={`shrink-0 rounded-full px-3 py-1 text-[11px] font-bold ${twoFactorStatus.data?.enabled ? 'bg-[#31825a]/10 text-[#31825a]' : 'bg-[hsl(var(--muted))] text-[hsl(var(--muted-foreground))]'}`}>
+              {twoFactorStatus.isLoading ? 'Consultando…' : twoFactorStatus.data?.enabled ? 'Activada' : 'Desactivada'}
+            </span>
+          </div>
+          {twoFactorStatus.isError && <p className="mt-3 text-xs font-semibold text-[hsl(var(--destructive))]" role="alert">No pudimos consultar este ajuste. Recargá la sección.</p>}
+          <div className="mt-4 flex flex-col gap-2 sm:flex-row">
+            <input
+              type="password"
+              className="field max-w-sm"
+              value={twoFactorPassword}
+              onChange={(event) => { setTwoFactorPassword(event.target.value); setTwoFactorError(''); }}
+              autoComplete="current-password"
+              placeholder="Contraseña actual"
+              aria-label="Contraseña actual para cambiar verificación en dos pasos"
+              data-testid="input-two-factor-current-password"
+            />
+            <Button
+              type="button"
+              variant={twoFactorStatus.data?.enabled ? 'ghost' : 'dark'}
+              disabled={twoFactorBusy || twoFactorStatus.isLoading || twoFactorStatus.isError || !emailIsVerified || !twoFactorPassword}
+              onClick={() => void updateTwoFactor()}
+              testId="button-toggle-two-factor"
+            >
+              {twoFactorBusy ? 'Guardando…' : twoFactorStatus.data?.enabled ? 'Desactivar' : 'Activar'}
+            </Button>
+          </div>
+          {!emailIsVerified && <p className="mt-2 text-xs text-[hsl(var(--muted-foreground))]">Primero verificá tu email para poder activarla.</p>}
+          {twoFactorError && <p className="mt-2 text-xs font-semibold text-[hsl(var(--destructive))]" role="alert">{twoFactorError}</p>}
+          {twoFactorMessage && <p className="mt-2 text-xs font-semibold text-[#31825a]" role="status">{twoFactorMessage}</p>}
         </div>
         <form onSubmit={handleSubmit} className="space-y-5" noValidate>
           <label className="block space-y-1.5 max-w-sm">

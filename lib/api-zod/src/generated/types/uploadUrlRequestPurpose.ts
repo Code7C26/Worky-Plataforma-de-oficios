@@ -12,5 +12,6 @@ export type UploadUrlRequestPurpose = typeof UploadUrlRequestPurpose[keyof typeo
 export const UploadUrlRequestPurpose = {
   profile_photo: 'profile_photo',
   chat_image: 'chat_image',
+  client_verification: 'client_verification',
   file: 'file',
 } as const;

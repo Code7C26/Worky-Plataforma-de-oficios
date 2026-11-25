@@ -9,8 +9,14 @@ The GitHub integration can authenticate API calls while the repository's HTTPS G
 
 **How to apply:** Prefer the authenticated GitHub client for repository operations; verify each created blob before building a tree, throttle batches, and surface any files rejected by the proxy rather than silently changing them.
 
-For Worky, GitHub `main` may have an independently initialized snapshot history rather than sharing ancestry with the local Replit `main`. Never force-push the local branch over the remote.
+GitHub's `POST /git/trees` response may list only the new tree's top-level entries, even when nested file paths were included. It is not a complete recursive view of the created tree.
 
-**Why:** Replacing a divergent remote branch would discard its existing commits and any remote-only files.
+**Why:** A nested file can look missing in the create response even though the stored tree contains it.
 
-**How to apply:** Compare the GitHub tip with local history before publishing. If they diverge, add scoped commits whose parents descend from the current GitHub tip, preserve remote-only files, and update the branch only after verifying the uploaded blobs and trees.
+**How to apply:** Before creating a commit, fetch the new tree with `GET /git/trees/{sha}?recursive=1` and verify every expected path and blob SHA against that result.
+
+For Worky, GitHub `main` may have an independently initialized snapshot history rather than sharing ancestry with the local Replit `main`. Never force-push the local branch over the remote. When importing a merged PR, apply only that PR's first-parent changes and resolve conflicts file by file; do not replace whole local files or assume unrelated mail/auth flows are equivalent.
+
+**Why:** Replacing a divergent remote branch would discard its existing commits and any remote-only files. A broad merge can also erase Replit-only features or change existing email transports while importing an unrelated PR.
+
+**How to apply:** Compare the GitHub tip with local history before publishing. If they diverge, preserve the local working tree and remote-only files, resolve only the requested PR's changes, then verify the final diff and tests before publication. Update GitHub only after verifying uploaded blobs and trees.

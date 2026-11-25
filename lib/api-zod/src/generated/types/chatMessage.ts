@@ -12,6 +12,8 @@ export interface ChatMessage {
   id: number;
   changaId: number;
   emisorId: number;
+  /** @nullable */
+  conversacionProfesionalId: number | null;
   texto: string;
   adjuntos: MessageAttachment[];
   leido: boolean;

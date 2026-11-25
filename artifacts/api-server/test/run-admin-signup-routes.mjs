@@ -13,7 +13,10 @@ try {
     bundle: true,
     platform: "node",
     format: "cjs",
-    external: ["@electric-sql/pglite", "drizzle-orm", "drizzle-orm/*", "express", "express-rate-limit", "bcryptjs", "jsonwebtoken"],
+    external: [
+      "@electric-sql/pglite", "drizzle-orm", "drizzle-orm/*", "express", "express-rate-limit",
+      "bcryptjs", "jsonwebtoken", "pino", "pino-http", "thread-stream",
+    ],
     plugins: [{
       name: "isolate-admin-signup",
       setup(build) {
@@ -30,11 +33,14 @@ try {
         build.onLoad({ filter: /.*/, namespace: "forbidden-side-effect" }, () => ({
           contents: `
             const forbidden = () => { throw new Error("Unrelated side effect in isolated admin signup test"); };
-            export const deleteObject = forbidden, isProfilePhotoSourcePath = forbidden,
+            export const deleteObject = forbidden, isProfilePhotoRenderedPath = forbidden,
+              isProfilePhotoSourcePath = forbidden,
               isValidImageObject = forbidden, processProfilePhoto = forbidden,
               cleanupRejectedChatAttachment = forbidden, createPasswordRecovery = forbidden,
               isPasswordRecoveryTokenValid = forbidden, passwordRecoveryTokenHash = forbidden,
-              confirmEmailVerificationCode = forbidden, createEmailVerificationChallenge = forbidden,
+              passwordRecoveryFailureDetails = () => ({ reason: "internal_error" }),
+              confirmEmailVerificationCode = forbidden,
+              createEmailVerificationChallenge = async () => ({ sent: true, throttled: false }),
               emailVerificationFailureDetails = forbidden;
           `,
           loader: "js",
@@ -42,7 +48,7 @@ try {
       },
     }],
   });
-  const result = spawnSync(process.execPath, ["--test", path.join(output, "tests.cjs")], {
+  const result = spawnSync(process.execPath, [path.join(output, "tests.cjs")], {
     stdio: "inherit",
     // Fixed test secrets, no inherited production credentials or database URL.
     env: { PATH: process.env.PATH, NODE_ENV: "test", JWT_SECRET: "isolated-admin-signup-test-secret" },

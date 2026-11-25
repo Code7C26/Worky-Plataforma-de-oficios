@@ -3,3 +3,12 @@
 
 # No need to store the pnpm store twice.
 .local
+/generated-artifacts/
+# Development caches and Python support files are not used at runtime.
+/.cache/
+/.pythonlibs/
+/.git/
+/artifacts/worky-mobile/static-build/
+/artifacts/worky-mobile/android/
+/artifacts/worky-mobile/test-results/android-status-bar/
+/artifacts/worky-publicidad-vertical/hyperframes/renders/

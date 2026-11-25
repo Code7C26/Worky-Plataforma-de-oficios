@@ -18,9 +18,29 @@ import { fetch as uploadFetch } from 'expo/fetch';
 import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
 import { useQueryClient } from '@tanstack/react-query';
-import { markMessagesRead, useCreateMessage, useListMessages, useRequestUploadUrl } from '@workspace/api-client-react';
-import { AppText, Avatar, FeedbackPressable, StateMessage, SuccessNotice } from '@/components/WorkyUI';
+import {
+  getGetJobQueryKey,
+  getGetProfessionalThreadJobQueryKey,
+  getListAppointmentsQueryKey,
+  getListProfessionalThreadMessagesQueryKey,
+  markMessagesRead,
+  useCreateMessage,
+  useCreateProfessionalThreadMessage,
+  useGetJob,
+  useGetProfessionalThreadJob,
+  useListAppointments,
+  useListMessages,
+  useListProfessionalThreadMessages,
+  useMarkProfessionalThreadMessagesRead,
+  useProposeAppointment,
+  useRequestUploadUrl,
+} from '@workspace/api-client-react';
+import { AppText, Avatar, BrandHeader, Button, FeedbackPressable, StateMessage, SuccessNotice } from '@/components/WorkyUI';
+import { canReviewJob, formatJobContextTitle, getJobParticipant, getJobReviewRoute } from '@/lib/job-navigation';
+import { ChatVisitCard } from '@/components/ChatVisitCard';
+import { buildChatTimeline } from '@/lib/chat-timeline';
 import { useAuth } from '@/context/AuthContext';
+import { useTheme } from '@/context/ThemeContext';
 import { useColors } from '@/hooks/useColors';
 import {
   CHAT_IMAGE_LIMIT_MESSAGE,
@@ -36,13 +56,48 @@ export default function ChatScreen() {
   const insets = useSafeAreaInsets();
   const queryClient = useQueryClient();
   const { account } = useAuth();
-  const params = useLocalSearchParams<{ changaId?: string; category?: string; participant?: string; participantPhotoPath?: string }>();
+  const { mode } = useTheme();
+  const params = useLocalSearchParams<{ changaId?: string; category?: string; participant?: string; participantPhotoPath?: string; profesionalId?: string }>();
   const changaId = Number(params.changaId);
-  const category = typeof params.category === 'string' ? params.category : 'Trabajo';
-  const participant = typeof params.participant === 'string' ? params.participant : 'Conversación';
-  const participantPhotoPath = typeof params.participantPhotoPath === 'string' ? params.participantPhotoPath : undefined;
-  const messages = useListMessages(changaId, { query: { queryKey: [`/api/v1/chats/${changaId}/mensajes`], enabled: Number.isInteger(changaId) && changaId > 0, refetchInterval: 8_000 } });
+  const threadProfessionalId = Number(params.profesionalId);
+  const hasThread = Number.isInteger(threadProfessionalId) && threadProfessionalId > 0;
+  const validJobId = Number.isInteger(changaId) && changaId > 0;
+  const generalJob = useGetJob(changaId, {
+    query: {
+      queryKey: getGetJobQueryKey(changaId),
+      enabled: validJobId && !hasThread,
+      refetchInterval: 8_000,
+      refetchOnMount: 'always',
+    },
+  });
+  const threadJob = useGetProfessionalThreadJob(changaId, hasThread ? threadProfessionalId : 0, {
+    query: {
+      queryKey: getGetProfessionalThreadJobQueryKey(changaId, hasThread ? threadProfessionalId : 0),
+      enabled: validJobId && hasThread,
+      refetchInterval: 8_000,
+      refetchOnMount: 'always',
+    },
+  });
+  const job = hasThread ? threadJob : generalJob;
+  const jobData = job.data;
+  const other = jobData ? getJobParticipant(jobData, account?.id) : null;
+  const category = jobData?.categoria || (typeof params.category === 'string' ? params.category : 'Trabajo');
+  const participant = other?.nombre || (typeof params.participant === 'string' ? params.participant : 'Conversación');
+  const participantPhotoPath = other?.fotoObjectPath || (typeof params.participantPhotoPath === 'string' ? params.participantPhotoPath : undefined);
+  const generalMessages = useListMessages(changaId, { query: { queryKey: [`/api/v1/chats/${changaId}/mensajes`], enabled: validJobId && !hasThread, refetchInterval: 8_000 } });
+  const threadMessages = useListProfessionalThreadMessages(changaId, hasThread ? threadProfessionalId : 0, {
+    query: {
+      queryKey: getListProfessionalThreadMessagesQueryKey(changaId, hasThread ? threadProfessionalId : 0),
+      enabled: validJobId && hasThread,
+      refetchInterval: 8_000,
+    },
+  });
+  const messages = hasThread ? threadMessages : generalMessages;
+  const appointments = useListAppointments(changaId, { query: { queryKey: getListAppointmentsQueryKey(changaId), enabled: Number.isInteger(changaId) && changaId > 0, refetchInterval: 8_000, refetchOnMount: 'always' } });
+  const proposeAppointment = useProposeAppointment();
   const createMessage = useCreateMessage();
+  const createThreadMessage = useCreateProfessionalThreadMessage();
+  const markThreadRead = useMarkProfessionalThreadMessagesRead();
   const requestUploadUrl = useRequestUploadUrl();
   const [mediaPermission, requestMediaPermission] = ImagePicker.useMediaLibraryPermissions();
   const [text, setText] = useState('');
@@ -52,14 +107,42 @@ export default function ChatScreen() {
   const [isPickingImages, setIsPickingImages] = useState(false);
   const [isSending, setIsSending] = useState(false);
   const [showSettingsLink, setShowSettingsLink] = useState(false);
-  const allMessages = useMemo(() => [...(messages.data ?? [])].reverse(), [messages.data]);
+  const [visitDate, setVisitDate] = useState('');
+  const [visitTime, setVisitTime] = useState('');
+  const [visitFee, setVisitFee] = useState('');
+  const [visitProposalError, setVisitProposalError] = useState('');
+  const timeline = useMemo(() => buildChatTimeline(messages.data ?? [], appointments.data ?? []), [messages.data, appointments.data]);
+  const hasActiveVisit = (appointments.data ?? []).some((item) => ['solicitada', 'confirmada', 'en_curso'].includes(item.estado));
+  const canProposeVisit = account?.rol === 'profesional' && jobData?.profesionalId === account.id && !hasActiveVisit && !appointments.isLoading;
+
+  const proposeVisit = async () => {
+    if (!visitDate || !visitTime || !Number.isFinite(Number(visitFee)) || Number(visitFee) < 1) return;
+    setVisitProposalError('');
+    try {
+      const startsAt = new Date(`${visitDate}T${visitTime}:00`);
+      if (Number.isNaN(startsAt.getTime()) || startsAt.getTime() <= Date.now()) throw new Error('Elegí una fecha y hora futuras.');
+      await proposeAppointment.mutateAsync({
+        changaId,
+        data: { empiezaAt: startsAt.toISOString(), tarifaVisita: Number(visitFee) },
+      });
+      await queryClient.invalidateQueries({ queryKey: getListAppointmentsQueryKey(changaId) });
+      setVisitDate('');
+      setVisitTime('');
+      setVisitFee('');
+    } catch (reason) {
+      setVisitProposalError(reason instanceof Error ? reason.message : 'No se pudo enviar la propuesta.');
+    }
+  };
 
   useEffect(() => {
-    if (!Number.isInteger(changaId) || changaId < 1) return;
-    void markMessagesRead(changaId)
+    if (!validJobId) return;
+    const markRead = hasThread
+      ? markThreadRead.mutateAsync({ changaId, profesionalId: threadProfessionalId })
+      : markMessagesRead(changaId);
+    void markRead
       .then(() => queryClient.invalidateQueries())
       .catch(() => undefined);
-  }, [changaId, queryClient]);
+  }, [changaId, hasThread, threadProfessionalId, validJobId, markThreadRead.mutateAsync, queryClient]);
 
   const chooseImages = async () => {
     if (isPickingImages || isSending || images.length >= MAX_CHAT_IMAGES) return;
@@ -108,7 +191,7 @@ export default function ChatScreen() {
   const send = async () => {
     const value = text.trim();
     const selectedImages = [...images];
-    if ((!value && !selectedImages.length) || isPickingImages || isSending || createMessage.isPending) return;
+    if ((!value && !selectedImages.length) || isPickingImages || isSending || createMessage.isPending || createThreadMessage.isPending) return;
     Keyboard.dismiss();
     setSendError('');
     setSendNotice('');
@@ -147,10 +230,12 @@ export default function ChatScreen() {
         adjuntos.push({ objectPath: upload.objectPath, nombre: image.name });
       }
 
-      await createMessage.mutateAsync({
-        changaId,
-        data: { texto: value || 'Imagen adjunta', adjuntos },
-      });
+      const data = { texto: value || 'Imagen adjunta', adjuntos };
+      if (hasThread) {
+        await createThreadMessage.mutateAsync({ changaId, profesionalId: threadProfessionalId, data });
+      } else {
+        await createMessage.mutateAsync({ changaId, data });
+      }
       setText('');
       setImages([]);
       await queryClient.invalidateQueries();
@@ -165,7 +250,7 @@ export default function ChatScreen() {
   const topInset = insets.top || (Platform.OS === 'web' ? 67 : 0);
   const bottomInset = insets.bottom || (Platform.OS === 'web' ? 34 : 0);
 
-  if (!Number.isInteger(changaId) || changaId < 1) {
+  if (!validJobId) {
     return <View style={{ flex: 1, justifyContent: 'center', backgroundColor: colors.background }}><StateMessage icon="message-circle" title="Conversación no disponible" message="Volvé a la bandeja e ingresá desde un trabajo válido." action={{ label: 'Volver', onPress: () => router.back() }} /></View>;
   }
 
@@ -176,31 +261,95 @@ export default function ChatScreen() {
           <Feather name="arrow-left" size={21} color={colors.foreground} />
         </Pressable>
         <Avatar name={participant} size={40} photoObjectPath={participantPhotoPath} />
-        <View style={{ flex: 1, gap: 1 }}>
-          <AppText variant="label" numberOfLines={1}>{participant}</AppText>
-          <AppText variant="caption" style={{ color: colors.mutedForeground }}>{category}</AppText>
-        </View>
+        {account?.rol === 'cliente' && (hasThread ? threadProfessionalId : jobData?.profesionalId) ? (
+          <Pressable
+            onPress={() => router.push({
+              pathname: '/professional/[id]',
+              params: { id: String(hasThread ? threadProfessionalId : jobData?.profesionalId) },
+            })}
+            accessibilityRole="button"
+            accessibilityLabel={`Abrir el perfil de ${participant}; trabajo ${category}`}
+            accessibilityHint="Muestra el perfil de este profesional."
+            testID="button-chat-professional-profile"
+            style={{ flex: 1, gap: 1 }}
+          >
+            <AppText variant="label" numberOfLines={2}>{formatJobContextTitle(category, participant)}</AppText>
+            <AppText variant="caption" style={{ color: colors.mutedForeground }}>Conversación del trabajo</AppText>
+          </Pressable>
+        ) : (
+          <View style={{ flex: 1, gap: 1 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              <AppText variant="label" numberOfLines={2} style={{ flex: 1 }}>{formatJobContextTitle(category, participant)}</AppText>
+              {account?.rol === 'profesional' && jobData?.cliente.clientVerified ? (
+                <Feather name="check-circle" size={15} color={colors.secondary} testID="badge-client-verified-chat" />
+              ) : null}
+            </View>
+            <AppText variant="caption" style={{ color: colors.mutedForeground }}>Conversación del trabajo</AppText>
+          </View>
+        )}
+        <BrandHeader
+          onDark={mode === 'dark'}
+          small
+          onPress={() => router.replace('/')}
+        />
       </View>
-      {messages.isLoading ? (
+      {messages.isError || appointments.isError ? (
+        <View style={{ padding: 12, gap: 8 }}>
+          <AppText variant="caption" accessibilityRole="alert" style={{ color: colors.destructive }}>
+            {messages.isError ? 'No pudimos cargar los mensajes. ' : ''}{appointments.isError ? 'No pudimos cargar las visitas.' : ''}
+          </AppText>
+          <Pressable accessibilityRole="button" testID="button-retry-chat" onPress={() => { void messages.refetch(); void appointments.refetch(); }}>
+            <AppText variant="label" style={{ color: colors.primary }}>Reintentar</AppText>
+          </Pressable>
+        </View>
+      ) : null}
+      {messages.isLoading && appointments.isLoading ? (
         <View style={{ flex: 1, justifyContent: 'center' }}><StateMessage icon="message-circle" title="Cargando mensajes" message="Un momento." /></View>
-      ) : messages.isError ? (
-        <View style={{ flex: 1, justifyContent: 'center' }}><StateMessage icon="wifi-off" title="No cargaron los mensajes" message="Podés intentar de nuevo." action={{ label: 'Reintentar', onPress: () => void messages.refetch() }} /></View>
       ) : (
-        <FlatList
+      <>
+      {jobData ? (
+        <View testID="chat-job-status" style={{ padding: 12, gap: 8, backgroundColor: colors.muted }}>
+          <AppText variant="label">Estado del trabajo: {jobData.estado === 'trabajo_realizado' ? 'Pago pendiente' : jobData.estado.replaceAll('_', ' ')}</AppText>
+          {canReviewJob(jobData, account?.id) ? (
+            <Button label="Dejar una reseña" icon="star" testID="chat-leave-review" onPress={() => router.push(getJobReviewRoute(changaId))} />
+          ) : jobData.calificada && jobData.clienteId === account?.id ? <AppText variant="caption">Calificación enviada</AppText> : null}
+        </View>
+      ) : job.isError ? (
+        <StateMessage icon="wifi-off" title="No cargó el detalle del trabajo" message="Reintentá para ver el estado y los participantes." action={{ label: 'Reintentar', onPress: () => void job.refetch() }} />
+      ) : null}
+      {canProposeVisit ? (
+        <View style={{ padding: 12, gap: 8, backgroundColor: colors.card, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border }} testID="mobile-propose-visit">
+          <AppText variant="label">Proponer una visita</AppText>
+          <AppText variant="caption" style={{ color: colors.mutedForeground }}>Definí fecha, hora y tarifa. El cliente verá el desglose: Worky 15% y Partner 85%.</AppText>
+          <View style={{ flexDirection: 'row', gap: 8 }}>
+            <TextInput value={visitDate} onChangeText={setVisitDate} placeholder="AAAA-MM-DD" accessibilityLabel="Fecha de visita" testID="input-mobile-visit-date"
+              style={[styles.visitInput, { color: colors.foreground, backgroundColor: colors.background, borderColor: colors.border, flex: 1.2 }]} />
+            <TextInput value={visitTime} onChangeText={setVisitTime} placeholder="HH:MM" accessibilityLabel="Hora de visita" testID="input-mobile-visit-time"
+              style={[styles.visitInput, { color: colors.foreground, backgroundColor: colors.background, borderColor: colors.border, flex: 0.8 }]} />
+          </View>
+          <TextInput value={visitFee} onChangeText={setVisitFee} placeholder="Tarifa de visita (ARS)" keyboardType="decimal-pad" accessibilityLabel="Tarifa de visita en pesos" testID="input-mobile-visit-fee"
+            style={[styles.visitInput, { color: colors.foreground, backgroundColor: colors.background, borderColor: colors.border }]} />
+          {visitProposalError ? <AppText variant="caption" accessibilityRole="alert" style={{ color: colors.destructive }}>{visitProposalError}</AppText> : null}
+          <Button label={proposeAppointment.isPending ? 'Enviando propuesta…' : 'Enviar propuesta de visita'} icon="calendar" disabled={proposeAppointment.isPending || !visitDate || !visitTime || !visitFee} testID="button-mobile-propose-visit" onPress={() => void proposeVisit()} />
+        </View>
+      ) : null}
+      <FlatList
           inverted
-          data={allMessages}
-          keyExtractor={(item) => String(item.id)}
-          contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 18, paddingBottom: 12, flexGrow: 1, justifyContent: allMessages.length ? 'flex-start' : 'flex-end' }}
+          data={timeline}
+          keyExtractor={(item) => item.key}
+          contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 18, paddingBottom: 12, flexGrow: 1, justifyContent: timeline.length ? 'flex-start' : 'flex-end' }}
           keyboardDismissMode="interactive"
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
-          ListEmptyComponent={
+          ListEmptyComponent={messages.isLoading || appointments.isLoading || messages.isError || appointments.isError ? undefined :
             <View style={{ alignItems: 'center', padding: 22 }}>
               <AppText variant="label">Todavía no hay mensajes</AppText>
               <AppText variant="caption" style={{ color: colors.mutedForeground, textAlign: 'center' }}>Escribí para empezar a coordinar este trabajo.</AppText>
             </View>
           }
-          renderItem={({ item }) => {
+          renderItem={({ item: entry }) => {
+            if (entry.kind === 'visit') return <ChatVisitCard appointment={entry.appointment} accountId={account?.id} />;
+            const item = entry.message;
             const outgoing = item.emisorId === account?.id;
             return (
               <View style={{ alignSelf: outgoing ? 'flex-end' : 'flex-start', maxWidth: '84%', marginVertical: 5 }}>
@@ -217,6 +366,7 @@ export default function ChatScreen() {
             );
           }}
         />
+      </>
       )}
       <View style={[styles.composer, { borderTopColor: colors.border, backgroundColor: colors.card, paddingBottom: Math.max(bottomInset, 10) }]}>
         {images.length ? (
@@ -288,7 +438,7 @@ export default function ChatScreen() {
           />
           <FeedbackPressable
             onPress={() => void send()}
-            disabled={(!text.trim() && !images.length) || isPickingImages || isSending || createMessage.isPending}
+            disabled={(!text.trim() && !images.length) || isPickingImages || isSending || createMessage.isPending || createThreadMessage.isPending}
             style={({ pressed }) => ({
               width: 48,
               height: 48,
@@ -302,7 +452,7 @@ export default function ChatScreen() {
             accessibilityLabel="Enviar mensaje"
             testID="button-send-message"
           >
-            {isSending || createMessage.isPending ? <Feather name="loader" size={18} color={colors.primaryForeground} /> : <Feather name="arrow-up" size={20} color={colors.primaryForeground} />}
+            {isSending || createMessage.isPending || createThreadMessage.isPending ? <Feather name="loader" size={18} color={colors.primaryForeground} /> : <Feather name="arrow-up" size={20} color={colors.primaryForeground} />}
           </FeedbackPressable>
         </View>
       </View>
@@ -315,6 +465,7 @@ const styles = StyleSheet.create({
   backButton: { width: 34, height: 40, alignItems: 'center', justifyContent: 'center' },
   bubble: { borderRadius: 17, borderWidth: 1, paddingHorizontal: 13, paddingVertical: 10 },
   composer: { borderTopWidth: 1, paddingHorizontal: 14, paddingTop: 10, gap: 8 },
+  visitInput: { minHeight: 44, borderWidth: 1, borderRadius: 11, paddingHorizontal: 12, paddingVertical: 9, fontFamily: 'DMSans_400Regular', fontSize: 14 },
   messageInput: { flex: 1, minHeight: 48, maxHeight: 120, borderRadius: 17, borderWidth: 1, paddingHorizontal: 14, paddingTop: 12, paddingBottom: 12, fontFamily: 'DMSans_400Regular', fontSize: 15 },
   attachmentList: { gap: 10, paddingHorizontal: 3, paddingBottom: 2 },
   attachmentPreview: { width: 68, height: 68, borderWidth: 1, borderRadius: 13, overflow: 'visible' },

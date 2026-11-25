@@ -21,9 +21,9 @@ export default function IndexRoute() {
     return (
       <View style={{ flex: 1, justifyContent: 'center', backgroundColor: colors.background, padding: 24 }}>
         <StateMessage
-          icon="wifi-off"
-          title="No pudimos validar tu sesión"
-          message="Revisá tu conexión e intentá de nuevo."
+          icon="server"
+          title="No pudimos conectar con Worky"
+          message="La sesión no se borró. El servidor puede estar tardando en responder; intentá nuevamente en unos segundos."
           action={{ label: 'Reintentar', onPress: () => void refreshSession() }}
         />
       </View>

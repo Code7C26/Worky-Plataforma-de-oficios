@@ -110,7 +110,7 @@ async function run() {
     const createdProfile = await request(server, "/api/v1/partner-profile", {
       method: "POST",
       token: client.token,
-      body: { oficio: "Plomero", categoria: "Plomería" },
+      body: { oficio: "Plomero", categoria: "Plomería", ubicacionFija: { direccionTexto: "Av. Siempre Viva 123", ciudad: "Córdoba" } },
     });
     assert.equal(createdProfile.status, 201, JSON.stringify(createdProfile.body));
     assert.equal(createdProfile.body.usuario.id, client.id);

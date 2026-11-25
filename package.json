@@ -9,7 +9,9 @@
     "typecheck": "pnpm run typecheck:libs && pnpm -r --filter \"./artifacts/**\" --filter \"./scripts\" --if-present run typecheck",
     "build:worky": "pnpm run validate:artifact-config && pnpm --filter @workspace/api-spec run codegen && pnpm --filter @workspace/api-client-react run build",
     "validate:artifact-config": "pnpm --filter @workspace/scripts test && pnpm --filter @workspace/scripts exec tsx src/validate-artifact-config.ts",
-    "validate:worky": "pnpm run validate:artifact-config && pnpm --filter @workspace/api-spec run codegen && pnpm --filter @workspace/api-client-react run build && pnpm --filter @workspace/api-server run test:privacy && pnpm --filter @workspace/api-server run test:location && pnpm --filter @workspace/api-server run test:account-settings && pnpm --filter @workspace/api-server run test:admin && pnpm --filter @workspace/worky run validate"
+    "validate:work-log": "pnpm --filter @workspace/scripts run validate:work-log",
+    "validate:worky": "pnpm run validate:work-log && pnpm run validate:artifact-config && pnpm --filter @workspace/api-spec run codegen && pnpm --filter @workspace/api-client-react run build && pnpm --filter @workspace/api-server run test:email-verification && pnpm --filter @workspace/api-server run test:password-recovery && pnpm --filter @workspace/api-server run test:privacy && pnpm --filter @workspace/api-server run test:location && pnpm --filter @workspace/api-server run test:account-settings && pnpm --filter @workspace/api-server run test:admin && pnpm --filter @workspace/api-server run test:admin-role-grant && pnpm --filter @workspace/api-server run test:recommendation-ranking && pnpm --filter @workspace/worky run validate",
+    "validate:admin-role-grant": "pnpm --filter @workspace/api-server run test:admin-role-grant"
   },
   "private": true,
   "dependencies": {
@@ -18,5 +20,6 @@
   "devDependencies": {
     "prettier": "^3.9.6",
     "typescript": "~5.9.3"
-  }
+  },
+  "packageManager": "pnpm@10.26.1"
 }

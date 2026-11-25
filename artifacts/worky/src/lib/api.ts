@@ -16,9 +16,11 @@ export type AuthUser = {
   onboardingEstado?: string;
   onboardingPaso?: number;
 };
+export type AuthLoginChallenge = { requiresTwoFactor: true; challengeId: number; maskedEmail: string };
+export type AuthLoginResult = AuthUser | AuthLoginChallenge;
 
 export class WorkyApiError extends Error {
-  constructor(public status: number, message: string) {
+  constructor(public status: number, message: string, public code?: string) {
     super(message);
   }
 }
@@ -106,12 +108,12 @@ export function configureApiAuth(onUnauthorized?: () => void) {
       ...init,
       headers: { "Content-Type": "application/json", ...(getToken() ? { Authorization: `Bearer ${getToken()}` } : {}), ...init.headers },
     });
-    if (response.status === 401) {
+    const data = await response.json().catch(() => null);
+    if (response.status === 401 || (response.status === 403 && data?.code === "EMAIL_NOT_VERIFIED")) {
       clearToken();
       onUnauthorized?.();
     }
-    const data = await response.json().catch(() => null);
-    if (!response.ok) throw new WorkyApiError(response.status, data?.error || "No pudimos completar la solicitud.");
+    if (!response.ok) throw new WorkyApiError(response.status, data?.error || "No pudimos completar la solicitud.", data?.code);
     return data as T;
   };
 }
@@ -126,11 +128,45 @@ export async function markNotificationRead(notificationId: number, onConfirmed?:
   return result;
 }
 
-export async function login(email: string, password: string) {
+export async function login(email: string, password: string): Promise<AuthLoginResult> {
   const request = configureApiAuth();
-  const data = await request<{ token: string; usuario: AuthUser }>("/auth/login", { method: "POST", body: JSON.stringify({ email, password }) });
+  const data = await request<{ token: string; usuario: AuthUser } | AuthLoginChallenge>("/auth/login", { method: "POST", body: JSON.stringify({ email, password }) });
+  if ("requiresTwoFactor" in data) return data;
   localStorage.setItem(TOKEN_KEY, data.token);
   return data.usuario;
+}
+
+export async function verifyTwoFactorLogin(challengeId: number, code: string) {
+  const request = configureApiAuth();
+  const data = await request<{ token: string; usuario: AuthUser }>("/auth/login/verify", {
+    method: "POST",
+    body: JSON.stringify({ challengeId, code }),
+  });
+  localStorage.setItem(TOKEN_KEY, data.token);
+  return data.usuario;
+}
+export async function requestAdminSignupCode(email: string) {
+  return apiRequest<{ message: string }>("/auth/admin-signup/request", {
+    method: "POST",
+    body: JSON.stringify({ email }),
+  });
+}
+
+export async function completeAdminSignup(payload: {
+  nombre: string;
+  email: string;
+  password: string;
+  codigo: string;
+}) {
+  const result = await apiRequest<{ token: string; usuario: AuthUser }>("/auth/admin-signup/complete", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+  if (result.usuario.rol !== "admin") {
+    throw new WorkyApiError(403, "El servidor no confirmó el rol administrador.");
+  }
+  localStorage.setItem(TOKEN_KEY, result.token);
+  return result.usuario;
 }
 
 export async function requestPasswordRecovery(email: string) {
@@ -163,14 +199,28 @@ export async function confirmAccountEmailVerification(code: string) {
   });
 }
 
-export async function register(payload: { nombre: string; email: string; password: string; telefono?: string; ubicacion?: unknown; edad?: number; fotoObjectPath?: string | null; rol?: "cliente" | "profesional"; onboardingRespuestas?: Record<string, string> }) {
-  const request = configureApiAuth();
-  const data = await request<{ token: string; usuario: AuthUser }>("/auth/register", { method: "POST", body: JSON.stringify(payload) });
+export async function requestRegistrationEmailVerification(email: string) {
+  return apiRequest<{ message: string }>("/auth/email-verification/registration/request", {
+    method: "POST",
+    body: JSON.stringify({ email }),
+  });
+}
+
+export async function confirmRegistrationEmailVerification(email: string, code: string) {
+  const data = await apiRequest<{ token: string; usuario: AuthUser }>("/auth/email-verification/registration/confirm", {
+    method: "POST",
+    body: JSON.stringify({ email, code }),
+  });
   localStorage.setItem(TOKEN_KEY, data.token);
   return data.usuario;
 }
 
-export async function uploadWorkyFile(file: File, purpose: "profile_photo" | "chat_image" | "file" = "file", changaId?: number) {
+export async function register(payload: { nombre: string; email: string; password: string; telefono?: string; ubicacion?: unknown; edad?: number; fotoObjectPath?: string | null; rol?: "cliente" | "profesional"; onboardingRespuestas?: Record<string, string> }) {
+  const request = configureApiAuth();
+  return request<{ message: string }>("/auth/register", { method: "POST", body: JSON.stringify(payload) });
+}
+
+export async function uploadWorkyFile(file: File, purpose: "profile_photo" | "chat_image" | "file" = "file", changaId?: number, profesionalId?: number) {
   if (purpose === "profile_photo") {
     if (!file.type.startsWith("image/")) throw new Error("Elegí un archivo de imagen para tu foto de perfil.");
     if (file.size > 10 * 1024 * 1024) throw new Error("La foto de perfil puede pesar hasta 10 MB.");
@@ -182,7 +232,7 @@ export async function uploadWorkyFile(file: File, purpose: "profile_photo" | "ch
   }
   const request = configureApiAuth();
   const prepared = await request<{ uploadURL: string; objectPath: string }>("/storage/uploads/request-url", {
-    method: "POST", body: JSON.stringify({ name: file.name, size: file.size, contentType: file.type || "application/octet-stream", purpose, ...(changaId ? { changaId } : {}) }),
+    method: "POST", body: JSON.stringify({ name: file.name, size: file.size, contentType: file.type || "application/octet-stream", purpose, ...(changaId ? { changaId } : {}), ...(profesionalId ? { profesionalId } : {}) }),
   });
   const uploaded = await fetch(prepared.uploadURL, { method: "PUT", headers: { "Content-Type": file.type || "application/octet-stream" }, body: file });
   if (!uploaded.ok) throw new Error("No pudimos cargar el archivo.");
@@ -194,6 +244,18 @@ export async function fetchWorkyObject(objectPath: string) {
     headers: getToken() ? { Authorization: `Bearer ${getToken()}` } : {},
   });
   if (!response.ok) throw new Error("No pudimos cargar el archivo.");
+  return response.blob();
+}
+
+export async function fetchWorkyApiFile(path: string) {
+  const response = await fetch(`/api/v1${path}`, {
+    headers: getToken() ? { Authorization: `Bearer ${getToken()}` } : {},
+    cache: "no-store",
+  });
+  if (!response.ok) {
+    const body = await response.json().catch(() => null);
+    throw new WorkyApiError(response.status, body?.error || "No pudimos cargar el archivo privado.");
+  }
   return response.blob();
 }
 

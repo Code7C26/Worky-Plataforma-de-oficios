@@ -8,3 +8,7 @@ When a React integration test swaps global window, document, and browser APIs, r
 **Why:** React and the testing library can retain references to the first DOM environment, causing later tests to render an empty body even when the same test passes in isolation. Separately, a React Query hook loaded with a different React peer from the renderer throws an invalid-hook error even when the JSDOM test already runs alone.
 
 **How to apply:** Put browser-global-heavy integration cases in separate test files and include each file in package validation. For invalid-hook failures, compare renderer and hook resolution first; prefer Vite SSR or Playwright over changing DOM cleanup or package versions when the mismatch comes from linked workspace resolution. Avoid relying on global DOM constructors such as `Node` in these tests; use the JSDOM window's constructor or call `.contains()` with a type cast.
+
+Components that combine API requests with browser routing also need storage, location/history, and bound window event listeners in their test browser globals. Missing storage can appear as a query error before the mocked fetch is ever called; missing routing globals can fail only when a conditional link renders.
+
+**Why:** Loading the component through Vite preserves package resolution, but does not supply the browser APIs used by account-token storage and Wouter.

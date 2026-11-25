@@ -17,5 +17,7 @@ export interface ParticipantUser {
   /** @nullable */
   fotoObjectPath?: string | null;
   rol: ParticipantUserRol;
+  /** Present only in worker-facing views. */
+  clientVerified?: boolean;
   ubicacion?: UserLocation | null;
 }

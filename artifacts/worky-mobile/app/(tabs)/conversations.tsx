@@ -1,11 +1,13 @@
 import React from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
+import { Feather } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useListConversations } from '@workspace/api-client-react';
 import { AppText, Avatar, Screen, StateMessage, formatShortDate } from '@/components/WorkyUI';
 import { useAuth } from '@/context/AuthContext';
 import { useColors } from '@/hooks/useColors';
 import { createConversationOnPress, getConversationInboxQuery, getConversationRowPresentation } from '@/lib/conversation-inbox';
+import { formatJobContextTitle } from '@/lib/job-navigation';
 
 export default function ConversationsScreen() {
   const colors = useColors();
@@ -18,7 +20,7 @@ export default function ConversationsScreen() {
   const items = conversations.data ?? [];
 
   return (
-    <Screen contentStyle={styles.screenContent}>
+    <Screen hasHeader contentStyle={styles.screenContent}>
       <View style={styles.header}>
         <AppText variant="title">Mensajes</AppText>
         <AppText variant="caption" style={{ color: colors.mutedForeground }}>Tus conversaciones de Worky</AppText>
@@ -34,26 +36,24 @@ export default function ConversationsScreen() {
           {items.map((conversation, index) => {
             const row = getConversationRowPresentation(conversation, new Date(), formatShortDate);
             return (
-              <View key={conversation.changaId}>
+              <View key={`${conversation.changaId}-${conversation.profesionalId ?? 'general'}`}>
                 <Pressable
                   onPress={createConversationOnPress(conversation, (route) => router.push(route))}
                   accessibilityRole="button"
                   accessibilityLabel={row.accessibilityLabel}
                   accessibilityHint="Abre el chat del trabajo"
-                  testID={`card-conversation-${conversation.changaId}`}
+                  testID={`card-conversation-${conversation.changaId}-${conversation.profesionalId ?? 'general'}`}
                   style={({ pressed }) => [styles.row, pressed ? styles.rowPressed : null]}
                 >
                   <Avatar name={row.name} size={54} photoObjectPath={row.photoObjectPath} />
                   <View style={styles.conversationCopy}>
                     <View style={styles.topLine}>
-                      <View style={styles.nameAndCategory}>
-                        <AppText variant="label" numberOfLines={1} style={styles.name}>{row.name}</AppText>
-                        <View style={[styles.categoryPill, { backgroundColor: colors.muted }]}>
-                          <AppText variant="caption" numberOfLines={1} style={[styles.category, { color: colors.mutedForeground }]}>
-                            {row.category}
-                          </AppText>
-                        </View>
-                      </View>
+                      <AppText variant="label" numberOfLines={2} style={styles.name}>
+                        {formatJobContextTitle(row.category, row.name)}
+                      </AppText>
+                      {account?.rol === 'profesional' && conversation.interlocutor?.clientVerified ? (
+                        <Feather name="check-circle" size={15} color={colors.secondary} testID={`badge-client-verified-conversation-${conversation.changaId}`} />
+                      ) : null}
                       <AppText
                         variant="caption"
                         style={{ color: conversation.unread > 0 ? colors.messageUnread : colors.mutedForeground }}
@@ -110,10 +110,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     gap: 8,
   },
-  nameAndCategory: { minWidth: 0, flex: 1, flexDirection: 'row', alignItems: 'center', gap: 6 },
-  name: { flexShrink: 1, fontSize: 15, lineHeight: 20 },
-  categoryPill: { maxWidth: 88, flexShrink: 1, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 9 },
-  category: { fontSize: 10, lineHeight: 14 },
+  name: { minWidth: 0, flex: 1, fontSize: 15, lineHeight: 20 },
   messageLine: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   preview: { minWidth: 0, flex: 1, fontSize: 13, lineHeight: 18 },
   unreadBadge: {

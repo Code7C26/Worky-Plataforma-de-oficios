@@ -20,6 +20,13 @@ export interface Account {
   edad?: number | null;
   /** @nullable */
   fotoObjectPath?: string | null;
+  /**
+     * @minLength 3
+     * @maxLength 20
+     * @nullable
+     * @pattern ^[A-Za-z0-9_]{3,20}$
+     */
+  username?: string | null;
   rol: AccountRol;
   ubicacion?: UserLocation | null;
   onboardingEstado?: string;

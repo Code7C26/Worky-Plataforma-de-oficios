@@ -11,6 +11,8 @@ import type { ParticipantUser } from './participantUser';
 
 export interface Conversation {
   changaId: number;
+  /** @nullable */
+  profesionalId: number | null;
   estado: ConversationEstado;
   categoria: string;
   /** @nullable */

@@ -72,7 +72,7 @@ export function RoleSwitcher({
               />
               <AppText
                 variant="label"
-                style={{ color: selected ? colors.secondary : colors.mutedForeground }}
+                style={{ color: selected ? colors.foreground : colors.mutedForeground }}
               >
                 {option.label}
               </AppText>

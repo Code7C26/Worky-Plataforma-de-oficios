@@ -35,7 +35,8 @@ const updateBaselines = process.argv.includes('--update-baselines') ||
 const profile = {
   id: 7, usuarioId: 42, oficio: 'Electricista', categoria: 'Electricidad',
   rating: 4.8, completedJobs: 32, experienciaAnios: 8, precioReferencia: 12000,
-  disponible: true, verificado: true, about: 'Instalaciones y mantenimiento.',
+  disponible: true, verificado: true, habilitado: true, estadoVerificacion: 'verified',
+  about: 'Instalaciones y mantenimiento.', distanceKm: 3.4,
   skills: ['Urgencias', 'Mantenimiento'], reviewsCount: 18, recommendationsCount: 12,
   usuario: { id: 42, nombre: 'Ana Pérez', email: 'ana@example.com', ubicacion: { zona: 'Palermo' } },
 };
@@ -47,10 +48,11 @@ function json(body, status = 200) {
 
 function mockFor(url, scenario) {
   const path = new URL(url).pathname;
-  if (scenario.state === 'error' && path.endsWith('/profesionales')) {
+  if (scenario.state === 'error' && (path.endsWith('/profesionales') || path.includes('/partner/dashboard'))) {
     return json({ error: 'Servicio temporalmente no disponible.' }, 503);
   }
   if (path.endsWith('/auth/me')) return json(user);
+  if (path.endsWith('/auth/verification-documents')) return json([]);
   if (path.endsWith('/partner-profile/me')) return json(profile);
   if (path.includes('/partner/dashboard')) return json({ trabajos: [], calendario: [], archivos: [], notificacionesNoLeidas: 0 });
   if (path.includes('/catalogo/categorias')) return json(['Plomería', 'Electricidad', 'Gas', 'Albañilería', 'Otro']);
@@ -76,8 +78,21 @@ async function waitForServer() {
 }
 
 async function stabilizeForScreenshot(page) {
-  await page.evaluate(async () => {
+  const missingFonts = await page.evaluate(async () => {
+    await document.fonts.load('400 15px "DM Sans Variable"', 'Worky ñ');
+    await document.fonts.load('600 24px "Space Grotesk Variable"', 'Worky');
     await document.fonts.ready;
+    return [
+      ['DM Sans Variable', '400 15px "DM Sans Variable"'],
+      ['Space Grotesk Variable', '600 24px "Space Grotesk Variable"'],
+    ]
+      .filter(([, font]) => !document.fonts.check(font))
+      .map(([name]) => name);
+  });
+  if (missingFonts.length) {
+    throw new Error(`no se cargaron las fuentes locales: ${missingFonts.join(', ')}`);
+  }
+  await page.evaluate(async () => {
     await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
   });
   await page.waitForTimeout(50);
@@ -254,7 +269,8 @@ try {
       });
       await page.route('**/api/v1/**', async (requestRoute) => {
         const response = mockFor(requestRoute.request().url(), scenario);
-        if (scenario.state === 'loading' && new URL(requestRoute.request().url()).pathname.endsWith('/profesionales')) {
+        const requestPath = new URL(requestRoute.request().url()).pathname;
+        if (scenario.state === 'loading' && (requestPath.endsWith('/profesionales') || requestPath.includes('/partner/dashboard'))) {
           await sleep(2000);
         }
         try {
@@ -273,6 +289,11 @@ try {
         await page.goto(`${baseUrl}${route}`, { waitUntil: scenario.state === 'loading' ? 'domcontentloaded' : 'networkidle' });
         if (scenario.prepare) await scenario.prepare(page);
         if (scenario.waitFor) await page.locator(scenario.waitFor).first().waitFor({ state: 'visible' });
+        if (scenario.auth === 'authenticated') {
+          const headerBrand = page.locator('header [data-testid="link-brand"] img[alt="Worky"]');
+          await headerBrand.waitFor({ state: 'attached' });
+          await headerBrand.evaluate((image) => image.decode());
+        }
         await stabilizeForScreenshot(page);
         const audit = await page.evaluate(({ width }) => {
           const isVisible = (el) => {
@@ -291,7 +312,13 @@ try {
             return (rect.left < -1 && rect.right > 0) || (rect.right > width + 1 && rect.left < width);
           }).slice(0, 8).map((el) => ({ tag: el.tagName, testId: el.getAttribute('data-testid'), right: Math.round(el.getBoundingClientRect().right) }));
           const interactives = [...document.querySelectorAll('a,button,input,select,textarea,[tabindex]:not([tabindex="-1"])')].filter(isVisible);
-          return { overflow, offscreen, interactiveCount: interactives.length, heading: document.querySelector('h1,h2')?.textContent?.trim() || '' };
+          const heading = [...document.querySelectorAll('h1,h2,h3,[data-testid="state-error"],[aria-label="Cargando"]')].find(isVisible);
+          return {
+            overflow,
+            offscreen,
+            interactiveCount: interactives.length,
+            heading: heading?.textContent?.trim() || heading?.getAttribute('aria-label') || '',
+          };
         }, { width });
         const screenshotPath = `${resultsDir}${name}-${width}.png`;
         const baselinePath = `${baselinesDir}${name}-${width}.png`;
@@ -322,7 +349,18 @@ try {
             throw error;
           }
         }
-        if (!audit.heading) throw new Error('no se encontró un encabezado visible');
+        if (!audit.heading) {
+          const headingDebug = await page.evaluate(() => ({
+            bodyText: document.body.innerText.slice(0, 300),
+            candidates: [...document.querySelectorAll('h1,h2,h3,[data-testid="state-error"],[aria-label="Cargando"]')].map((el) => ({
+              tag: el.tagName,
+              text: el.textContent?.trim(),
+              visible: getComputedStyle(el).display !== 'none' && getComputedStyle(el).visibility !== 'hidden',
+              testId: el.getAttribute('data-testid'),
+            })),
+          }));
+          throw new Error(`no se encontró un encabezado visible: ${JSON.stringify(headingDebug)}`);
+        }
         if (audit.overflow > 1) throw new Error(`overflow horizontal de ${audit.overflow}px`);
         if (audit.offscreen.length) throw new Error(`elementos fuera de pantalla: ${JSON.stringify(audit.offscreen)}`);
         if (audit.interactiveCount) {

@@ -5,6 +5,7 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
+import type { UploadUrlRequestDocumentType } from './uploadUrlRequestDocumentType';
 import type { UploadUrlRequestPurpose } from './uploadUrlRequestPurpose';
 
 export interface UploadUrlRequest {
@@ -15,5 +16,7 @@ export interface UploadUrlRequest {
   /** @minLength 1 */
   contentType: string;
   purpose: UploadUrlRequestPurpose;
+  documentType?: UploadUrlRequestDocumentType;
   changaId?: number;
+  profesionalId?: number;
 }

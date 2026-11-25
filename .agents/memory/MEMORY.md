@@ -1,5 +1,6 @@
 - [API contract validation](api-contract-validation.md) — use OpenAPI number for numeric fields until the generated Zod runtime supports z.int().
-- [Email verification after signup](registration-verification-proof-binding.md) — create accounts immediately; verification remains available later in authenticated settings.
+- [Historical change-log dates](historical-change-log-dates.md) — commit timestamps are evidence of when Git recorded a change, not proof of when the work was completed.
+- [Mandatory email verification](registration-verification-proof-binding.md) — use Gmail for verification and recovery; no session or protected access before confirming the current email.
 - [Test isolation for audit histories](test-isolation.md) — isolate entity histories before assertions so interrupted cleanup cannot leak stale audit rows.
 - [Offline queue synchronization](offline-queue-synchronization.md) — serialize retries per conversation and remove local attempts only after the server confirms them.
 - [Build environment defaults](build-environment-defaults.md) — align Vite fallbacks with artifact service values because recursive root builds lack injected service env.
@@ -17,7 +18,7 @@
 - [Profile photo cleanup races](profile-photo-cleanup-races.md) — lock the account before claiming photo objects and re-check the current path before deletion.
 - [Development schema synchronization](development-schema-synchronization.md) — API privacy tests require generated database declarations and the development schema to match the current Drizzle source.
 - [GitHub connector publishing](github-connector-publishing.md) — API auth and shell Git auth are separate; verify blobs and throttle connector uploads.
-- [Live location privacy](live-location-privacy.md) — browser tracking needs a movement watch plus heartbeat, while exact coordinates stay server-private.
+- [Location privacy and distance](live-location-privacy.md) — professional workshop address is public; coordinates stay private, and client location is one-shot.
 - [Own profile identity](profile-id-ambiguity.md) — resolve the current account through the authenticated profile endpoint before public detail lookups.
 - [Account settings concurrency](account-settings-concurrency.md) — settings forms own separate fields; merge address and live coordinates atomically to prevent lost updates.
 - [Role-scoped conversations](role-scoped-conversations.md) — one account switches roles without losing its Partner profile; inbox follows active role, notifications stay account-wide.
@@ -27,11 +28,27 @@
 - [Workspace package installs](workspace-package-installs.md) — target artifact packages with a pnpm workspace filter instead of adding dependencies at the monorepo root.
 - [Metro and generated API code](metro-codegen-output-race.md) — finish OpenAPI codegen before starting or restarting Metro; Orval temporarily cleans the generated client directory.
 - [Workspace-scoped package installs](package-install-workspace-scope.md) — package additions in a monorepo must target the intended workspace package, not the root.
-- [React Native Web radio state](react-native-web-radio-state.md) — set `aria-checked` explicitly alongside `accessibilityState`; web output may omit the checked state otherwise.
+- [React Native Web selection state](react-native-web-radio-state.md) — set explicit ARIA checked/selected state alongside `accessibilityState`; web output may omit it otherwise.
 - [Selective mobile motion](selective-mobile-motion.md) — use brief motion for navigation, primary actions, and confirmations; keep secondary controls quiet and respect reduced-motion settings.
 - [React Native Web live announcements](react-native-web-live-announcements.md) — assert rendered ARIA and server-confirmed timing in a real browser.
 - [Vite React Query deduplication](vite-react-query-dedupe.md) — duplicate QueryClient contexts can break production even when the provider is present.
 - [Worky marketing site separation](worky-marketing-site-scope.md) — keep the public landing in its own Replit project and domain, separate from the marketplace deployment.
-- [Production email sender](production-email-sender.md) — Resend's default sender cannot deliver to arbitrary users; require a verified-domain sender and privacy-safe diagnostics.
+- [Production email sender](production-email-sender.md) — Worky account verification and password recovery use connected Gmail; real recovery and production delivery remain unverified.
 - [Partner approval and publication](partner-approval-and-publication.md) — document approval, directory eligibility, and account suspension are separate states.
-- [Admin manager hosting](admin-manager-hosting.md) — the user chose a separate Repl/domain for the gestor; connect it to Worky's API instead of adding a marketplace route.
+- [Client identity review policy](client-identity-review-policy.md) — customer verification is optional and manually reviewed; delete DNI and selfie images after resolution.
+- [Admin manager hosting](admin-manager-hosting.md) — keep the Admin console at `/admin` in Worky's marketplace; no separate Repl/domain.
+- [Primary admin delegation](primary-admin-delegation.md) — only the configured primary admin may grant or revoke admin roles; delegated admins cannot manage the admin roster.
+- [Recognized-device login](recognized-device-login-policy.md) — ask for login codes only on new devices; restored admin sessions should open the panel directly.
+- [Mobile tab visual system](mobile-tab-visual-system.md) — keep Worky's main mobile tabs visually consistent with a compact navy header and readable colors.
+- [React type isolation](react-type-isolation.md) — runtime deduplication does not prevent cross-app React declaration conflicts after Expo upgrades.
+- [Password visibility policy](password-visibility-policy.md) — add reveal controls to sign-in and registration fields, but keep password-change flows masked.
+- [Android native build memory](android-native-build-memory.md) — Gradle daemon memory needs system properties; project-property syntax can be silently ignored.
+- [APK/API compatibility](apk-api-compatibility.md) — validate mobile auth operations and their production schema; a healthy API can still be too old for the APK.
+- [Mobile APK delivery](mobile-apk-delivery.md) — every requested change to Worky Móvil should include a newly built Android APK.
+- [Android ARM emulator limits](android-arm-emulator-limits.md) — this x86_64 workspace's QEMU cannot boot ARM64 Android images; use a real ARM device or ARM host.
+- [HyperFrames CLI resolution](hyperframes-cli-resolution.md) — generated projects share the CLI package name; qualify the CLI version or invoke it from the workspace root.
+- [Local Whisper limits](local-whisper-memory-limit.md) — large-v3 exceeded 8 GB memory and medium hit the 4 GB cache limit; use small for short, clear audio.
+- [Worky ad narration](worky-ad-voice.md) — preserve the approved script and favor natural, conversational delivery over adding copy for runtime.
+- [Subagent follow-up authority](subagent-followup-authority.md) — if a follow-up is rejected for connector authority, start a fresh agent with the complete context.
+- [Mercado Pago collection](mercado-pago-collection.md) — payment confirmation controls finalization and reviews; count only real unpaid checkouts for modest ranking changes.
+- [Isolated API route test bundles](pino-worker-test-bundles.md) — keep Pino and thread-stream external so worker entry paths resolve outside temporary bundles.

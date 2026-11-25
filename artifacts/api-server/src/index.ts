@@ -1,5 +1,6 @@
 import app from "./app";
 import { logger } from "./lib/logger";
+import { cleanupDeletingClientIdentityCases, cleanupPendingClientVerificationUploads, startClientIdentityCleanup } from "./lib/client-verification";
 import { cleanupAbandonedChatAttachments, cleanupAbandonedProfilePhotoUploads, startChatAttachmentCleanup, startProfilePhotoCleanup } from "./routes/storage";
 
 const rawPort = process.env["PORT"];
@@ -25,10 +26,17 @@ app.listen(port, (err) => {
   logger.info({ port }, "Server listening");
   startChatAttachmentCleanup();
   startProfilePhotoCleanup();
+  startClientIdentityCleanup();
   void cleanupAbandonedChatAttachments().catch((cleanupError) => {
     logger.error({ err: cleanupError }, "Falló la limpieza inicial de cargas de chat abandonadas");
   });
   void cleanupAbandonedProfilePhotoUploads().catch((cleanupError) => {
     logger.error({ err: cleanupError }, "Falló la limpieza inicial de cargas de fotos de perfil abandonadas");
+  });
+  void Promise.all([
+    cleanupPendingClientVerificationUploads(),
+    cleanupDeletingClientIdentityCases(),
+  ]).catch((cleanupError) => {
+    logger.error({ err: cleanupError }, "Falló la limpieza inicial de verificaciones de clientes");
   });
 });

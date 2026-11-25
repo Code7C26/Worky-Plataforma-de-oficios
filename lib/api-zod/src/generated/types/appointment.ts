@@ -6,6 +6,7 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { AppointmentEstado } from './appointmentEstado';
+import type { VisitPaymentSummary } from './visitPaymentSummary';
 
 export interface Appointment {
   id: number;
@@ -15,7 +16,9 @@ export interface Appointment {
   empiezaAt: Date;
   /** @nullable */
   terminaAt: Date | null;
+  tarifaVisita: number;
   estado: AppointmentEstado;
+  finanzas: VisitPaymentSummary | null;
   createdAt: Date;
   updatedAt: Date;
 }

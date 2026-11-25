@@ -5,6 +5,7 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
+import type { JobInputPaymentMethod } from './jobInputPaymentMethod';
 import type { UserLocation } from './userLocation';
 
 export interface JobInput {
@@ -20,4 +21,5 @@ export interface JobInput {
   detalle?: string | null;
   /** @nullable */
   profesionalId?: number | null;
+  paymentMethod?: JobInputPaymentMethod;
 }

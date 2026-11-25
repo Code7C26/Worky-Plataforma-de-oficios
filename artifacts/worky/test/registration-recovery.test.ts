@@ -17,7 +17,9 @@ test("el wizard guarda y recupera los tres pasos para cliente y Partner", async 
   assert.match(source, /draft\?\.role/);
   assert.match(source, /draft\?\.step/);
   assert.doesNotMatch(source, /data: \{[^}]*password/);
-  assert.doesNotMatch(source, /registrationVerificationToken|requestRegistrationEmailVerification|confirmRegistrationEmailVerification/);
+  const registrationDraft = source.match(/type RegistrationDraft = \{([\s\S]*?)\n\};/);
+  assert(registrationDraft, "The persisted registration draft type should remain explicit.");
+  assert.doesNotMatch(registrationDraft[1], /verificationCode|verificationToken|\btoken\b/i);
   assert.match(source, /await auth\.register\(\{ nombre: data\.name, email: data\.email, password: data\.password/);
 });
 

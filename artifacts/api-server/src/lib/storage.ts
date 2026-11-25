@@ -25,6 +25,62 @@ export async function createUploadUrl() {
   return createSignedUpload(`uploads/${crypto.randomUUID()}`);
 }
 
+export async function createClientVerificationUploadUrl(usuarioId: number) {
+  return createSignedUpload(`client-verification/${usuarioId}/upload/${crypto.randomUUID()}`, 5 * 60 * 1000);
+}
+
+export function isClientVerificationUploadPath(objectPath: string, usuarioId: number) {
+  return new RegExp(`^/objects/client-verification/${usuarioId}/upload/[0-9a-f-]{36}$`).test(objectPath);
+}
+
+export function isClientVerificationReviewPath(objectPath: string, usuarioId: number) {
+  return new RegExp(`^/objects/client-verification/${usuarioId}/review/[0-9a-f-]{36}\\.webp$`).test(objectPath);
+}
+
+export async function prepareClientVerificationImage(sourcePath: string, usuarioId: number) {
+  if (!isClientVerificationUploadPath(sourcePath, usuarioId)) throw new Error("La imagen debe cargarse desde esta cuenta.");
+  const source = await getObject(sourcePath);
+  if (!source) throw new Error("No encontramos una de las imágenes que enviaste.");
+  const [metadata] = await source.getMetadata();
+  if (metadata.size !== null && metadata.size > MAX_IMAGE_BYTES) throw new Error("Cada imagen puede pesar hasta 10 MB.");
+
+  const sourceBuffer = await readStream(source.createReadStream(), MAX_IMAGE_BYTES);
+  let prepared: Buffer;
+  try {
+    const image = sharp(sourceBuffer, { animated: false, limitInputPixels: 40_000_000 }).rotate();
+    const details = await image.metadata();
+    if (!details.format || !["jpeg", "png", "webp"].includes(details.format)) {
+      throw new Error("Usá una imagen JPG, PNG o WebP.");
+    }
+    prepared = await image
+      .resize(3200, 3200, { fit: "inside", withoutEnlargement: true })
+      .webp({ quality: 94, effort: 4 })
+      .toBuffer();
+  } catch (error) {
+    if (error instanceof Error && error.message === "Usá una imagen JPG, PNG o WebP.") throw error;
+    throw new Error("No pudimos leer esta imagen. Probá con una foto JPG, PNG o WebP.");
+  }
+  if (prepared.length > MAX_IMAGE_BYTES) throw new Error("La imagen preparada supera el límite de 10 MB.");
+
+  const destinationPath = `client-verification/${usuarioId}/review/${crypto.randomUUID()}.webp`;
+  const destination = await createSignedUpload(destinationPath, 2 * 60 * 1000);
+  const uploaded = await fetch(destination.uploadURL, {
+    method: "PUT",
+    headers: { "Content-Type": "image/webp", "Content-Length": String(prepared.length) },
+    body: prepared,
+    signal: AbortSignal.timeout(30_000),
+  });
+  if (!uploaded.ok) throw new Error("No pudimos preparar una imagen segura para la revisión.");
+  const verified = await getObject(destination.objectPath);
+  if (!verified) throw new Error("No pudimos confirmar la imagen preparada.");
+  const [verifiedMetadata] = await verified.getMetadata();
+  if (verifiedMetadata.size !== null && verifiedMetadata.size > MAX_IMAGE_BYTES) {
+    await deleteObject(destination.objectPath);
+    throw new Error("La imagen preparada supera el límite de 10 MB.");
+  }
+  return { objectPath: destination.objectPath, contentType: "image/webp", sizeBytes: prepared.length };
+}
+
 export async function createChatAttachmentUploadUrl(changaId: number, usuarioId: number) {
   return createSignedUpload(`chat-attachments/${changaId}/${usuarioId}/${crypto.randomUUID()}`);
 }
@@ -130,11 +186,11 @@ export async function deleteObject(path: string): Promise<boolean> {
   return missing;
 }
 
-async function createSignedUpload(relativePath: string) {
+async function createSignedUpload(relativePath: string, lifetimeMs = 15 * 60 * 1000) {
   const fullPath = `${privateObjectDir()}/${relativePath}`;
   if (!fullPath.startsWith("/")) throw new Error("Object Storage no está configurado.");
   const { bucketName, objectName } = parseObjectPath(fullPath);
-  const signedUrl = await requestSignedObjectUrl({ bucketName, objectName }, "PUT", 15 * 60 * 1000);
+  const signedUrl = await requestSignedObjectUrl({ bucketName, objectName }, "PUT", lifetimeMs);
   if (!signedUrl) throw new Error("No se pudo firmar la carga.");
   return { uploadURL: signedUrl, objectPath: `/objects/${relativePath}` };
 }

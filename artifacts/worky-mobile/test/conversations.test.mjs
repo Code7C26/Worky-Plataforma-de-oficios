@@ -11,6 +11,7 @@ import { switchRoleAfterServerConfirmation } from '../lib/role-switch.ts';
 
 const clientConversation = {
   changaId: 412,
+  profesionalId: 28,
   estado: 'en_curso',
   categoria: 'Plomería',
   detalle: null,
@@ -43,6 +44,7 @@ const clientConversation = {
 
 const partnerConversation = {
   changaId: 719,
+  profesionalId: 501,
   estado: 'aceptada',
   categoria: 'Electricidad',
   detalle: null,
@@ -247,6 +249,7 @@ test('tocar una fila abre el trabajo y participante correctos e incluye la foto 
       changaId: '412',
       category: 'Plomería',
       participant: 'Camila Partner',
+      profesionalId: '28',
       participantPhotoPath: 'profile-photos/camila.webp',
     },
   }]);
@@ -259,8 +262,27 @@ test('tocar una fila abre el trabajo y participante correctos e incluye la foto 
       changaId: '719',
       category: 'Electricidad',
       participant: 'Diego Cliente',
+      profesionalId: '501',
     },
   }]);
+});
+
+test('dos profesionales que responden al mismo trabajo abren rutas de chat distintas', () => {
+  const firstRoutes = [];
+  const secondRoutes = [];
+  const first = { ...clientConversation, changaId: 900, profesionalId: 41 };
+  const second = {
+    ...clientConversation,
+    changaId: 900,
+    profesionalId: 52,
+    interlocutor: { ...clientConversation.interlocutor, id: 52, nombre: 'Otro profesional' },
+  };
+
+  createConversationOnPress(first, (route) => firstRoutes.push(route))();
+  createConversationOnPress(second, (route) => secondRoutes.push(route))();
+
+  assert.equal(firstRoutes[0].params.changaId, secondRoutes[0].params.changaId);
+  assert.notEqual(firstRoutes[0].params.profesionalId, secondRoutes[0].params.profesionalId);
 });
 
 test('la fila refleja el último mensaje, la fecha y los no leídos devueltos por el API', () => {

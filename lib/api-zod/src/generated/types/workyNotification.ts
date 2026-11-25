@@ -5,9 +5,12 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
+import type { NotificationJobContext } from './notificationJobContext';
 
 export interface WorkyNotification {
   id: number;
+  /** @nullable */
+  changaId?: number | null;
   tipo: string;
   titulo: string;
   /** @nullable */
@@ -16,4 +19,5 @@ export interface WorkyNotification {
   href: string | null;
   leida: boolean;
   createdAt: Date;
+  jobContext?: NotificationJobContext | null;
 }

@@ -14,3 +14,676 @@ mtime_ms = 1787537356528
 storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:30cdce69-26de-4bbd-be5a-e35f8db8dfd8/ea30af06-aa8e-4b5f-b5bd-4e66c1c97a5b/cb78de13-5e9e-4411-b38c-08db18504a4e"
 storage_version_token = "1787537361071494"
 content_type = "text/markdown"
+
+[[outputs]]
+id = "VSfMTtR7kjUeMPST9BD3r"
+uri = "file://generated-artifacts/Worky_Planilla_de_Testing.xlsx"
+type = "table"
+title = "Planilla de testing de Worky — resultados QA"
+description = "Versión actualizada con 33 casos, resultados automatizados, 7 casos aún pendientes y el bug BUG-QA-001 vinculado al fallo de asignación inicial del rol admin. Incluye resumen, casos, registro de bugs y guía."
+logical_id = "2600e79f-0783-4e02-b818-2af1a6ba3859"
+content_hash = "sha256:081f663f46b4da807a01d94007f0f092cf9651366bba99c94a12e7d9051ea4a0"
+size = 21820
+mtime_ms = 1792073522397
+storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:30cdce69-26de-4bbd-be5a-e35f8db8dfd8/2600e79f-0783-4e02-b818-2af1a6ba3859/34bf1b10-5c15-49a2-83d9-db0a600839fa"
+storage_version_token = "1792073604776025"
+content_type = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+
+[[outputs]]
+id = "2GxXeZ6BmY7JiLBDPSOFI"
+uri = "file://artifacts/worky-publicidad-funciones/public/audio/bg_music.mp3"
+type = "audio"
+title = "bg"
+description = "Generated music: Upbeat warm modern pop-funk instrumental for a tech marketplace app ad. Bright plucks, claps, bouncy bass, 112 BPM, confident build, clear lift at 4 seconds, resolved ending at 29 se…"
+logical_id = "95074215-235f-4156-b6e8-778e0074e0d7"
+
+[[outputs]]
+id = "1AAhIELBGNnFlrg_2wgOH"
+uri = "file://generated-artifacts/worky-android/worky-prueba-android.apk"
+type = "unspecified"
+title = "Worky Móvil — prueba universal"
+description = "APK de prueba actualizado, versión 10. Incluye compatibilidad ARM64 y ARMv7. Usa la API y la base de datos de desarrollo."
+logical_id = "54c13408-8ff2-479e-b28c-8bce9cc40954"
+content_hash = "sha256:92a4d01d9976bcaaa9d89e4057f0b2de3308a5dd98fd5239cbc04e987c2e2808"
+size = 66074659
+mtime_ms = 1795610509227
+storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:30cdce69-26de-4bbd-be5a-e35f8db8dfd8/54c13408-8ff2-479e-b28c-8bce9cc40954/b2a0a421-d750-4cbb-987a-1bc9dcbf5543"
+storage_version_token = "1795610648001888"
+content_type = "application/octet-stream"
+
+[[outputs]]
+id = "vkXq3eZRKGkdmSmX7nJtL"
+uri = "file://artifacts/worky-presentacion-final-v2/public/guion-charla-worky.docx"
+type = "word_document"
+title = "Guion actualizado de Worky (Word)"
+description = "Incluye el relato completo de la diapositiva 10."
+logical_id = "2db1dafd-1d9c-49fe-b858-e22a7f6c6116"
+content_hash = "sha256:b0ece09c72802b92721c101b40d9d20ad32aa3c04dc8e89a8086cb995ddfc333"
+size = 8577
+mtime_ms = 1794828176355
+storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:30cdce69-26de-4bbd-be5a-e35f8db8dfd8/2db1dafd-1d9c-49fe-b858-e22a7f6c6116/05c320be-5bdf-472d-a2ba-c83afba20e44"
+storage_version_token = "1794828255964534"
+content_type = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+
+[[outputs]]
+id = "FWdSDRCjWWiosfvjTU_hS"
+uri = "file://docs/entrega-final/Documento_Final_Worky.pdf"
+type = "pdf"
+title = "Worky — Documentación final (PDF)"
+description = "Versión final de 15 páginas en A4, con evolución, arquitectura, funcionalidades, testing, limitaciones, referencias y los mockups iniciales."
+logical_id = "6e0fd226-0dc1-4c90-af38-eb87da14a54b"
+content_hash = "sha256:18cf8cbaff1790e101d2bc09b20337b2d51b7de2230421690460c2a58273c6a1"
+size = 483926
+mtime_ms = 1793792018757
+storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:30cdce69-26de-4bbd-be5a-e35f8db8dfd8/6e0fd226-0dc1-4c90-af38-eb87da14a54b/ab9890bc-8cc8-45fe-b238-4be661afb30f"
+storage_version_token = "1793792056049855"
+content_type = "application/pdf"
+
+[[outputs]]
+id = "c9r4mMgjoRB-CyVRyQhFl"
+uri = "file://docs/entrega-final/Documento_Final_Worky.docx"
+type = "word_document"
+title = "Worky — Documentación final (Word)"
+description = "Versión editable con portada, índice, tablas, figuras del primer mockup y referencias."
+logical_id = "8f350903-c1cc-4a1e-9df6-45b5cc5fb8f4"
+content_hash = "sha256:0663235a497901cc42b9e7ec906cd012d78e52fc34d3f3d2b42a6c9d8df3f0fe"
+size = 399665
+mtime_ms = 1793791979729
+storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:30cdce69-26de-4bbd-be5a-e35f8db8dfd8/8f350903-c1cc-4a1e-9df6-45b5cc5fb8f4/db77d8ca-a882-411e-9215-e251f23cb228"
+storage_version_token = "1793792056787852"
+content_type = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+
+[[outputs]]
+id = "u_BrSfHARt_dt5wsjTVuT"
+uri = "file://artifacts/worky-publicidad-vertical/hyperframes/voz.wav"
+type = "audio"
+title = "Locución de prueba de Worky"
+description = "Voz local generada para revisar ritmo y pronunciación antes de animar."
+logical_id = "841de577-ccd4-4075-9314-16401e39972b"
+content_hash = "sha256:60e22dd815d11e2fa0f4ce6db3d3a51c2c7856f650ad813a473148e95724cc07"
+size = 1621772
+mtime_ms = 1794357122174
+storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:30cdce69-26de-4bbd-be5a-e35f8db8dfd8/841de577-ccd4-4075-9314-16401e39972b/777953fd-df69-4975-9e5c-3b0ac08aea9c"
+storage_version_token = "1794357906253131"
+content_type = "audio/wav"
+
+[[outputs]]
+id = "O0nli9QBs-RO-zeWjou-z"
+uri = "file://artifacts/worky-publicidad-vertical/hyperframes/muestra-af_heart.wav"
+type = "audio"
+title = "Muestra de voz local: Heart"
+description = "Timbre femenino alternativo; español generado con voz de otro idioma."
+logical_id = "b5d5c79d-7d0d-44a7-96bf-eb5848d2df1a"
+content_hash = "sha256:519b123f4ba84a6d313dccfa422d7eb1d3746aa66f18e952c243e22df423e38a"
+size = 113708
+mtime_ms = 1794358171337
+storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:30cdce69-26de-4bbd-be5a-e35f8db8dfd8/b5d5c79d-7d0d-44a7-96bf-eb5848d2df1a/5cf6fc6d-74a0-4482-bca7-461c049c41c2"
+storage_version_token = "1794358235105050"
+content_type = "audio/wav"
+
+[[outputs]]
+id = "VrVx4mML4qhDiCXJPQ-q-"
+uri = "file://artifacts/worky-publicidad-vertical/hyperframes/muestra-af_sky.wav"
+type = "audio"
+title = "Muestra de voz local: Sky"
+description = "Timbre femenino alternativo; español generado con voz de otro idioma."
+logical_id = "40f1cfdf-5e46-457d-b911-3016c998dcd8"
+content_hash = "sha256:6c3d84612b68e932e5b65bd83d183b65e7e93dcda89c0718a0579e9abd1ae801"
+size = 123948
+mtime_ms = 1794358184125
+storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:30cdce69-26de-4bbd-be5a-e35f8db8dfd8/40f1cfdf-5e46-457d-b911-3016c998dcd8/e2fbbe23-a2c2-4a45-aaee-86045f4649c3"
+storage_version_token = "1794358235571752"
+content_type = "audio/wav"
+
+[[outputs]]
+id = "npUiVQJMyeEye8abMQGS7"
+uri = "file://artifacts/worky-publicidad-vertical/hyperframes/muestra-am_michael.wav"
+type = "audio"
+title = "Muestra de voz local: Michael"
+description = "Timbre masculino alternativo; español generado con voz de otro idioma."
+logical_id = "b5bfc16f-a968-44b6-b322-f71de71513e9"
+content_hash = "sha256:c967899fa6153e903abf7aaad0ead41045f52b9fda8a4d01549cd2f87d63b1b7"
+size = 122924
+mtime_ms = 1794358198441
+storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:30cdce69-26de-4bbd-be5a-e35f8db8dfd8/b5bfc16f-a968-44b6-b322-f71de71513e9/8e5fc3a6-a0f1-4ff1-bc51-8d37c0157bbd"
+storage_version_token = "1794358236061358"
+content_type = "audio/wav"
+
+[[outputs]]
+id = "M4CNKVNzatfn63yPnUW5A"
+uri = "file://artifacts/worky-publicidad-vertical/hyperframes/voz-michael.wav"
+type = "audio"
+title = "Locución Worky con voz Michael"
+description = "Versión completa de 55,8 segundos, con el guion original y la voz local elegida."
+logical_id = "91e2c746-88ee-4d69-930e-440c0917115d"
+content_hash = "sha256:41d4922f312e71ef22661cfdeb23e23713b61f9826241571f6682040829f6cc5"
+size = 2677516
+mtime_ms = 1794358352152
+storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:30cdce69-26de-4bbd-be5a-e35f8db8dfd8/91e2c746-88ee-4d69-930e-440c0917115d/a8d715a7-a313-4c6d-a73d-272785a47e33"
+storage_version_token = "1794358440182436"
+content_type = "audio/wav"
+
+[[outputs]]
+id = "Lxd_7MtQKz-kGq37jD1xR"
+uri = "file://artifacts/worky-publicidad-vertical/hyperframes/renders/worky-preview-8s.mp4"
+type = "video"
+title = "Worky · Prueba animada (8 segundos)"
+description = "Apertura animada vertical con ilustración 2D, voz de ElevenLabs y subtítulos cinéticos. Revisá esta prueba antes de continuar con el video completo."
+logical_id = "a0b5eef0-5eb4-4e04-a4c2-65b1ac685d2f"
+content_hash = "sha256:5d214406f5c5e380b02d0d43215e3237e9d5259110674e7f37769ddcc2342e15"
+size = 1446955
+mtime_ms = 1794361856999
+storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:30cdce69-26de-4bbd-be5a-e35f8db8dfd8/a0b5eef0-5eb4-4e04-a4c2-65b1ac685d2f/084f35e2-0c0f-42e3-9621-f0fdb6f7670e"
+storage_version_token = "1794362248260694"
+content_type = "video/mp4"
+
+[[outputs]]
+id = "KkyF6hWd6kEf0QSLnYHyi"
+uri = "file://artifacts/worky-publicidad-vertical/hyperframes/renders/video-FINAL.mp4"
+type = "video"
+title = "Worky · Video con transiciones suavizadas"
+description = "Versión final con subtítulos, locución original y transiciones más fluidas entre pantallas. 36,6 s · 1080 × 1920 · 30 fps."
+logical_id = "61d5336e-337a-464f-b0f9-bf274764c865"
+content_hash = "sha256:e4ff99560a46dfba68f08011ca2d4f2ef24f734a9718b1538c3c8a302396a4dc"
+size = 4846540
+mtime_ms = 1794367317440
+storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:30cdce69-26de-4bbd-be5a-e35f8db8dfd8/61d5336e-337a-464f-b0f9-bf274764c865/692fa856-1f7f-4967-aee1-ddf146c412f4"
+storage_version_token = "1794367472627137"
+content_type = "video/mp4"
+
+[[outputs]]
+id = "Np57e3vkwO9gnID527zXl"
+uri = "file://artifacts/worky-publicidad-vertical/hyperframes/renders/video-SIN-SUBTITULOS.mp4"
+type = "video"
+title = "Worky · Transiciones suavizadas, sin subtítulos"
+description = "Alternativa sin subtítulos quemados, con locución original y transiciones más fluidas. 36,6 s · 1080 × 1920 · 30 fps."
+logical_id = "aa105c5d-30c5-41ef-8109-6dd9144868c6"
+content_hash = "sha256:c32474178b685a2a04a3a0d764c55aa2128fadb65b10d180b6d6fb6b81f681f2"
+size = 3720824
+mtime_ms = 1794367320118
+storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:30cdce69-26de-4bbd-be5a-e35f8db8dfd8/aa105c5d-30c5-41ef-8109-6dd9144868c6/2bd9b977-07d9-4c18-b8b0-723c66969635"
+storage_version_token = "1794367473795345"
+content_type = "video/mp4"
+
+[[outputs]]
+id = "9DCbUg3AubMFHS_dOpwNc"
+uri = "file://generated-artifacts/worky-instagram-launch/pinned-grid-preview.jpg"
+type = "image"
+title = "Vista de las publicaciones fijadas"
+description = "Así se ven juntas en una cuadrícula cuadrada: las tres piezas que recomiendo fijar primero."
+logical_id = "6d8dfa0c-943c-49dc-b637-d55ce28ae0b7"
+content_hash = "sha256:bac603b2f25ebf291a5ccf83c470002e1d6e4c60cb11df20e35f8a3f40808633"
+size = 100155
+mtime_ms = 1794369529686
+storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:30cdce69-26de-4bbd-be5a-e35f8db8dfd8/6d8dfa0c-943c-49dc-b637-d55ce28ae0b7/214912f5-baf2-471c-a03b-7d1ed1a42332"
+storage_version_token = "1794369749627977"
+content_type = "image/jpeg"
+
+[[outputs]]
+id = "FTjznqGg1ETYKC1izzYZM"
+uri = "file://generated-artifacts/worky-instagram-launch/01-que-es-worky.png"
+type = "image"
+title = "Publicación 1 · Qué es Worky"
+description = "PNG 1080 × 1350 px, listo para el feed de Instagram."
+logical_id = "a35b030c-148d-40e5-b42f-d0e6e71d02ba"
+content_hash = "sha256:58a4658b974172d4138bf304d4932f2a278074c55afd031c79eee6863bb0d6b6"
+size = 99351
+mtime_ms = 1794369525942
+storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:30cdce69-26de-4bbd-be5a-e35f8db8dfd8/a35b030c-148d-40e5-b42f-d0e6e71d02ba/ec57f25f-99ef-4a55-8394-f0485453b745"
+storage_version_token = "1794369750266795"
+content_type = "image/png"
+
+[[outputs]]
+id = "9eGAuuQlQkek9KYfblwnX"
+uri = "file://generated-artifacts/worky-instagram-launch/02-como-funciona-clientes.png"
+type = "image"
+title = "Publicación 2 · Para clientes"
+description = "PNG 1080 × 1350 px, listo para el feed de Instagram."
+logical_id = "04988921-e63f-4046-9d45-e1df57698c63"
+content_hash = "sha256:9961e22fa0131408220d70c3da0a475b579c0feac6328f3c323aa2c60508a724"
+size = 114829
+mtime_ms = 1794369526562
+storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:30cdce69-26de-4bbd-be5a-e35f8db8dfd8/04988921-e63f-4046-9d45-e1df57698c63/7120a1a7-20b1-4d58-8429-cc482054fe63"
+storage_version_token = "1794369750739547"
+content_type = "image/png"
+
+[[outputs]]
+id = "dJNft97wFzNsBTNuz-fp6"
+uri = "file://generated-artifacts/worky-instagram-launch/03-para-profesionales.png"
+type = "image"
+title = "Publicación 3 · Para profesionales"
+description = "PNG 1080 × 1350 px, listo para el feed de Instagram."
+logical_id = "cec0aae1-3327-4df1-bd7c-85726af82d0b"
+content_hash = "sha256:da0dc215f274db9f2f208e5bb6803186f78c8fe4da79e05086fbbe6df787468a"
+size = 117346
+mtime_ms = 1794369527138
+storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:30cdce69-26de-4bbd-be5a-e35f8db8dfd8/cec0aae1-3327-4df1-bd7c-85726af82d0b/1c9cb62d-fc91-4d03-8fe3-49d6f7b559d8"
+storage_version_token = "1794369751472448"
+content_type = "image/png"
+
+[[outputs]]
+id = "rHLh5hFFAjFBCPHFUzmxo"
+uri = "file://generated-artifacts/worky-instagram-launch/04-confianza.png"
+type = "image"
+title = "Publicación 4 · Revisión y confianza"
+description = "PNG 1080 × 1350 px, listo para el feed de Instagram."
+logical_id = "1e7bea99-795d-4255-8ea9-2b71f0de21fd"
+content_hash = "sha256:bac23e2045d14c9957d94a89389878c77f5710963defb6d3d4eb032ca3c87b94"
+size = 125768
+mtime_ms = 1794369527702
+storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:30cdce69-26de-4bbd-be5a-e35f8db8dfd8/1e7bea99-795d-4255-8ea9-2b71f0de21fd/6e16dde9-c5f1-43a3-804a-2524e2312f11"
+storage_version_token = "1794369752143654"
+content_type = "image/png"
+
+[[outputs]]
+id = "1VpLq9qAERAQI4daOEVV7"
+uri = "file://generated-artifacts/worky-instagram-launch/05-empeza-por-aca.png"
+type = "image"
+title = "Publicación 5 · Conocé Worky"
+description = "PNG 1080 × 1350 px, listo para el feed de Instagram."
+logical_id = "44d651ea-554f-4e7e-a1fa-e71468c68661"
+content_hash = "sha256:1be16ed3d4aa32805e2a2617a296a7c348773eab975b6d2e31899cbed83f7a22"
+size = 114542
+mtime_ms = 1794369528274
+storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:30cdce69-26de-4bbd-be5a-e35f8db8dfd8/44d651ea-554f-4e7e-a1fa-e71468c68661/56f42a4f-dd3e-4c79-be23-183d7832d48e"
+storage_version_token = "1794369752631555"
+content_type = "image/png"
+
+[[outputs]]
+id = "XvTpXcQ-8CNh7aNxvKDTs"
+uri = "file://generated-artifacts/worky-instagram-launch/copys-listos-para-instagram.html"
+type = "html"
+title = "Textos, captions y hashtags"
+description = "Galería autocontenida con las cinco piezas y sus textos listos para copiar."
+logical_id = "16e722fb-f6fe-48dc-a666-20ca796c69ee"
+content_hash = "sha256:98476dbcf0a7240c4230d221749d712b475c7b05255dc74e2d0b2e35946335bc"
+size = 768829
+mtime_ms = 1794369626629
+storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:30cdce69-26de-4bbd-be5a-e35f8db8dfd8/16e722fb-f6fe-48dc-a666-20ca796c69ee/80b91255-ee4a-4544-ad01-f5d7e8497bdb"
+storage_version_token = "1794369753153337"
+content_type = "text/html"
+
+[[outputs]]
+id = "LaRssc-hQk-B2nOQquwoK"
+uri = "file://generated-artifacts/worky-instagram-launch/fuentes-editables.html"
+type = "html"
+title = "Descargar fuentes editables"
+description = "Página autocontenida para descargar cada SVG vectorial editable con logo y tipografías incorporados."
+logical_id = "ed2ef18d-7d02-48f3-9316-6d9492aa6247"
+content_hash = "sha256:7c1c0ecab5be279e0f65405e5291179536079501c7f48036f6b8ea2390e15cb2"
+size = 3943735
+mtime_ms = 1794369674513
+storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:30cdce69-26de-4bbd-be5a-e35f8db8dfd8/ed2ef18d-7d02-48f3-9316-6d9492aa6247/162eae6c-cffc-4cc9-988e-6a1929df1acd"
+storage_version_token = "1794369753978572"
+content_type = "text/html"
+
+[[outputs]]
+id = "pSDQca3Y9bOkE7newWUnp"
+uri = "file://.local/outputs/Worky---Defensa-final.pptx"
+type = "slides"
+title = "Worky — Defensa final.pptx"
+logical_id = "47e238cd-997b-4c2c-aee8-b6ae4fdd1a04"
+
+[[outputs]]
+id = "15fPeUJAe5EULxuDJ3hHd"
+uri = "file://generated-artifacts/worky-instagram-launch/cuadrado-1080x1080/vista-general.jpg"
+type = "image"
+title = "Vista previa de las cinco publicaciones"
+description = "Resumen visual del carrusel de Worky, ahora encuadrado en formato cuadrado."
+logical_id = "2cd9afe2-36f6-455e-8538-d8b99e7ef490"
+content_hash = "sha256:6cebd88047d75c135b0b42376bee38f24677c11ff76053d917e2d4ee10275030"
+size = 157243
+mtime_ms = 1794397615081
+storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:30cdce69-26de-4bbd-be5a-e35f8db8dfd8/2cd9afe2-36f6-455e-8538-d8b99e7ef490/db16cc7a-08ab-4e22-b054-e3e868ee9d1c"
+storage_version_token = "1794397634838389"
+content_type = "image/jpeg"
+
+[[outputs]]
+id = "UvaeWTNBTsmPfMDnxlT38"
+uri = "file://generated-artifacts/worky-instagram-launch/cuadrado-1080x1080/01-que-es-worky-cuadrado.png"
+type = "image"
+title = "Publicación 1 · Qué es Worky"
+description = "PNG cuadrado 1080 × 1080, listo para Instagram."
+logical_id = "cb8a31fe-ea02-4ab1-8a05-c77646fb062c"
+content_hash = "sha256:bc8902ba8dcb97454c9c4bd2c4a2175394ba1c7052a547c6a36eaa8f21a5c232"
+size = 120028
+mtime_ms = 1794397549573
+storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:30cdce69-26de-4bbd-be5a-e35f8db8dfd8/cb8a31fe-ea02-4ab1-8a05-c77646fb062c/45709370-0a5a-4ba2-bf03-0fee47c7d937"
+storage_version_token = "1794397635469129"
+content_type = "image/png"
+
+[[outputs]]
+id = "RsYO34pQV4F-x7I0dDNVp"
+uri = "file://generated-artifacts/worky-instagram-launch/cuadrado-1080x1080/02-como-funciona-clientes-cuadrado.png"
+type = "image"
+title = "Publicación 2 · Para clientes"
+description = "PNG cuadrado 1080 × 1080, listo para Instagram."
+logical_id = "502ff297-11e5-420c-9f92-d9df793330f6"
+content_hash = "sha256:1e96da22cb3a75c4753d402046f0c3c7f67c591c602d41d911301c5b534e1c1d"
+size = 130361
+mtime_ms = 1794397550225
+storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:30cdce69-26de-4bbd-be5a-e35f8db8dfd8/502ff297-11e5-420c-9f92-d9df793330f6/b90c8fed-21f9-4815-a41c-59bed3266116"
+storage_version_token = "1794397636237051"
+content_type = "image/png"
+
+[[outputs]]
+id = "3d9JkmzEYWICt1HEPyDW_"
+uri = "file://generated-artifacts/worky-instagram-launch/cuadrado-1080x1080/03-para-profesionales-cuadrado.png"
+type = "image"
+title = "Publicación 3 · Para profesionales"
+description = "PNG cuadrado 1080 × 1080, listo para Instagram."
+logical_id = "3c6bb09a-bf0d-42b7-90cf-30b93703d0f0"
+content_hash = "sha256:33354029013aff3933a89f4ac97847ccb1a563382416988e6249102c63b62c4c"
+size = 136842
+mtime_ms = 1794397550929
+storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:30cdce69-26de-4bbd-be5a-e35f8db8dfd8/3c6bb09a-bf0d-42b7-90cf-30b93703d0f0/65b2d39c-f539-4c13-a297-90bf49e40f31"
+storage_version_token = "1794397636833879"
+content_type = "image/png"
+
+[[outputs]]
+id = "9t5lKZsk4UPOKqDF22wtS"
+uri = "file://generated-artifacts/worky-instagram-launch/cuadrado-1080x1080/04-confianza-cuadrado.png"
+type = "image"
+title = "Publicación 4 · Confianza"
+description = "PNG cuadrado 1080 × 1080, listo para Instagram."
+logical_id = "9e9e8d9d-9e80-404e-aa3e-42cac45e5512"
+content_hash = "sha256:2665b23257e92f06da6d3aea358043073624d732ba40f844291ef8384676c283"
+size = 157975
+mtime_ms = 1794397551581
+storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:30cdce69-26de-4bbd-be5a-e35f8db8dfd8/9e9e8d9d-9e80-404e-aa3e-42cac45e5512/41e3a000-ed38-4d7e-94ea-ecd0e3503cf9"
+storage_version_token = "1794397637530493"
+content_type = "image/png"
+
+[[outputs]]
+id = "aJMuUqYyFWqg8ls9Et-e0"
+uri = "file://generated-artifacts/worky-instagram-launch/cuadrado-1080x1080/05-empeza-por-aca-cuadrado.png"
+type = "image"
+title = "Publicación 5 · Empezá por acá"
+description = "PNG cuadrado 1080 × 1080, listo para Instagram."
+logical_id = "39cf61df-6f4a-4f8a-b487-0ba70b248b0c"
+content_hash = "sha256:aa351be78d370a35742f4eb01c2c9197324b6ab831f485574f19123402a418b3"
+size = 142620
+mtime_ms = 1794397552257
+storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:30cdce69-26de-4bbd-be5a-e35f8db8dfd8/39cf61df-6f4a-4f8a-b487-0ba70b248b0c/0bd09f56-851f-40bb-aa90-1d0738ef3c8f"
+storage_version_token = "1794397638077382"
+content_type = "image/png"
+
+[[outputs]]
+id = "G9vl6sXHgG5he0R-SmkQD"
+uri = "file://generated-artifacts/worky-android/worky-prueba-desarrollo.apk"
+type = "unspecified"
+title = "Worky Móvil — APK de prueba"
+description = "APK firmada para pruebas, conectada al entorno de desarrollo (.replit.dev), no a producción. Expo Go se abre por QR y es independiente de esta APK instalable."
+logical_id = "e3fe46e4-4c23-4f9f-9fb7-8082e0f1776d"
+content_hash = "sha256:5d5704b644df368417b63a9fbbb94f4ebaa3096fc2a124f4fdff644433ef1bc6"
+size = 66019091
+mtime_ms = 1794806755505
+storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:30cdce69-26de-4bbd-be5a-e35f8db8dfd8/e3fe46e4-4c23-4f9f-9fb7-8082e0f1776d/306e55be-cfa1-4713-9bf4-880a9d1eefa8"
+storage_version_token = "1794830685767028"
+content_type = "application/octet-stream"
+
+[[outputs]]
+id = "56454bfkg3ssrXiRIuEtJ"
+uri = "file://generated-artifacts/worky-android/worky-produccion-android.apk"
+type = "unspecified"
+title = "Worky APK de producción"
+description = "Conectada a la API y base de producción (.replit.app). APK de instalación directa; firma de prueba, no publicada en Play Store."
+logical_id = "6c794449-d896-4cf9-a142-ac88947283ea"
+content_hash = "sha256:b2427c45d9809c5806890137642e75683423079bd1c7cdb880830b982b56bf8c"
+size = 66019163
+mtime_ms = 1794806866437
+storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:30cdce69-26de-4bbd-be5a-e35f8db8dfd8/6c794449-d896-4cf9-a142-ac88947283ea/38330eaf-7ad5-4fd1-a10e-8c52474217b6"
+storage_version_token = "1794806902755520"
+content_type = "application/octet-stream"
+
+[[outputs]]
+id = "uhdUsjVz5-gFaRNyQAeUa"
+uri = "file://generated-artifacts/worky-android/worky-prueba-android-arm64.apk"
+type = "unspecified"
+title = "Worky Móvil — prueba ARM64"
+description = "APK de prueba actualizado, versión 10. Usa la API y la base de datos de desarrollo."
+logical_id = "0631d522-b264-4542-84d6-bdad18a7e549"
+content_hash = "sha256:d46213d35f3868e249a8393cbbc323de2381ec35274ccfb48ff0b8f77aeee6b1"
+size = 48378665
+mtime_ms = 1795610426271
+storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:30cdce69-26de-4bbd-be5a-e35f8db8dfd8/0631d522-b264-4542-84d6-bdad18a7e549/17d048c6-0925-413d-8088-d050270c5c82"
+storage_version_token = "1795610646666634"
+content_type = "application/octet-stream"
+
+[[outputs]]
+id = "K4o12RNEUCqRkFa44TZSx"
+uri = "file://generated-artifacts/worky-android/worky-prueba-android-universal.apk"
+type = "unspecified"
+title = "Worky Prueba v4 Universal — 63 MB"
+description = "APK completa compatible con Android ARM de 32 y 64 bits. Usala si el teléfono no acepta la variante ARM64."
+logical_id = "97287617-108a-4e3a-b053-b8d85c74fc7f"
+content_hash = "sha256:5ebba47b50cd954ab5c8b44209c34fa633a735d769467a265c19e68293b7b31a"
+size = 66043419
+mtime_ms = 1795222065966
+storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:30cdce69-26de-4bbd-be5a-e35f8db8dfd8/97287617-108a-4e3a-b053-b8d85c74fc7f/2837bd68-b423-4703-bb8d-c12101a8636f"
+storage_version_token = "1795222130416836"
+content_type = "application/octet-stream"
+
+[[outputs]]
+id = "bvlek3QW0YRoN7VjzHEE8"
+uri = "file://docs/entrega-final/Guion_Defensa_Worky.docx"
+type = "word_document"
+title = "Guion de la defensa"
+description = "Documento Word con el relato completo de 12 diapositivas, tiempos y demo guiada."
+logical_id = "62411724-a3e9-413e-b77e-94e96b3e1bec"
+content_hash = "sha256:5cbf2afb5d08422bd24758a9b57c4af8461df59be18bf0343f3d5f7d6bdbe712"
+size = 44575
+mtime_ms = 1795389994852
+storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:30cdce69-26de-4bbd-be5a-e35f8db8dfd8/62411724-a3e9-413e-b77e-94e96b3e1bec/860ceff6-d60b-4e31-a372-942f123c0277"
+storage_version_token = "1795390256909061"
+content_type = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+
+[[outputs]]
+id = "mXKmzJw5uSrhiC78eNr4j"
+uri = "file://docs/entrega-final/Manual_de_Usuario_Worky.docx"
+type = "word_document"
+title = "Manual de usuario de Worky"
+description = "Guía Word para los recorridos de cliente y profesional."
+logical_id = "3928a323-c749-4e7e-b284-5cab9eb5f48d"
+content_hash = "sha256:4fd6f72b0a8c55faaee3edb8c0dc9a6f4a99de95223d73f45a43b328dc49ead9"
+size = 39703
+mtime_ms = 1795389994924
+storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:30cdce69-26de-4bbd-be5a-e35f8db8dfd8/3928a323-c749-4e7e-b284-5cab9eb5f48d/26462c3d-7f99-44bf-80d4-de02b9cf37d0"
+storage_version_token = "1795390259231584"
+content_type = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+
+[[outputs]]
+id = "W-SVkylIFd4eLKcGDaRrU"
+uri = "file://docs/entrega-final/Publicaciones_Instagram_Worky.docx"
+type = "word_document"
+title = "Primeras publicaciones de Instagram"
+description = "Cinco captions, tres historias y orden sugerido para fijar publicaciones."
+logical_id = "50a753c9-c8ed-4ded-a55f-2448f929ffc1"
+content_hash = "sha256:0398ff841ce3199d6c58d0af45c925134a88c0cfa77ab0741e3fc724bf2e59f5"
+size = 39955
+mtime_ms = 1795389731604
+storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:30cdce69-26de-4bbd-be5a-e35f8db8dfd8/50a753c9-c8ed-4ded-a55f-2448f929ffc1/607e9dd2-0967-435d-91aa-7f5924db27aa"
+storage_version_token = "1795390261506334"
+content_type = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+
+[[outputs]]
+id = "VGMdRPMQAN1FlZYbbmzmF"
+uri = "file://generated-artifacts/worky-defense/folleto-worky-a5.pdf"
+type = "pdf"
+title = "Folleto Worky A5"
+description = "Folleto listo para imprimir, con QR de la app y del repositorio público."
+logical_id = "f51ebb1c-0415-4bc8-a129-b517b646729b"
+content_hash = "sha256:68718899379b386f912db0d7ec288b5f68e94576dbefee7fa4025faf75ee0f55"
+size = 210270
+mtime_ms = 1795390224604
+storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:30cdce69-26de-4bbd-be5a-e35f8db8dfd8/f51ebb1c-0415-4bc8-a129-b517b646729b/325a2fc2-5e99-4f7d-b8d5-bdf09ef32d6a"
+storage_version_token = "1795390264822651"
+content_type = "application/pdf"
+
+[[outputs]]
+id = "JaOv-fnc3peOwvXg8y99f"
+uri = "file://generated-artifacts/worky-defense/resumen-ejecutivo-worky.pdf"
+type = "pdf"
+title = "Resumen ejecutivo Worky"
+description = "Resumen A4 con producto, arquitectura, modelo y límites de validación."
+logical_id = "374dd89b-d85c-4205-b241-b8e42b96b6bb"
+content_hash = "sha256:dc6529185858f7ae85ce6bdf0c2948db9e426ce1824236bc8423fb3434bf22dd"
+size = 218091
+mtime_ms = 1795389910312
+storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:30cdce69-26de-4bbd-be5a-e35f8db8dfd8/374dd89b-d85c-4205-b241-b8e42b96b6bb/f7e11f08-6360-4883-932d-19e61ec4abe4"
+storage_version_token = "1795390266744924"
+content_type = "application/pdf"
+
+[[outputs]]
+id = "4PDFn6f47T2JWqHPtXboA"
+uri = "file://generated-artifacts/worky-defense/stickers-qr-worky-a4.pdf"
+type = "pdf"
+title = "Stickers QR Worky"
+description = "Hoja A4 de stickers QR para la app y el repositorio."
+logical_id = "8ede33ed-8367-42df-beff-cb888392a2dd"
+content_hash = "sha256:6d4af8a4b92ed35d054208563f1f446515315cf09bcb2d3006962257d8c7f49a"
+size = 258864
+mtime_ms = 1795389345532
+storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:30cdce69-26de-4bbd-be5a-e35f8db8dfd8/8ede33ed-8367-42df-beff-cb888392a2dd/b1225a6c-d88a-448c-a7d8-033643f671bf"
+storage_version_token = "1795390268193674"
+content_type = "application/pdf"
+
+[[outputs]]
+id = "zxh9Kv4clXj1ebcVemETL"
+uri = "file://generated-artifacts/worky-defense/mesa-worky-a4.pdf"
+type = "pdf"
+title = "Cartel de mesa Worky"
+description = "Cartel A4 para acompañar la exposición y dirigir a los QR."
+logical_id = "f570be74-8ebc-453f-a183-1fd230e7f481"
+content_hash = "sha256:abec01b333cb7c7a77845e18177584166f5f7b9de63277f97e04462e6db71fb6"
+size = 209006
+mtime_ms = 1795389352688
+storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:30cdce69-26de-4bbd-be5a-e35f8db8dfd8/f570be74-8ebc-453f-a183-1fd230e7f481/cd6565d8-1646-4b50-a415-1e5ed5ec9f5a"
+storage_version_token = "1795390269249811"
+content_type = "application/pdf"
+
+[[outputs]]
+id = "DSRQGLm4VNVL1b2VopCvW"
+uri = "file://generated-artifacts/worky-defense/tarjetas-worky-a4.pdf"
+type = "pdf"
+title = "Tarjetas del equipo"
+description = "Dos tarjetas listas para recortar, con roles compartidos y QR al repositorio."
+logical_id = "fbc0795d-cba0-4da4-89ab-3f447d854455"
+content_hash = "sha256:7f105b6ff18a34458ff93e8960c67d467807d2574ec13cbe563cd6b457090467"
+size = 196368
+mtime_ms = 1795389916260
+storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:30cdce69-26de-4bbd-be5a-e35f8db8dfd8/fbc0795d-cba0-4da4-89ab-3f447d854455/fafc8476-9b45-446f-bf4d-d5b5675babb5"
+storage_version_token = "1795390269766917"
+content_type = "application/pdf"
+
+[[outputs]]
+id = "xvZuEP-tSMwmUp8uLE_Z-"
+uri = "file://generated-artifacts/worky-defense/instagram-worky-kit.html"
+type = "html"
+title = "Vista previa de las cinco publicaciones"
+description = "Página HTML autocontenida para revisar juntas las cinco piezas de Instagram."
+logical_id = "02d222a5-a4ec-4198-ae27-4a4702272ff2"
+content_hash = "sha256:6127c04b4abb2064bc6af1ae6b783cd7e2919bc1a3a75e1986c4deea08becf2e"
+size = 1349420
+mtime_ms = 1795389340768
+storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:30cdce69-26de-4bbd-be5a-e35f8db8dfd8/02d222a5-a4ec-4198-ae27-4a4702272ff2/e364c166-7ae9-4c9f-92d0-2fda89c6df2a"
+storage_version_token = "1795390270328301"
+content_type = "text/html"
+
+[[outputs]]
+id = "WqN43u5ISkniqjwBGgCA_"
+uri = "file://generated-artifacts/worky-defense/instagram-worky-1.png"
+type = "image"
+title = "Publicación Instagram 1"
+description = "Imagen 1080×1350: qué es Worky."
+logical_id = "60424db0-9763-42d2-affe-8cd8d91072f3"
+content_hash = "sha256:6355247479919bc808103b923aaa659cc8e1b98bb9ccf2bd6cda0236b8c238e1"
+size = 105713
+mtime_ms = 1795389356052
+storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:30cdce69-26de-4bbd-be5a-e35f8db8dfd8/60424db0-9763-42d2-affe-8cd8d91072f3/6e6f1971-73cb-4db7-b29f-7e631feafa36"
+storage_version_token = "1795390270810148"
+content_type = "image/png"
+
+[[outputs]]
+id = "IKYTa_LWVUgaE0cvpWvTo"
+uri = "file://generated-artifacts/worky-defense/instagram-worky-2.png"
+type = "image"
+title = "Publicación Instagram 2"
+description = "Imagen 1080×1350: recorrido de uso."
+logical_id = "00121c2b-c1d6-4cf0-8a5d-914c496a0c99"
+content_hash = "sha256:a28e5a4206f19385054e17e34ab10633d158215da9db6f7332e21e23b7c5fdcb"
+size = 103239
+mtime_ms = 1795389359816
+storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:30cdce69-26de-4bbd-be5a-e35f8db8dfd8/00121c2b-c1d6-4cf0-8a5d-914c496a0c99/5b6e1899-996b-4635-b91a-6bb00c2c7371"
+storage_version_token = "1795390271293779"
+content_type = "image/png"
+
+[[outputs]]
+id = "x51CJbftBVHsviyeDUDEe"
+uri = "file://generated-artifacts/worky-defense/instagram-worky-3.png"
+type = "image"
+title = "Publicación Instagram 3"
+description = "Imagen 1080×1350: convocatoria a profesionales."
+logical_id = "f098d5e1-820e-45cf-a963-b62afccec473"
+content_hash = "sha256:314620c0cf103534049f2342ac5f3be063e0c03c7b17bac29e4b74eb35ff38e6"
+size = 99095
+mtime_ms = 1795389363776
+storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:30cdce69-26de-4bbd-be5a-e35f8db8dfd8/f098d5e1-820e-45cf-a963-b62afccec473/f2379f2f-6660-448b-8d8b-7bb2428ffd7e"
+storage_version_token = "1795390271845828"
+content_type = "image/png"
+
+[[outputs]]
+id = "ocGtWm2cXxYql_iEICoBz"
+uri = "file://generated-artifacts/worky-defense/instagram-worky-4.png"
+type = "image"
+title = "Publicación Instagram 4"
+description = "Imagen 1080×1350: conversación asociada a la changa."
+logical_id = "c642714e-40a8-4c23-9f16-0222e263676b"
+content_hash = "sha256:6bbf9091060b8448f6c4bc8bb3bf4016173db0e0371aa9fffc02e2207a755ee9"
+size = 100200
+mtime_ms = 1795389367692
+storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:30cdce69-26de-4bbd-be5a-e35f8db8dfd8/c642714e-40a8-4c23-9f16-0222e263676b/6963e941-7048-433c-8842-585b88578d37"
+storage_version_token = "1795390272314470"
+content_type = "image/png"
+
+[[outputs]]
+id = "Vj68VGAuAucK42xU59lrI"
+uri = "file://generated-artifacts/worky-defense/instagram-worky-5.png"
+type = "image"
+title = "Publicación Instagram 5"
+description = "Imagen 1080×1350: equipo y origen del proyecto."
+logical_id = "5f26ebea-d3f6-455f-b2eb-1fd8baab5e81"
+content_hash = "sha256:7ca729bb6f4f2c115ebc884e33259dd279ef63187e1c8415ef8dbdbf9f37a69e"
+size = 113888
+mtime_ms = 1795389371184
+storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:30cdce69-26de-4bbd-be5a-e35f8db8dfd8/5f26ebea-d3f6-455f-b2eb-1fd8baab5e81/6dde7900-3fd8-4b75-9202-17319ec2e74a"
+storage_version_token = "1795390272762521"
+content_type = "image/png"
+
+[[outputs]]
+id = "D0MAAy84G2x0sAnowYQKK"
+uri = "file://generated-artifacts/worky-android/worky-produccion-android-arm64-actualizada.apk"
+type = "unspecified"
+title = "Worky Producción · ARM64"
+description = "APK de producción, versión 2, para la mayoría de los teléfonos Android. Usa la API y los datos reales de Worky. Puede actualizar Worky Oficios sin desinstalarla."
+logical_id = "24361230-47cf-402a-9a07-59ac80df9eb1"
+content_hash = "sha256:a8e3e9516416fcd03c4383a587435aa44f83b9ce8f97b1a9b10daa69d8231744"
+size = 48347409
+mtime_ms = 1795558051786
+storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:30cdce69-26de-4bbd-be5a-e35f8db8dfd8/24361230-47cf-402a-9a07-59ac80df9eb1/481ebbb7-5be2-4637-9815-0e0bdd5b2ce3"
+storage_version_token = "1795558316099076"
+content_type = "application/octet-stream"
+
+[[outputs]]
+id = "KUv7KL6xpln9abtdpIy0J"
+uri = "file://generated-artifacts/worky-android/worky-produccion-android-actualizada.apk"
+type = "unspecified"
+title = "Worky Producción · Universal"
+description = "APK de producción, versión 2, compatible con Android ARM de 32 y 64 bits. Usa la API y los datos reales de Worky. Puede actualizar Worky Oficios sin desinstalarla."
+logical_id = "1e8851ba-e93d-4a84-a327-ba45fe605a55"
+content_hash = "sha256:6ae0ef8a7fb4500dabd59d6caefcb11c257ec6a2f99be18dd70c38ebf9cc76db"
+size = 66043403
+mtime_ms = 1795558163750
+storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:30cdce69-26de-4bbd-be5a-e35f8db8dfd8/1e8851ba-e93d-4a84-a327-ba45fe605a55/a790a938-9fa2-4fd8-a114-2d7895a34b98"
+storage_version_token = "1795558317178332"
+content_type = "application/octet-stream"

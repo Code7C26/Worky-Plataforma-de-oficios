@@ -43,6 +43,7 @@ beforeEach(async () => {
   await resetDatabase();
   resetEmail();
   process.env.WORKY_ADMIN_SIGNUP_ALLOWED_EMAILS = email;
+  process.env.WORKY_ADMIN_PRIMARY_EMAIL = email;
   scenario++;
 });
 
@@ -360,10 +361,10 @@ test("ordinary registration cannot grant admin even to an allowlisted email", as
       nombre: "Ordinary Test", email: address, password, rol,
       activo: true, emailVerifiedAt: new Date().toISOString(), isAdmin: true,
     });
-    assert.equal(response.status, 201);
-    assert.equal(response.body.usuario.rol, rol === "profesional" ? "profesional" : "cliente");
-    assert.equal(response.body.usuario.emailVerifiedAt, null);
-    const [account] = await db.select().from(users).where(eq(users.id, response.body.usuario.id));
+    assert.equal(response.status, 202);
+    const [account] = await db.select().from(users).where(eq(users.email, address));
+    assert.equal(account.emailVerifiedAt, null);
+    assert.equal(account.rol, rol === "profesional" ? "profesional" : "cliente");
     assert.notEqual(account.rol, "admin");
     assert.equal(account.emailVerifiedAt, null);
   }

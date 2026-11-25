@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="es-AR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#243B49">
+  <title>Worky — Tu barrio tiene una solución</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      color-scheme: dark;
+      --field: #243B49;
+      --paper: #F8F5EC;
+      --sun: #FFC52F;
+      --ink: #243B49;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      width: 100vw;
+      height: 100vh;
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+    }
+
+    body {
+      background: var(--field);
+    }
+
+    .ad {
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      width: 100vw;
+      height: 100vh;
+      overflow: hidden;
+      margin: 0;
+      padding: 7.1vh 8.1vw 8.2vh;
+      background: var(--field);
+      color: var(--paper);
+      font-family: "DM Sans", sans-serif;
+    }
+
+    .logo {
+      display: block;
+      width: 26vw;
+      height: 8vh;
+      max-width: 26vw;
+      max-height: 8vh;
+      object-fit: contain;
+      object-position: left top;
+    }
+
+    .message {
+      margin-top: auto;
+      margin-bottom: 0;
+      max-width: 83vw;
+      color: var(--paper);
+      font-family: "Space Grotesk", sans-serif;
+      font-size: min(10.2vw, 13.1vh);
+      font-weight: 700;
+      letter-spacing: -0.075em;
+      line-height: 0.99;
+    }
+
+    .benefit {
+      max-width: 70vw;
+      margin: 4.1vh 0 0;
+      color: var(--paper);
+      font-family: "DM Sans", sans-serif;
+      font-size: min(3.15vw, 4.05vh);
+      font-weight: 500;
+      letter-spacing: -0.025em;
+      line-height: 1.28;
+    }
+
+    .cta {
+      display: inline-flex;
+      min-height: 7.2vh;
+      align-items: center;
+      justify-content: center;
+      margin-top: 5.2vh;
+      padding: 0 3.2vw;
+      border: 0;
+      border-radius: 0.7vw;
+      background: var(--sun);
+      color: var(--ink);
+      font-family: "DM Sans", sans-serif;
+      font-size: min(2.6vw, 3.35vh);
+      font-weight: 700;
+      letter-spacing: -0.025em;
+      line-height: 1;
+      cursor: pointer;
+    }
+
+    @media (max-aspect-ratio: 3/4) {
+      .ad {
+        padding-right: 7vw;
+        padding-left: 7vw;
+      }
+
+      .message {
+        max-width: 86vw;
+        font-size: min(10.5vw, 12.5vh);
+      }
+
+      .benefit {
+        max-width: 79vw;
+      }
+
+      .logo {
+        width: 29vw;
+        max-width: 29vw;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="ad" aria-label="Anuncio de Worky">
+    <img class="logo" src="./worky-logo.png" alt="Worky">
+    <h1 class="message">La ayuda que necesitás, cerca.</h1>
+    <p class="benefit">Worky conecta clientes con profesionales de oficios.</p>
+    <button class="cta" type="button">Conocé Worky</button>
+  </main>
+</body>
+</html>

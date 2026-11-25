@@ -1,9 +1,10 @@
 import { Readable } from "node:stream";
-import { Router, type IRouter } from "express";
+import { Router, type IRouter, type RequestHandler } from "express";
+import rateLimit from "express-rate-limit";
 import { requireAuth } from "../middlewares/auth";
-import { createChatAttachmentUploadUrl, createProfilePhotoUploadUrl, createUploadUrl, deleteObject, getObject, isChatAttachmentPath, isProfilePhotoRenderedPath, isProfilePhotoSourcePath } from "../lib/storage";
-import { chatUploads, db, jobs, messages, professionalVerificationDocuments, profilePhotoUploads, users } from "@workspace/db";
-import { and, asc, eq, lt, or, sql } from "drizzle-orm";
+import { createChatAttachmentUploadUrl, createClientVerificationUploadUrl, createProfilePhotoUploadUrl, createUploadUrl, deleteObject, getObject, isChatAttachmentPath, isProfilePhotoRenderedPath, isProfilePhotoSourcePath } from "../lib/storage";
+import { chatUploads, clientIdentityVerifications, clientVerificationUploads, db, jobs, messages, professionalProfiles, professionalServices, professionalVerificationDocuments, profilePhotoUploads, users } from "@workspace/db";
+import { and, asc, eq, isNotNull, lt, or, sql } from "drizzle-orm";
 import { logger } from "../lib/logger";
 
 const router: IRouter = Router();
@@ -13,6 +14,18 @@ const CHAT_ATTACHMENT_CLEANUP_BATCH_SIZE = 100;
 export const PROFILE_PHOTO_GRACE_PERIOD_MS = 24 * 60 * 60 * 1000;
 export const PROFILE_PHOTO_CLEANUP_INTERVAL_MS = 60 * 60 * 1000;
 const PROFILE_PHOTO_CLEANUP_BATCH_SIZE = 100;
+const clientVerificationUploadLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  limit: 8,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => String(req.usuarioId ?? "anonymous"),
+  message: { error: "Llegaste al límite de cargas de verificación. Esperá antes de intentar de nuevo." },
+});
+const limitClientVerificationUploads: RequestHandler = (req, res, next) => {
+  if (req.body?.purpose === "client_verification") return clientVerificationUploadLimiter(req, res, next);
+  return next();
+};
 function requestedObjectPath(raw: string | string[]) {
   const value = (Array.isArray(raw) ? raw.join("/") : raw).replace(/^\/+/, "");
   return value.startsWith("objects/") ? `/${value}` : `/objects/${value}`;
@@ -30,20 +43,63 @@ router.get("/storage/public-objects/*filePath", async (req, res): Promise<void> 
   res.setHeader("Cache-Control", "public, max-age=3600");
   Readable.from(file.createReadStream()).pipe(res);
 });
-router.post("/storage/uploads/request-url", requireAuth, async (req, res): Promise<void> => {
+router.post("/storage/uploads/request-url", requireAuth, limitClientVerificationUploads, async (req, res): Promise<void> => {
   const { name, size, contentType, purpose } = req.body ?? {};
   if (typeof name !== "string" || !name || !Number.isFinite(Number(size)) || Number(size) <= 0 || typeof contentType !== "string") {
     res.status(400).json({ error: "Metadatos de archivo inválidos." }); return;
   }
   const isProfilePhoto = purpose === "profile_photo";
   const isChatImage = purpose === "chat_image";
+  const isClientVerification = purpose === "client_verification";
+  const documentType = req.body?.documentType;
   const changaId = Number(req.body?.changaId);
+  const requestedProfessionalId = req.body?.profesionalId == null ? null : Number(req.body.profesionalId);
+  if (isClientVerification && (!["dni", "selfie"].includes(documentType) || !["image/jpeg", "image/png", "image/webp"].includes(contentType) || Number(size) > 10 * 1024 * 1024)) {
+    res.status(400).json({ error: "Elegí una imagen JPG, PNG o WebP de hasta 10 MB." }); return;
+  }
+  if (isClientVerification) {
+    const [account] = await db.select({ rol: users.rol, activo: users.activo })
+      .from(users).where(eq(users.id, req.usuarioId as number)).limit(1);
+    if (!account?.activo || account.rol !== "cliente") {
+      res.status(403).json({ error: "La verificación está disponible para cuentas de cliente." }); return;
+    }
+    const [current] = await db.select({ estado: clientIdentityVerifications.estado })
+      .from(clientIdentityVerifications)
+      .where(eq(clientIdentityVerifications.usuarioId, req.usuarioId as number)).limit(1);
+    if (current?.estado === "pending_verification" || current?.estado === "deleting" || current?.estado === "verified") {
+      res.status(409).json({ error: "Ya hay una verificación en curso o la cuenta ya está verificada." }); return;
+    }
+  }
   if (isChatImage && (!Number.isInteger(changaId) || changaId <= 0)) {
     res.status(400).json({ error: "Indicá la conversación para adjuntar la imagen." }); return;
   }
+  if (isChatImage && requestedProfessionalId !== null && (!Number.isInteger(requestedProfessionalId) || requestedProfessionalId <= 0)) {
+    res.status(400).json({ error: "La conversación seleccionada no es válida." }); return;
+  }
   if (isChatImage) {
-    const [job] = await db.select({ clienteId: jobs.clienteId, profesionalId: jobs.profesionalId }).from(jobs).where(eq(jobs.id, changaId)).limit(1);
-    if (!job || (job.clienteId !== req.usuarioId && job.profesionalId !== req.usuarioId)) {
+    const [job] = await db.select().from(jobs).where(eq(jobs.id, changaId)).limit(1);
+    let allowed = Boolean(job && (job.clienteId === req.usuarioId || job.profesionalId === req.usuarioId));
+    if (job && job.clienteId === req.usuarioId && requestedProfessionalId !== null) {
+      allowed = job.profesionalId === null || job.profesionalId === requestedProfessionalId;
+    }
+    if (job && job.profesionalId === null && job.estado === "publicada" && job.clienteId !== req.usuarioId) {
+      const [profile] = await db.select({ usuarioId: professionalProfiles.usuarioId, categoria: professionalProfiles.categoria })
+        .from(professionalProfiles).innerJoin(users, eq(users.id, professionalProfiles.usuarioId))
+        .where(and(
+          eq(professionalProfiles.usuarioId, req.usuarioId as number),
+          eq(professionalProfiles.habilitado, true),
+          eq(professionalProfiles.verificado, true),
+          eq(professionalProfiles.estadoVerificacion, "verified"),
+          eq(users.activo, true),
+          isNotNull(users.emailVerifiedAt),
+        )).limit(1);
+      const [extraService] = profile && profile.categoria !== job.categoria
+        ? await db.select({ id: professionalServices.id }).from(professionalServices)
+          .where(and(eq(professionalServices.profesionalId, req.usuarioId as number), eq(professionalServices.categoria, job.categoria))).limit(1)
+        : [null];
+      allowed = Boolean(profile && (profile.categoria === job.categoria || extraService));
+    }
+    if (!allowed) {
       res.status(403).json({ error: "No participás en esta conversación." }); return;
     }
   }
@@ -58,22 +114,36 @@ router.post("/storage/uploads/request-url", requireAuth, async (req, res): Promi
       ? await createProfilePhotoUploadUrl(req.usuarioId as number)
       : isChatImage
         ? await createChatAttachmentUploadUrl(changaId, req.usuarioId as number)
-        : await createUploadUrl();
+        : isClientVerification
+          ? await createClientVerificationUploadUrl(req.usuarioId as number)
+          : await createUploadUrl();
     let uploadId: number | undefined;
-    if (isProfilePhoto || isChatImage) {
+    if (isProfilePhoto || isChatImage || isClientVerification) {
       try {
-        const [tracked] = isProfilePhoto
-          ? await db.insert(profilePhotoUploads).values({
+        let trackedId: number | undefined;
+        if (isProfilePhoto) {
+          const [tracked] = await db.insert(profilePhotoUploads).values({
             usuarioId: req.usuarioId as number,
             objectPath: upload.objectPath,
             variante: "source",
-          }).returning({ id: profilePhotoUploads.id })
-          : await db.insert(chatUploads).values({
+          }).returning({ id: profilePhotoUploads.id });
+          trackedId = tracked?.id;
+        } else if (isChatImage) {
+          const [tracked] = await db.insert(chatUploads).values({
             changaId,
             usuarioId: req.usuarioId as number,
             objectPath: upload.objectPath,
           }).returning({ id: chatUploads.id });
-        uploadId = tracked?.id;
+          trackedId = tracked?.id;
+        } else if (isClientVerification) {
+          const [tracked] = await db.insert(clientVerificationUploads).values({
+              usuarioId: req.usuarioId as number,
+              tipo: documentType,
+              objectPath: upload.objectPath,
+          }).returning({ id: clientVerificationUploads.id });
+          trackedId = tracked?.id;
+        }
+        uploadId = trackedId;
       } catch (error) {
         await deleteObject(upload.objectPath).catch((cleanupError) => {
           req.log.warn({ err: cleanupError, objectPath: upload.objectPath }, "No se pudo revertir una carga sin registrar");
@@ -81,7 +151,16 @@ router.post("/storage/uploads/request-url", requireAuth, async (req, res): Promi
         throw error;
       }
     }
-    res.json({ ...upload, ...(uploadId ? { uploadId } : {}), metadata: { name, size: Number(size), contentType }, purpose: isProfilePhoto ? "profile_photo" : isChatImage ? "chat_image" : "file" });
+    res.json({
+      ...upload,
+      ...(uploadId ? { uploadId } : {}),
+      metadata: {
+        name: isClientVerification ? (documentType === "dni" ? "Foto del DNI" : "Selfie") : name,
+        size: Number(size),
+        contentType,
+      },
+      purpose: isProfilePhoto ? "profile_photo" : isChatImage ? "chat_image" : isClientVerification ? "client_verification" : "file",
+    });
   } catch (error) {
     req.log.error({ err: error }, "No se pudo generar URL de carga");
     res.status(500).json({ error: "No se pudo preparar la carga." });
@@ -315,12 +394,17 @@ router.get("/storage/objects/*filePath", requireAuth, async (req, res): Promise<
   if (chatMatch) {
     const changaId = Number(chatMatch[1]);
     const [job] = await db.select({ clienteId: jobs.clienteId, profesionalId: jobs.profesionalId }).from(jobs).where(eq(jobs.id, changaId)).limit(1);
-    if (job && (job.clienteId === ownerId || job.profesionalId === ownerId)) {
-      const [message] = await db.select({ id: messages.id }).from(messages).where(and(
+    if (job) {
+      const [message] = await db.select({ id: messages.id, emisorId: messages.emisorId, conversacionProfesionalId: messages.conversacionProfesionalId }).from(messages).where(and(
         eq(messages.changaId, changaId),
         sql`${messages.adjuntos} @> ${JSON.stringify([{ objectPath }])}::jsonb`,
       )).limit(1);
-      chatAttachment = Boolean(message);
+      chatAttachment = Boolean(message && (
+        job.clienteId === ownerId
+        || job.profesionalId === ownerId
+        || message.conversacionProfesionalId === ownerId
+        || (message.conversacionProfesionalId === null && message.emisorId === ownerId)
+      ));
     }
   }
   if (!ownedPhoto && !ownedDocument && !adminDocument && !chatAttachment) { res.status(403).json({ error: "No tenés permiso para acceder a este archivo." }); return; }

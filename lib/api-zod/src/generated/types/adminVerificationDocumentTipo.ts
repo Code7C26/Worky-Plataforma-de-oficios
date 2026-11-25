@@ -13,4 +13,5 @@ export const AdminVerificationDocumentTipo = {
   dni_frente: 'dni_frente',
   dni_dorso: 'dni_dorso',
   antecedentes_penales: 'antecedentes_penales',
+  matricula: 'matricula',
 } as const;

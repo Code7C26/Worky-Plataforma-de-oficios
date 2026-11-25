@@ -32,6 +32,7 @@ export function getConversationRoute(conversation: Conversation) {
       changaId: String(conversation.changaId),
       category: conversation.categoria,
       participant,
+      ...(conversation.profesionalId ? { profesionalId: String(conversation.profesionalId) } : {}),
       ...(participantPhotoPath ? { participantPhotoPath } : {}),
     },
   };

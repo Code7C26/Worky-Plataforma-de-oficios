@@ -1,10 +1,10 @@
 ---
 name: Production email sender
-description: Resend test-domain restrictions and privacy-safe diagnosis of verification delivery failures.
+description: Worky verification and password-recovery emails use the connected Gmail account.
 ---
 
-Resend's default resend.dev sender is test-only and can deliver only to the email associated with the Resend account. Sending verification codes to other users requires a sender on a domain verified in Resend.
+All Worky email-verification codes and password-recovery messages use the project-connected Gmail integration. The user confirmed the verification flow delivered and accepted a code in the Worky web preview. Password recovery is covered end-to-end by a Gmail-mocked API test, but live recovery delivery and production delivery have not been tested. Resend is no longer used for these flows.
 
-**Why:** Worky's production verification requests returned generic 503 responses while the sender setting was absent. Resend's documented test-domain restriction makes that fallback unsuitable for public registration, even when the API credential exists.
+**Why:** The user has no domain with editable DNS and explicitly asked to use connected Gmail for both verification and account recovery.
 
-**How to apply:** Check the production sender configuration before treating verification delivery as functional. Keep provider status and fixed failure categories in diagnostics, not raw provider bodies, recipient addresses, codes, or credentials. Mocked delivery tests validate the flow but do not prove real email delivery.
+**How to apply:** Keep all Worky verification and recovery email on the connected Gmail API unless the user changes this choice. Do not treat the successful preview verification or mocked recovery test as proof of published delivery. Log only fixed failure categories and HTTP status; never log provider bodies, recipients, codes, reset links, or credentials.

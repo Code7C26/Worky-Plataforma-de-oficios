@@ -5,6 +5,7 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
+import type { ProfessionalFixedLocationInput } from './professionalFixedLocationInput';
 
 export interface ProfessionalProfileInput {
   /** @minLength 2 */
@@ -12,6 +13,7 @@ export interface ProfessionalProfileInput {
   categoria: string;
   /** @minimum 0 */
   precioReferencia: number;
+  ubicacionFija: ProfessionalFixedLocationInput;
   /** @minimum 0 */
   experienciaAnios?: number;
   /** @nullable */

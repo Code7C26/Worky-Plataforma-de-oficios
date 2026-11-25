@@ -78,6 +78,41 @@ export const ListAdminAccountsResponse = zod.object({
 
 
 /**
+ * @summary List administrator accounts for the primary administrator
+ */
+export const ListAdminManagersResponse = zod.object({
+  "isPrimaryAdmin": zod.boolean(),
+  "primaryAdminId": zod.number().nullable(),
+  "items": zod.array(zod.object({
+  "id": zod.number(),
+  "name": zod.string(),
+  "email": zod.string(),
+  "emailVerifiedAt": zod.coerce.date().nullable(),
+  "createdAt": zod.coerce.date()
+}))
+})
+
+
+/**
+ * @summary Remove an administrator role
+ */
+export const RevokeAdminRoleParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const revokeAdminRoleBodyReasonMin = 5;
+export const revokeAdminRoleBodyReasonMax = 1000;
+
+
+
+export const RevokeAdminRoleBody = zod.object({
+  "reason": zod.string().min(revokeAdminRoleBodyReasonMin).max(revokeAdminRoleBodyReasonMax)
+})
+
+export const RevokeAdminRoleResponse = zod.unknown()
+
+
+/**
  * @summary Suspend or reactivate a non-administrator account
  */
 export const UpdateAdminAccountStatusParams = zod.object({
@@ -104,6 +139,98 @@ export const UpdateAdminAccountStatusResponse = zod.object({
   "emailVerifiedAt": zod.coerce.date().nullable(),
   "createdAt": zod.coerce.date(),
   "city": zod.string().nullable()
+})
+
+
+/**
+ * Requires the configured primary administrator and records an audit event.
+ * @summary Assign the administrator role to a verified active account
+ */
+export const grantAdminRoleBodyEmailMax = 320;
+
+export const grantAdminRoleBodyMotivoMin = 5;
+export const grantAdminRoleBodyMotivoMax = 500;
+
+
+
+export const GrantAdminRoleBody = zod.object({
+  "email": zod.string().max(grantAdminRoleBodyEmailMax),
+  "motivo": zod.string().min(grantAdminRoleBodyMotivoMin).max(grantAdminRoleBodyMotivoMax)
+})
+
+export const GrantAdminRoleResponse = zod.object({
+  "rol": zod.enum(['admin']),
+  "changed": zod.boolean()
+})
+
+
+/**
+ * @summary Solicitudes de habilitación agrupadas por perfil con documentación privada
+ */
+export const listAdminPartnerApplicationsQueryPageDefault = 1;
+export const listAdminPartnerApplicationsQueryLimitDefault = 20;
+
+export const ListAdminPartnerApplicationsQueryParams = zod.object({
+  "page": zod.coerce.number().default(listAdminPartnerApplicationsQueryPageDefault),
+  "limit": zod.coerce.number().default(listAdminPartnerApplicationsQueryLimitDefault),
+  "search": zod.coerce.string().optional()
+})
+
+export const ListAdminPartnerApplicationsResponse = zod.object({
+  "items": zod.array(zod.object({
+  "partner": zod.object({
+  "userId": zod.number(),
+  "name": zod.string(),
+  "email": zod.string(),
+  "phone": zod.string().nullish(),
+  "trade": zod.string(),
+  "category": zod.string(),
+  "verificationStatus": zod.enum(['pending_verification', 'verified', 'rejected']),
+  "verified": zod.boolean(),
+  "enabled": zod.boolean(),
+  "accountActive": zod.boolean(),
+  "available": zod.boolean(),
+  "experienceYears": zod.number(),
+  "referencePrice": zod.number(),
+  "rating": zod.number(),
+  "createdAt": zod.coerce.date(),
+  "documents": zod.array(zod.object({
+  "id": zod.number(),
+  "type": zod.enum(['dni_frente', 'dni_dorso', 'antecedentes_penales', 'matricula']),
+  "status": zod.enum(['pending_verification', 'verified', 'rejected']),
+  "name": zod.string(),
+  "sizeBytes": zod.number(),
+  "createdAt": zod.coerce.date()
+}))
+}),
+  "emailVerifiedAt": zod.coerce.date().nullable(),
+  "matriculaHabilitante": zod.string().nullable(),
+  "documents": zod.array(zod.object({
+  "id": zod.number(),
+  "profesionalId": zod.number(),
+  "tipo": zod.enum(['dni_frente', 'dni_dorso', 'antecedentes_penales', 'matricula']),
+  "objectPath": zod.string(),
+  "nombre": zod.string(),
+  "contentType": zod.string(),
+  "sizeBytes": zod.number(),
+  "estado": zod.enum(['pending_verification', 'verified', 'rejected']),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date(),
+  "partner": zod.object({
+  "id": zod.number(),
+  "nombre": zod.string(),
+  "email": zod.string()
+}),
+  "perfil": zod.union([zod.object({
+  "oficio": zod.string(),
+  "categoria": zod.string(),
+  "estadoVerificacion": zod.enum(['pending_verification', 'verified', 'rejected'])
+}),zod.null()])
+}))
+})),
+  "total": zod.number(),
+  "page": zod.number(),
+  "limit": zod.number()
 })
 
 
@@ -142,7 +269,7 @@ export const ListAdminPartnersResponse = zod.object({
   "createdAt": zod.coerce.date(),
   "documents": zod.array(zod.object({
   "id": zod.number(),
-  "type": zod.enum(['dni_frente', 'dni_dorso', 'antecedentes_penales']),
+  "type": zod.enum(['dni_frente', 'dni_dorso', 'antecedentes_penales', 'matricula']),
   "status": zod.enum(['pending_verification', 'verified', 'rejected']),
   "name": zod.string(),
   "sizeBytes": zod.number(),
@@ -190,7 +317,7 @@ export const UpdateAdminPartnerActivationResponse = zod.object({
   "createdAt": zod.coerce.date(),
   "documents": zod.array(zod.object({
   "id": zod.number(),
-  "type": zod.enum(['dni_frente', 'dni_dorso', 'antecedentes_penales']),
+  "type": zod.enum(['dni_frente', 'dni_dorso', 'antecedentes_penales', 'matricula']),
   "status": zod.enum(['pending_verification', 'verified', 'rejected']),
   "name": zod.string(),
   "sizeBytes": zod.number(),
@@ -334,6 +461,83 @@ export const ListAdminSettlementsResponse = zod.object({
 
 
 /**
+ * @summary Search visit payments and reports
+ */
+
+export const listAdminVisitPaymentsQueryLimitMax = 100;
+
+
+
+export const ListAdminVisitPaymentsQueryParams = zod.object({
+  "status": zod.coerce.string().optional(),
+  "page": zod.coerce.number().min(1).optional(),
+  "limit": zod.coerce.number().min(1).max(listAdminVisitPaymentsQueryLimitMax).optional()
+})
+
+export const ListAdminVisitPaymentsResponse = zod.object({
+  "items": zod.array(zod.object({
+  "id": zod.number(),
+  "bookingId": zod.number(),
+  "clientId": zod.number(),
+  "clientName": zod.string(),
+  "partnerId": zod.number(),
+  "partnerName": zod.string(),
+  "amount": zod.number(),
+  "commissionAmount": zod.number(),
+  "partnerAmount": zod.number(),
+  "method": zod.enum(['mercado_pago', 'efectivo']),
+  "status": zod.enum(['checkout_started', 'pending_release', 'available', 'cash_pending_visit', 'cash_commission_due', 'cash_commission_settled', 'under_review', 'payment_failed', 'refunded']),
+  "issueType": zod.string().nullable(),
+  "issueDetail": zod.string().nullable(),
+  "completedAt": zod.coerce.date().nullable(),
+  "releaseAt": zod.coerce.date().nullable(),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date()
+})),
+  "total": zod.number(),
+  "page": zod.number(),
+  "limit": zod.number()
+})
+
+
+/**
+ * @summary Release a held visit balance after review
+ */
+export const ResolveAdminVisitPaymentParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const resolveAdminVisitPaymentBodyDetailMin = 5;
+export const resolveAdminVisitPaymentBodyDetailMax = 1000;
+
+
+
+export const ResolveAdminVisitPaymentBody = zod.object({
+  "detail": zod.string().min(resolveAdminVisitPaymentBodyDetailMin).max(resolveAdminVisitPaymentBodyDetailMax)
+})
+
+export const ResolveAdminVisitPaymentResponse = zod.object({
+  "id": zod.number(),
+  "bookingId": zod.number(),
+  "clientId": zod.number(),
+  "clientName": zod.string(),
+  "partnerId": zod.number(),
+  "partnerName": zod.string(),
+  "amount": zod.number(),
+  "commissionAmount": zod.number(),
+  "partnerAmount": zod.number(),
+  "method": zod.enum(['mercado_pago', 'efectivo']),
+  "status": zod.enum(['checkout_started', 'pending_release', 'available', 'cash_pending_visit', 'cash_commission_due', 'cash_commission_settled', 'under_review', 'payment_failed', 'refunded']),
+  "issueType": zod.string().nullable(),
+  "issueDetail": zod.string().nullable(),
+  "completedAt": zod.coerce.date().nullable(),
+  "releaseAt": zod.coerce.date().nullable(),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date()
+})
+
+
+/**
  * @summary Search review records
  */
 
@@ -425,6 +629,64 @@ export const UpdateAdminRecommendationVisibilityResponse = zod.object({
   "comment": zod.string().nullable(),
   "createdAt": zod.coerce.date(),
   "updatedAt": zod.coerce.date()
+})
+
+
+/**
+ * Returns no signals until a real, confirmed job payment exists in the production environment.
+ * @summary Get the production-gated recommendation ranking review queue
+ */
+export const GetAdminRecommendationRankingResponse = zod.object({
+  "active": zod.boolean(),
+  "windowDays": zod.number(),
+  "incidentThreshold": zod.number().optional(),
+  "activatedAt": zod.coerce.date().nullish(),
+  "activationProvider": zod.union([zod.literal('mercado_pago'),zod.literal('efectivo'),zod.literal(null)]).nullish(),
+  "candidates": zod.array(zod.object({
+  "jobId": zod.number(),
+  "partnerId": zod.number().nullable(),
+  "partnerName": zod.string(),
+  "clientId": zod.number(),
+  "clientName": zod.string(),
+  "category": zod.string(),
+  "updatedAt": zod.coerce.date(),
+  "messageCount": zod.number(),
+  "acceptedVisitCount": zod.number()
+})),
+  "incidents": zod.array(zod.object({
+  "jobId": zod.number(),
+  "partnerId": zod.number().nullable(),
+  "partnerName": zod.string(),
+  "clientName": zod.string(),
+  "category": zod.string(),
+  "decision": zod.enum(['confirmed', 'dismissed']),
+  "reason": zod.string().nullable(),
+  "reviewedAt": zod.coerce.date()
+}))
+})
+
+
+/**
+ * @summary Confirm or dismiss a structured activity signal
+ */
+export const ReviewAdminRecommendationRankingIncidentParams = zod.object({
+  "jobId": zod.coerce.number()
+})
+
+export const reviewAdminRecommendationRankingIncidentBodyReasonMin = 5;
+export const reviewAdminRecommendationRankingIncidentBodyReasonMax = 1000;
+
+
+
+export const ReviewAdminRecommendationRankingIncidentBody = zod.object({
+  "decision": zod.enum(['confirmed', 'dismissed']),
+  "reason": zod.string().min(reviewAdminRecommendationRankingIncidentBodyReasonMin).max(reviewAdminRecommendationRankingIncidentBodyReasonMax)
+})
+
+export const ReviewAdminRecommendationRankingIncidentResponse = zod.object({
+  "jobId": zod.number(),
+  "decision": zod.enum(['confirmed', 'dismissed']),
+  "unchanged": zod.boolean()
 })
 
 
@@ -569,7 +831,7 @@ export const ListAdminVerificationsQueryParams = zod.object({
 export const ListAdminVerificationsResponseItem = zod.object({
   "id": zod.number(),
   "profesionalId": zod.number(),
-  "tipo": zod.enum(['dni_frente', 'dni_dorso', 'antecedentes_penales']),
+  "tipo": zod.enum(['dni_frente', 'dni_dorso', 'antecedentes_penales', 'matricula']),
   "objectPath": zod.string(),
   "nombre": zod.string(),
   "contentType": zod.string(),
@@ -615,6 +877,69 @@ export const ResolveAdminVerificationResponse = zod.object({
 
 
 /**
+ * @summary List customer identity requests awaiting private review
+ */
+
+export const listAdminClientVerificationsQueryLimitMax = 100;
+
+export const listAdminClientVerificationsQuerySearchMax = 120;
+
+
+
+export const ListAdminClientVerificationsQueryParams = zod.object({
+  "page": zod.coerce.number().min(1).optional(),
+  "limit": zod.coerce.number().min(1).max(listAdminClientVerificationsQueryLimitMax).optional(),
+  "search": zod.coerce.string().max(listAdminClientVerificationsQuerySearchMax).optional()
+})
+
+export const ListAdminClientVerificationsResponse = zod.object({
+  "items": zod.array(zod.object({
+  "id": zod.number(),
+  "userId": zod.number(),
+  "name": zod.string(),
+  "email": zod.string(),
+  "submittedAt": zod.coerce.date(),
+  "hasDni": zod.boolean(),
+  "hasSelfie": zod.boolean()
+})),
+  "total": zod.number(),
+  "page": zod.number(),
+  "limit": zod.number()
+})
+
+
+/**
+ * @summary Approve or reject a customer identity request and delete its files
+ */
+export const ReviewAdminClientVerificationParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const ReviewAdminClientVerificationBody = zod.object({
+  "decision": zod.enum(['verified', 'rejected']),
+  "reasonCode": zod.enum(['dni_unreadable', 'selfie_unusable', 'identity_mismatch']).optional()
+})
+
+export const ReviewAdminClientVerificationResponse = zod.object({
+  "status": zod.enum(['not_requested', 'pending_verification', 'verified', 'rejected']),
+  "submittedAt": zod.coerce.date().nullable(),
+  "reviewedAt": zod.coerce.date().nullable(),
+  "reasonCode": zod.union([zod.literal('dni_unreadable'),zod.literal('selfie_unusable'),zod.literal('identity_mismatch'),zod.literal(null)]).nullable()
+})
+
+
+/**
+ * @summary Stream one private customer identity image to an administrator
+ */
+export const GetAdminClientVerificationFileParams = zod.object({
+  "id": zod.coerce.number(),
+  "kind": zod.enum(['dni', 'selfie'])
+})
+
+export const GetAdminClientVerificationFileResponse = zod.unknown()
+
+
+/**
  * Returns server health status
  * @summary Health check
  */
@@ -635,8 +960,10 @@ export const RequestUploadUrlBody = zod.object({
   "name": zod.string().min(1),
   "size": zod.number().min(1),
   "contentType": zod.string().min(1),
-  "purpose": zod.enum(['profile_photo', 'chat_image', 'file']),
-  "changaId": zod.number().optional()
+  "purpose": zod.enum(['profile_photo', 'chat_image', 'client_verification', 'file']),
+  "documentType": zod.enum(['dni', 'selfie']).optional(),
+  "changaId": zod.number().optional(),
+  "profesionalId": zod.number().optional()
 })
 
 export const RequestUploadUrlResponse = zod.object({
@@ -648,12 +975,12 @@ export const RequestUploadUrlResponse = zod.object({
   "size": zod.number(),
   "contentType": zod.string()
 }),
-  "purpose": zod.enum(['profile_photo', 'chat_image', 'file'])
+  "purpose": zod.enum(['profile_photo', 'chat_image', 'client_verification', 'file'])
 })
 
 
 /**
- * @summary Create an account
+ * @summary Create an account and send an email verification code
  */
 export const registerAccountBodyNombreMin = 2;
 export const registerAccountBodyNombreMax = 100;
@@ -689,6 +1016,51 @@ export const RegisterAccountBody = zod.object({
 })
 
 export const RegisterAccountResponse = zod.object({
+  "message": zod.string()
+})
+
+
+/**
+ * @summary Resend a registration email verification code
+ */
+export const requestRegistrationEmailVerificationBodyEmailMax = 320;
+
+
+
+export const RequestRegistrationEmailVerificationBody = zod.object({
+  "email": zod.string().max(requestRegistrationEmailVerificationBodyEmailMax)
+})
+
+export const RequestRegistrationEmailVerificationResponse = zod.object({
+  "message": zod.string()
+})
+
+
+/**
+ * @summary Confirm a registration code and create a session
+ */
+export const confirmRegistrationEmailVerificationBodyEmailMax = 320;
+
+export const confirmRegistrationEmailVerificationBodyCodeMin = 6;
+export const confirmRegistrationEmailVerificationBodyCodeMax = 6;
+
+
+export const confirmRegistrationEmailVerificationBodyCodeRegExp = new RegExp('^[0-9]{6}$');
+
+
+export const ConfirmRegistrationEmailVerificationBody = zod.object({
+  "email": zod.string().max(confirmRegistrationEmailVerificationBodyEmailMax),
+  "code": zod.string().min(confirmRegistrationEmailVerificationBodyCodeMin).max(confirmRegistrationEmailVerificationBodyCodeMax).regex(confirmRegistrationEmailVerificationBodyCodeRegExp)
+})
+
+export const confirmRegistrationEmailVerificationResponseUsuarioUsernameMin = 3;
+export const confirmRegistrationEmailVerificationResponseUsuarioUsernameMax = 20;
+
+
+export const confirmRegistrationEmailVerificationResponseUsuarioUsernameRegExp = new RegExp('^[A-Za-z0-9_]{3,20}$');
+
+
+export const ConfirmRegistrationEmailVerificationResponse = zod.object({
   "token": zod.string(),
   "usuario": zod.object({
   "id": zod.number(),
@@ -698,6 +1070,7 @@ export const RegisterAccountResponse = zod.object({
   "telefono": zod.string().nullish(),
   "edad": zod.number().nullish(),
   "fotoObjectPath": zod.string().nullish(),
+  "username": zod.string().min(confirmRegistrationEmailVerificationResponseUsuarioUsernameMin).max(confirmRegistrationEmailVerificationResponseUsuarioUsernameMax).regex(confirmRegistrationEmailVerificationResponseUsuarioUsernameRegExp).nullish(),
   "rol": zod.enum(['cliente', 'profesional', 'admin']),
   "ubicacion": zod.union([zod.object({
   "direccionTexto": zod.string().optional(),
@@ -779,6 +1152,13 @@ export const CompleteAdminSignupBody = zod.object({
   "codigo": zod.string().regex(completeAdminSignupBodyCodigoRegExp)
 })
 
+export const completeAdminSignupResponseUsuarioUsernameMin = 3;
+export const completeAdminSignupResponseUsuarioUsernameMax = 20;
+
+
+export const completeAdminSignupResponseUsuarioUsernameRegExp = new RegExp('^[A-Za-z0-9_]{3,20}$');
+
+
 export const CompleteAdminSignupResponse = zod.object({
   "token": zod.string(),
   "usuario": zod.object({
@@ -789,6 +1169,7 @@ export const CompleteAdminSignupResponse = zod.object({
   "telefono": zod.string().nullish(),
   "edad": zod.number().nullish(),
   "fotoObjectPath": zod.string().nullish(),
+  "username": zod.string().min(completeAdminSignupResponseUsuarioUsernameMin).max(completeAdminSignupResponseUsuarioUsernameMax).regex(completeAdminSignupResponseUsuarioUsernameRegExp).nullish(),
   "rol": zod.enum(['cliente', 'profesional', 'admin']),
   "ubicacion": zod.union([zod.object({
   "direccionTexto": zod.string().optional(),
@@ -818,6 +1199,13 @@ export const LoginAccountBody = zod.object({
   "password": zod.string().min(1).max(loginAccountBodyPasswordMax)
 })
 
+export const loginAccountResponseUsuarioUsernameMin = 3;
+export const loginAccountResponseUsuarioUsernameMax = 20;
+
+
+export const loginAccountResponseUsuarioUsernameRegExp = new RegExp('^[A-Za-z0-9_]{3,20}$');
+
+
 export const LoginAccountResponse = zod.object({
   "token": zod.string(),
   "usuario": zod.object({
@@ -828,6 +1216,7 @@ export const LoginAccountResponse = zod.object({
   "telefono": zod.string().nullish(),
   "edad": zod.number().nullish(),
   "fotoObjectPath": zod.string().nullish(),
+  "username": zod.string().min(loginAccountResponseUsuarioUsernameMin).max(loginAccountResponseUsuarioUsernameMax).regex(loginAccountResponseUsuarioUsernameRegExp).nullish(),
   "rol": zod.enum(['cliente', 'profesional', 'admin']),
   "ubicacion": zod.union([zod.object({
   "direccionTexto": zod.string().optional(),
@@ -844,37 +1233,227 @@ export const LoginAccountResponse = zod.object({
 
 
 /**
+ * @summary Verify an email code for a sign-in
+ */
+export const verifyTwoFactorLoginBodyCodeRegExp = new RegExp('^[0-9]{6}$');
+
+
+export const VerifyTwoFactorLoginBody = zod.object({
+  "challengeId": zod.number(),
+  "code": zod.string().regex(verifyTwoFactorLoginBodyCodeRegExp)
+})
+
+export const verifyTwoFactorLoginResponseUsuarioUsernameMin = 3;
+export const verifyTwoFactorLoginResponseUsuarioUsernameMax = 20;
+
+
+export const verifyTwoFactorLoginResponseUsuarioUsernameRegExp = new RegExp('^[A-Za-z0-9_]{3,20}$');
+
+
+export const VerifyTwoFactorLoginResponse = zod.object({
+  "token": zod.string(),
+  "usuario": zod.object({
+  "id": zod.number(),
+  "nombre": zod.string(),
+  "email": zod.string(),
+  "emailVerifiedAt": zod.coerce.date().nullable(),
+  "telefono": zod.string().nullish(),
+  "edad": zod.number().nullish(),
+  "fotoObjectPath": zod.string().nullish(),
+  "username": zod.string().min(verifyTwoFactorLoginResponseUsuarioUsernameMin).max(verifyTwoFactorLoginResponseUsuarioUsernameMax).regex(verifyTwoFactorLoginResponseUsuarioUsernameRegExp).nullish(),
+  "rol": zod.enum(['cliente', 'profesional', 'admin']),
+  "ubicacion": zod.union([zod.object({
+  "direccionTexto": zod.string().optional(),
+  "ciudad": zod.string().optional(),
+  "provincia": zod.string().optional(),
+  "zona": zod.string().optional(),
+  "capturedAt": zod.coerce.date().nullish(),
+  "coordinates": zod.array(zod.number()).optional()
+}),zod.null()]).optional(),
+  "onboardingEstado": zod.string().optional(),
+  "onboardingPaso": zod.number().optional()
+})
+})
+
+
+/**
+ * @summary Get two-factor security status
+ */
+export const GetTwoFactorSecurityResponse = zod.object({
+  "enabled": zod.boolean()
+})
+
+
+/**
+ * @summary Enable or disable email two-factor verification
+ */
+export const updateTwoFactorSecurityBodyCurrentPasswordMin = 6;
+export const updateTwoFactorSecurityBodyCurrentPasswordMax = 200;
+
+
+
+export const UpdateTwoFactorSecurityBody = zod.object({
+  "enabled": zod.boolean(),
+  "currentPassword": zod.string().min(updateTwoFactorSecurityBodyCurrentPasswordMin).max(updateTwoFactorSecurityBodyCurrentPasswordMax)
+})
+
+export const UpdateTwoFactorSecurityResponse = zod.object({
+  "enabled": zod.boolean()
+})
+
+
+/**
+ * @summary Sign in on a trusted mobile installation or request a one-time code
+ */
+export const requestMobileDeviceLoginBodyEmailMax = 320;
+
+export const requestMobileDeviceLoginBodyPasswordMax = 200;
+
+export const requestMobileDeviceLoginBodyDeviceIdMin = 32;
+export const requestMobileDeviceLoginBodyDeviceIdMax = 128;
+
+
+
+export const RequestMobileDeviceLoginBody = zod.object({
+  "email": zod.string().max(requestMobileDeviceLoginBodyEmailMax),
+  "password": zod.string().min(1).max(requestMobileDeviceLoginBodyPasswordMax),
+  "deviceId": zod.string().min(requestMobileDeviceLoginBodyDeviceIdMin).max(requestMobileDeviceLoginBodyDeviceIdMax)
+})
+
+export const requestMobileDeviceLoginResponseUsuarioUsernameMin = 3;
+export const requestMobileDeviceLoginResponseUsuarioUsernameMax = 20;
+
+
+export const requestMobileDeviceLoginResponseUsuarioUsernameRegExp = new RegExp('^[A-Za-z0-9_]{3,20}$');
+
+
+export const RequestMobileDeviceLoginResponse = zod.object({
+  "requiresCode": zod.boolean(),
+  "challengeId": zod.number().optional(),
+  "message": zod.string().optional(),
+  "token": zod.string().optional(),
+  "usuario": zod.object({
+  "id": zod.number(),
+  "nombre": zod.string(),
+  "email": zod.string(),
+  "emailVerifiedAt": zod.coerce.date().nullable(),
+  "telefono": zod.string().nullish(),
+  "edad": zod.number().nullish(),
+  "fotoObjectPath": zod.string().nullish(),
+  "username": zod.string().min(requestMobileDeviceLoginResponseUsuarioUsernameMin).max(requestMobileDeviceLoginResponseUsuarioUsernameMax).regex(requestMobileDeviceLoginResponseUsuarioUsernameRegExp).nullish(),
+  "rol": zod.enum(['cliente', 'profesional', 'admin']),
+  "ubicacion": zod.union([zod.object({
+  "direccionTexto": zod.string().optional(),
+  "ciudad": zod.string().optional(),
+  "provincia": zod.string().optional(),
+  "zona": zod.string().optional(),
+  "capturedAt": zod.coerce.date().nullish(),
+  "coordinates": zod.array(zod.number()).optional()
+}),zod.null()]).optional(),
+  "onboardingEstado": zod.string().optional(),
+  "onboardingPaso": zod.number().optional()
+}).optional()
+})
+
+
+/**
+ * @summary Confirm a one-time code and trust the mobile installation
+ */
+export const confirmMobileDeviceLoginBodyEmailMax = 320;
+
+export const confirmMobileDeviceLoginBodyDeviceIdMin = 32;
+export const confirmMobileDeviceLoginBodyDeviceIdMax = 128;
+
+export const confirmMobileDeviceLoginBodyCodeMin = 6;
+export const confirmMobileDeviceLoginBodyCodeMax = 6;
+
+
+export const confirmMobileDeviceLoginBodyCodeRegExp = new RegExp('^[0-9]{6}$');
+
+
+export const ConfirmMobileDeviceLoginBody = zod.object({
+  "email": zod.string().max(confirmMobileDeviceLoginBodyEmailMax),
+  "deviceId": zod.string().min(confirmMobileDeviceLoginBodyDeviceIdMin).max(confirmMobileDeviceLoginBodyDeviceIdMax),
+  "challengeId": zod.number(),
+  "code": zod.string().min(confirmMobileDeviceLoginBodyCodeMin).max(confirmMobileDeviceLoginBodyCodeMax).regex(confirmMobileDeviceLoginBodyCodeRegExp)
+})
+
+export const confirmMobileDeviceLoginResponseUsuarioUsernameMin = 3;
+export const confirmMobileDeviceLoginResponseUsuarioUsernameMax = 20;
+
+
+export const confirmMobileDeviceLoginResponseUsuarioUsernameRegExp = new RegExp('^[A-Za-z0-9_]{3,20}$');
+
+
+export const ConfirmMobileDeviceLoginResponse = zod.object({
+  "token": zod.string(),
+  "usuario": zod.object({
+  "id": zod.number(),
+  "nombre": zod.string(),
+  "email": zod.string(),
+  "emailVerifiedAt": zod.coerce.date().nullable(),
+  "telefono": zod.string().nullish(),
+  "edad": zod.number().nullish(),
+  "fotoObjectPath": zod.string().nullish(),
+  "username": zod.string().min(confirmMobileDeviceLoginResponseUsuarioUsernameMin).max(confirmMobileDeviceLoginResponseUsuarioUsernameMax).regex(confirmMobileDeviceLoginResponseUsuarioUsernameRegExp).nullish(),
+  "rol": zod.enum(['cliente', 'profesional', 'admin']),
+  "ubicacion": zod.union([zod.object({
+  "direccionTexto": zod.string().optional(),
+  "ciudad": zod.string().optional(),
+  "provincia": zod.string().optional(),
+  "zona": zod.string().optional(),
+  "capturedAt": zod.coerce.date().nullish(),
+  "coordinates": zod.array(zod.number()).optional()
+}),zod.null()]).optional(),
+  "onboardingEstado": zod.string().optional(),
+  "onboardingPaso": zod.number().optional()
+})
+})
+
+
+/**
+ * @summary List trusted mobile installations for the current account
+ */
+export const listMyTrustedMobileDevicesResponseDeviceKeyRegExp = new RegExp('^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$');
+
+
+export const ListMyTrustedMobileDevicesResponseItem = zod.object({
+  "deviceKey": zod.string().regex(listMyTrustedMobileDevicesResponseDeviceKeyRegExp),
+  "createdAt": zod.coerce.date(),
+  "lastSeenAt": zod.coerce.date()
+})
+export const ListMyTrustedMobileDevicesResponse = zod.array(ListMyTrustedMobileDevicesResponseItem)
+
+
+/**
+ * @summary Revoke a trusted mobile installation for the current account
+ */
+export const revokeMyTrustedMobileDevicePathDeviceKeyRegExp = new RegExp('^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$');
+
+
+export const RevokeMyTrustedMobileDeviceParams = zod.object({
+  "deviceKey": zod.coerce.string().regex(revokeMyTrustedMobileDevicePathDeviceKeyRegExp)
+})
+
+export const RevokeMyTrustedMobileDeviceResponse = zod.void()
+
+
+/**
  * @summary End the current session
  */
 export const LogoutAccountResponse = zod.void()
 
 
 /**
- * @summary Update the current professional's live location
- */
-export const updateProfessionalLocationBodyCoordinatesMin = 2;
-export const updateProfessionalLocationBodyCoordinatesMax = 2;
-
-
-
-export const UpdateProfessionalLocationBody = zod.object({
-  "coordinates": zod.array(zod.number()).min(updateProfessionalLocationBodyCoordinatesMin).max(updateProfessionalLocationBodyCoordinatesMax)
-})
-
-export const updateProfessionalLocationResponseCoordinatesMin = 2;
-export const updateProfessionalLocationResponseCoordinatesMax = 2;
-
-
-
-export const UpdateProfessionalLocationResponse = zod.object({
-  "coordinates": zod.array(zod.number()).min(updateProfessionalLocationResponseCoordinatesMin).max(updateProfessionalLocationResponseCoordinatesMax),
-  "capturedAt": zod.coerce.date()
-})
-
-
-/**
  * @summary Get the current account
  */
+export const getMyAccountResponseUsernameMin = 3;
+export const getMyAccountResponseUsernameMax = 20;
+
+
+export const getMyAccountResponseUsernameRegExp = new RegExp('^[A-Za-z0-9_]{3,20}$');
+
+
 export const GetMyAccountResponse = zod.object({
   "id": zod.number(),
   "nombre": zod.string(),
@@ -883,6 +1462,7 @@ export const GetMyAccountResponse = zod.object({
   "telefono": zod.string().nullish(),
   "edad": zod.number().nullish(),
   "fotoObjectPath": zod.string().nullish(),
+  "username": zod.string().min(getMyAccountResponseUsernameMin).max(getMyAccountResponseUsernameMax).regex(getMyAccountResponseUsernameRegExp).nullish(),
   "rol": zod.enum(['cliente', 'profesional', 'admin']),
   "ubicacion": zod.union([zod.object({
   "direccionTexto": zod.string().optional(),
@@ -907,6 +1487,11 @@ export const updateMyAccountBodyEmailMax = 200;
 
 export const updateMyAccountBodyTelefonoMax = 40;
 
+export const updateMyAccountBodyUsernameMin = 3;
+export const updateMyAccountBodyUsernameMax = 20;
+
+
+export const updateMyAccountBodyUsernameRegExp = new RegExp('^[A-Za-z0-9_]{3,20}$');
 export const updateMyAccountBodyEdadMin = 13;
 export const updateMyAccountBodyEdadMax = 120;
 
@@ -924,6 +1509,7 @@ export const UpdateMyAccountBody = zod.object({
   "nombre": zod.string().min(updateMyAccountBodyNombreMin).max(updateMyAccountBodyNombreMax).optional(),
   "email": zod.string().max(updateMyAccountBodyEmailMax).optional(),
   "telefono": zod.string().max(updateMyAccountBodyTelefonoMax).nullish(),
+  "username": zod.string().min(updateMyAccountBodyUsernameMin).max(updateMyAccountBodyUsernameMax).regex(updateMyAccountBodyUsernameRegExp).nullish(),
   "edad": zod.number().min(updateMyAccountBodyEdadMin).max(updateMyAccountBodyEdadMax).nullish(),
   "ubicacion": zod.union([zod.object({
   "direccionTexto": zod.string().max(updateMyAccountBodyUbicacionOneDireccionTextoMax).nullish(),
@@ -933,6 +1519,13 @@ export const UpdateMyAccountBody = zod.object({
   "currentPassword": zod.string().max(updateMyAccountBodyCurrentPasswordMax).nullish()
 })
 
+export const updateMyAccountResponseUsernameMin = 3;
+export const updateMyAccountResponseUsernameMax = 20;
+
+
+export const updateMyAccountResponseUsernameRegExp = new RegExp('^[A-Za-z0-9_]{3,20}$');
+
+
 export const UpdateMyAccountResponse = zod.object({
   "id": zod.number(),
   "nombre": zod.string(),
@@ -941,6 +1534,7 @@ export const UpdateMyAccountResponse = zod.object({
   "telefono": zod.string().nullish(),
   "edad": zod.number().nullish(),
   "fotoObjectPath": zod.string().nullish(),
+  "username": zod.string().min(updateMyAccountResponseUsernameMin).max(updateMyAccountResponseUsernameMax).regex(updateMyAccountResponseUsernameRegExp).nullish(),
   "rol": zod.enum(['cliente', 'profesional', 'admin']),
   "ubicacion": zod.union([zod.object({
   "direccionTexto": zod.string().optional(),
@@ -956,11 +1550,73 @@ export const UpdateMyAccountResponse = zod.object({
 
 
 /**
+ * @summary Read the current customer's identity verification status
+ */
+export const GetClientIdentityVerificationStatusResponse = zod.object({
+  "status": zod.enum(['not_requested', 'pending_verification', 'verified', 'rejected']),
+  "submittedAt": zod.coerce.date().nullable(),
+  "reviewedAt": zod.coerce.date().nullable(),
+  "reasonCode": zod.union([zod.literal('dni_unreadable'),zod.literal('selfie_unusable'),zod.literal('identity_mismatch'),zod.literal(null)]).nullable()
+})
+
+
+/**
+ * @summary Submit a DNI photo and selfie for private Worky review
+ */
+
+
+
+
+export const SubmitClientIdentityVerificationBody = zod.object({
+  "dniUploadId": zod.number().min(1),
+  "selfieUploadId": zod.number().min(1),
+  "consent": zod.literal(true)
+})
+
+export const SubmitClientIdentityVerificationResponse = zod.object({
+  "status": zod.enum(['not_requested', 'pending_verification', 'verified', 'rejected']),
+  "submittedAt": zod.coerce.date().nullable(),
+  "reviewedAt": zod.coerce.date().nullable(),
+  "reasonCode": zod.union([zod.literal('dni_unreadable'),zod.literal('selfie_unusable'),zod.literal('identity_mismatch'),zod.literal(null)]).nullable()
+})
+
+
+/**
+ * @summary Set the authenticated account profile photo from an uploaded source image
+ */
+
+
+
+export const UpdateMyProfilePhotoBody = zod.object({
+  "objectPath": zod.string().min(1)
+})
+
+export const UpdateMyProfilePhotoResponse = zod.object({
+  "fotoObjectPath": zod.string()
+})
+
+
+/**
+ * @summary Remove the authenticated account profile photo
+ */
+export const DeleteMyProfilePhotoResponse = zod.object({
+  "fotoObjectPath": zod.string().nullable()
+})
+
+
+/**
  * @summary Switch the current account between client and professional modes
  */
 export const SwitchAccountRoleBody = zod.object({
   "rol": zod.enum(['cliente', 'profesional'])
 })
+
+export const switchAccountRoleResponseUsernameMin = 3;
+export const switchAccountRoleResponseUsernameMax = 20;
+
+
+export const switchAccountRoleResponseUsernameRegExp = new RegExp('^[A-Za-z0-9_]{3,20}$');
+
 
 export const SwitchAccountRoleResponse = zod.object({
   "id": zod.number(),
@@ -970,6 +1626,7 @@ export const SwitchAccountRoleResponse = zod.object({
   "telefono": zod.string().nullish(),
   "edad": zod.number().nullish(),
   "fotoObjectPath": zod.string().nullish(),
+  "username": zod.string().min(switchAccountRoleResponseUsernameMin).max(switchAccountRoleResponseUsernameMax).regex(switchAccountRoleResponseUsernameRegExp).nullish(),
   "rol": zod.enum(['cliente', 'profesional', 'admin']),
   "ubicacion": zod.union([zod.object({
   "direccionTexto": zod.string().optional(),
@@ -1062,11 +1719,21 @@ export const ListProfessionalsQueryParams = zod.object({
   "longitud": zod.coerce.number().min(listProfessionalsQueryLongitudMin).max(listProfessionalsQueryLongitudMax).optional()
 })
 
+export const listProfessionalsResponseVisibilityRankMin = 0;
+export const listProfessionalsResponseVisibilityRankMax = 1;
+
+
+
 export const ListProfessionalsResponseItem = zod.object({
   "id": zod.number(),
   "usuarioId": zod.number(),
   "oficio": zod.string(),
   "categoria": zod.string(),
+  "ubicacionFija": zod.union([zod.object({
+  "direccionTexto": zod.string(),
+  "ciudad": zod.string(),
+  "provincia": zod.string().nullable()
+}),zod.null()]),
   "matriculaHabilitante": zod.string().nullish(),
   "verificado": zod.boolean(),
   "estadoVerificacion": zod.enum(['pending_verification', 'verified', 'rejected']),
@@ -1092,7 +1759,8 @@ export const ListProfessionalsResponseItem = zod.object({
   "reviewsCount": zod.number(),
   "completedJobs": zod.number(),
   "recommendationsCount": zod.number(),
-  "distanceKm": zod.number().nullish().describe('Distancia aproximada en kilómetros; es null cuando la ubicación del profesional no tiene un heartbeat vigente (máximo 5 minutos).')
+  "visibilityRank": zod.number().min(listProfessionalsResponseVisibilityRankMin).max(listProfessionalsResponseVisibilityRankMax).optional().describe('Internal ordering tier; 1 means the profile is shown lower in discovery results.'),
+  "distanceKm": zod.number().nullish().describe('Distancia aproximada entre la ubicación en vivo del cliente y la ubicación fija del taller del profesional.')
 })
 export const ListProfessionalsResponse = zod.array(ListProfessionalsResponseItem)
 
@@ -1104,11 +1772,21 @@ export const GetProfessionalParams = zod.object({
   "id": zod.coerce.number()
 })
 
+export const getProfessionalResponseVisibilityRankMin = 0;
+export const getProfessionalResponseVisibilityRankMax = 1;
+
+
+
 export const GetProfessionalResponse = zod.object({
   "id": zod.number(),
   "usuarioId": zod.number(),
   "oficio": zod.string(),
   "categoria": zod.string(),
+  "ubicacionFija": zod.union([zod.object({
+  "direccionTexto": zod.string(),
+  "ciudad": zod.string(),
+  "provincia": zod.string().nullable()
+}),zod.null()]),
   "matriculaHabilitante": zod.string().nullish(),
   "verificado": zod.boolean(),
   "estadoVerificacion": zod.enum(['pending_verification', 'verified', 'rejected']),
@@ -1134,7 +1812,8 @@ export const GetProfessionalResponse = zod.object({
   "reviewsCount": zod.number(),
   "completedJobs": zod.number(),
   "recommendationsCount": zod.number(),
-  "distanceKm": zod.number().nullish().describe('Distancia aproximada en kilómetros; es null cuando la ubicación del profesional no tiene un heartbeat vigente (máximo 5 minutos).')
+  "visibilityRank": zod.number().min(getProfessionalResponseVisibilityRankMin).max(getProfessionalResponseVisibilityRankMax).optional().describe('Internal ordering tier; 1 means the profile is shown lower in discovery results.'),
+  "distanceKm": zod.number().nullish().describe('Distancia aproximada entre la ubicación en vivo del cliente y la ubicación fija del taller del profesional.')
 })
 
 
@@ -1183,6 +1862,17 @@ export const createMyProfessionalProfileBodyOficioMin = 2;
 
 export const createMyProfessionalProfileBodyPrecioReferenciaMin = 0;
 
+export const createMyProfessionalProfileBodyUbicacionFijaDireccionTextoMin = 3;
+export const createMyProfessionalProfileBodyUbicacionFijaDireccionTextoMax = 200;
+
+export const createMyProfessionalProfileBodyUbicacionFijaCiudadMin = 2;
+export const createMyProfessionalProfileBodyUbicacionFijaCiudadMax = 100;
+
+export const createMyProfessionalProfileBodyUbicacionFijaProvinciaMax = 100;
+
+export const createMyProfessionalProfileBodyUbicacionFijaCoordinatesMin = 2;
+export const createMyProfessionalProfileBodyUbicacionFijaCoordinatesMax = 2;
+
 export const createMyProfessionalProfileBodyExperienciaAniosMin = 0;
 
 
@@ -1191,6 +1881,12 @@ export const CreateMyProfessionalProfileBody = zod.object({
   "oficio": zod.string().min(createMyProfessionalProfileBodyOficioMin),
   "categoria": zod.string(),
   "precioReferencia": zod.number().min(createMyProfessionalProfileBodyPrecioReferenciaMin),
+  "ubicacionFija": zod.object({
+  "direccionTexto": zod.string().min(createMyProfessionalProfileBodyUbicacionFijaDireccionTextoMin).max(createMyProfessionalProfileBodyUbicacionFijaDireccionTextoMax),
+  "ciudad": zod.string().min(createMyProfessionalProfileBodyUbicacionFijaCiudadMin).max(createMyProfessionalProfileBodyUbicacionFijaCiudadMax),
+  "provincia": zod.string().max(createMyProfessionalProfileBodyUbicacionFijaProvinciaMax).nullish(),
+  "coordinates": zod.array(zod.number()).min(createMyProfessionalProfileBodyUbicacionFijaCoordinatesMin).max(createMyProfessionalProfileBodyUbicacionFijaCoordinatesMax).optional()
+}),
   "experienciaAnios": zod.number().min(createMyProfessionalProfileBodyExperienciaAniosMin).optional(),
   "about": zod.string().nullish(),
   "skills": zod.array(zod.string()).optional(),
@@ -1198,11 +1894,21 @@ export const CreateMyProfessionalProfileBody = zod.object({
   "matriculaHabilitante": zod.string().nullish()
 })
 
+export const createMyProfessionalProfileResponseVisibilityRankMin = 0;
+export const createMyProfessionalProfileResponseVisibilityRankMax = 1;
+
+
+
 export const CreateMyProfessionalProfileResponse = zod.object({
   "id": zod.number(),
   "usuarioId": zod.number(),
   "oficio": zod.string(),
   "categoria": zod.string(),
+  "ubicacionFija": zod.union([zod.object({
+  "direccionTexto": zod.string(),
+  "ciudad": zod.string(),
+  "provincia": zod.string().nullable()
+}),zod.null()]),
   "matriculaHabilitante": zod.string().nullish(),
   "verificado": zod.boolean(),
   "estadoVerificacion": zod.enum(['pending_verification', 'verified', 'rejected']),
@@ -1228,18 +1934,29 @@ export const CreateMyProfessionalProfileResponse = zod.object({
   "reviewsCount": zod.number(),
   "completedJobs": zod.number(),
   "recommendationsCount": zod.number(),
-  "distanceKm": zod.number().nullish().describe('Distancia aproximada en kilómetros; es null cuando la ubicación del profesional no tiene un heartbeat vigente (máximo 5 minutos).')
+  "visibilityRank": zod.number().min(createMyProfessionalProfileResponseVisibilityRankMin).max(createMyProfessionalProfileResponseVisibilityRankMax).optional().describe('Internal ordering tier; 1 means the profile is shown lower in discovery results.'),
+  "distanceKm": zod.number().nullish().describe('Distancia aproximada entre la ubicación en vivo del cliente y la ubicación fija del taller del profesional.')
 })
 
 
 /**
  * @summary Get current professional profile
  */
+export const getMyProfessionalProfileResponseOneVisibilityRankMin = 0;
+export const getMyProfessionalProfileResponseOneVisibilityRankMax = 1;
+
+
+
 export const GetMyProfessionalProfileResponse = zod.union([zod.object({
   "id": zod.number(),
   "usuarioId": zod.number(),
   "oficio": zod.string(),
   "categoria": zod.string(),
+  "ubicacionFija": zod.union([zod.object({
+  "direccionTexto": zod.string(),
+  "ciudad": zod.string(),
+  "provincia": zod.string().nullable()
+}),zod.null()]),
   "matriculaHabilitante": zod.string().nullish(),
   "verificado": zod.boolean(),
   "estadoVerificacion": zod.enum(['pending_verification', 'verified', 'rejected']),
@@ -1265,7 +1982,8 @@ export const GetMyProfessionalProfileResponse = zod.union([zod.object({
   "reviewsCount": zod.number(),
   "completedJobs": zod.number(),
   "recommendationsCount": zod.number(),
-  "distanceKm": zod.number().nullish().describe('Distancia aproximada en kilómetros; es null cuando la ubicación del profesional no tiene un heartbeat vigente (máximo 5 minutos).')
+  "visibilityRank": zod.number().min(getMyProfessionalProfileResponseOneVisibilityRankMin).max(getMyProfessionalProfileResponseOneVisibilityRankMax).optional().describe('Internal ordering tier; 1 means the profile is shown lower in discovery results.'),
+  "distanceKm": zod.number().nullish().describe('Distancia aproximada entre la ubicación en vivo del cliente y la ubicación fija del taller del profesional.')
 }),zod.null()])
 
 
@@ -1276,6 +1994,17 @@ export const updateMyProfessionalProfileBodyOficioMin = 2;
 
 export const updateMyProfessionalProfileBodyPrecioReferenciaMin = 0;
 
+export const updateMyProfessionalProfileBodyUbicacionFijaDireccionTextoMin = 3;
+export const updateMyProfessionalProfileBodyUbicacionFijaDireccionTextoMax = 200;
+
+export const updateMyProfessionalProfileBodyUbicacionFijaCiudadMin = 2;
+export const updateMyProfessionalProfileBodyUbicacionFijaCiudadMax = 100;
+
+export const updateMyProfessionalProfileBodyUbicacionFijaProvinciaMax = 100;
+
+export const updateMyProfessionalProfileBodyUbicacionFijaCoordinatesMin = 2;
+export const updateMyProfessionalProfileBodyUbicacionFijaCoordinatesMax = 2;
+
 export const updateMyProfessionalProfileBodyExperienciaAniosMin = 0;
 
 
@@ -1284,6 +2013,12 @@ export const UpdateMyProfessionalProfileBody = zod.object({
   "oficio": zod.string().min(updateMyProfessionalProfileBodyOficioMin),
   "categoria": zod.string(),
   "precioReferencia": zod.number().min(updateMyProfessionalProfileBodyPrecioReferenciaMin),
+  "ubicacionFija": zod.object({
+  "direccionTexto": zod.string().min(updateMyProfessionalProfileBodyUbicacionFijaDireccionTextoMin).max(updateMyProfessionalProfileBodyUbicacionFijaDireccionTextoMax),
+  "ciudad": zod.string().min(updateMyProfessionalProfileBodyUbicacionFijaCiudadMin).max(updateMyProfessionalProfileBodyUbicacionFijaCiudadMax),
+  "provincia": zod.string().max(updateMyProfessionalProfileBodyUbicacionFijaProvinciaMax).nullish(),
+  "coordinates": zod.array(zod.number()).min(updateMyProfessionalProfileBodyUbicacionFijaCoordinatesMin).max(updateMyProfessionalProfileBodyUbicacionFijaCoordinatesMax).optional()
+}),
   "experienciaAnios": zod.number().min(updateMyProfessionalProfileBodyExperienciaAniosMin).optional(),
   "about": zod.string().nullish(),
   "skills": zod.array(zod.string()).optional(),
@@ -1291,11 +2026,21 @@ export const UpdateMyProfessionalProfileBody = zod.object({
   "matriculaHabilitante": zod.string().nullish()
 })
 
+export const updateMyProfessionalProfileResponseVisibilityRankMin = 0;
+export const updateMyProfessionalProfileResponseVisibilityRankMax = 1;
+
+
+
 export const UpdateMyProfessionalProfileResponse = zod.object({
   "id": zod.number(),
   "usuarioId": zod.number(),
   "oficio": zod.string(),
   "categoria": zod.string(),
+  "ubicacionFija": zod.union([zod.object({
+  "direccionTexto": zod.string(),
+  "ciudad": zod.string(),
+  "provincia": zod.string().nullable()
+}),zod.null()]),
   "matriculaHabilitante": zod.string().nullish(),
   "verificado": zod.boolean(),
   "estadoVerificacion": zod.enum(['pending_verification', 'verified', 'rejected']),
@@ -1321,7 +2066,8 @@ export const UpdateMyProfessionalProfileResponse = zod.object({
   "reviewsCount": zod.number(),
   "completedJobs": zod.number(),
   "recommendationsCount": zod.number(),
-  "distanceKm": zod.number().nullish().describe('Distancia aproximada en kilómetros; es null cuando la ubicación del profesional no tiene un heartbeat vigente (máximo 5 minutos).')
+  "visibilityRank": zod.number().min(updateMyProfessionalProfileResponseVisibilityRankMin).max(updateMyProfessionalProfileResponseVisibilityRankMax).optional().describe('Internal ordering tier; 1 means the profile is shown lower in discovery results.'),
+  "distanceKm": zod.number().nullish().describe('Distancia aproximada entre la ubicación en vivo del cliente y la ubicación fija del taller del profesional.')
 })
 
 
@@ -1348,7 +2094,8 @@ export const CreateJobBody = zod.object({
   "categoria": zod.string().min(createJobBodyCategoriaMin),
   "precioOfrecido": zod.number().min(createJobBodyPrecioOfrecidoMin),
   "detalle": zod.string().min(createJobBodyDetalleMin).nullish(),
-  "profesionalId": zod.number().nullish()
+  "profesionalId": zod.number().nullish(),
+  "paymentMethod": zod.enum(['mercado_pago', 'efectivo']).optional()
 })
 
 export const CreateJobResponse = zod.object({
@@ -1366,7 +2113,10 @@ export const CreateJobResponse = zod.object({
   "categoria": zod.string(),
   "precioOfrecido": zod.number(),
   "detalle": zod.string().nullable(),
-  "estado": zod.enum(['publicada', 'aceptada', 'en_curso', 'finalizada', 'cancelada']),
+  "estado": zod.enum(['publicada', 'aceptada', 'en_curso', 'trabajo_realizado', 'finalizada', 'cancelada']),
+  "paymentMethod": zod.enum(['mercado_pago', 'efectivo']),
+  "cashConfirmedByClient": zod.boolean(),
+  "cashConfirmedByProfessional": zod.boolean(),
   "createdAt": zod.string(),
   "updatedAt": zod.string(),
   "cliente": zod.object({
@@ -1376,6 +2126,7 @@ export const CreateJobResponse = zod.object({
   "telefono": zod.string().nullish(),
   "fotoObjectPath": zod.string().nullish(),
   "rol": zod.enum(['cliente', 'profesional', 'admin']),
+  "clientVerified": zod.boolean().optional().describe('Present only in worker-facing views.'),
   "ubicacion": zod.union([zod.object({
   "direccionTexto": zod.string().optional(),
   "ciudad": zod.string().optional(),
@@ -1392,6 +2143,7 @@ export const CreateJobResponse = zod.object({
   "telefono": zod.string().nullish(),
   "fotoObjectPath": zod.string().nullish(),
   "rol": zod.enum(['cliente', 'profesional', 'admin']),
+  "clientVerified": zod.boolean().optional().describe('Present only in worker-facing views.'),
   "ubicacion": zod.union([zod.object({
   "direccionTexto": zod.string().optional(),
   "ciudad": zod.string().optional(),
@@ -1403,6 +2155,48 @@ export const CreateJobResponse = zod.object({
 }),zod.null()]),
   "calificada": zod.boolean()
 })
+
+
+/**
+ * @summary List the current client's payments
+ */
+export const ListMyPaymentsResponseItem = zod.object({
+  "id": zod.number(),
+  "changaId": zod.number(),
+  "amount": zod.number(),
+  "currency": zod.enum(['ARS']),
+  "status": zod.enum(['pendiente', 'iniciado', 'aprobado', 'rechazado', 'reembolsado']),
+  "checkoutUrl": zod.string().nullable(),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date()
+})
+export const ListMyPaymentsResponse = zod.array(ListMyPaymentsResponseItem)
+
+
+/**
+ * @summary Start or resume payment for a job marked as performed
+ */
+
+
+
+export const CreatePaymentCheckoutBody = zod.object({
+  "changaId": zod.number().min(1)
+})
+
+export const CreatePaymentCheckoutResponse = zod.object({
+  "id": zod.number(),
+  "changaId": zod.number(),
+  "amount": zod.number(),
+  "currency": zod.enum(['ARS']),
+  "status": zod.enum(['pendiente', 'iniciado', 'aprobado', 'rechazado', 'reembolsado']),
+  "checkoutUrl": zod.string()
+})
+
+
+/**
+ * @summary Verify a Mercado Pago payment notification
+ */
+export const ReceiveMercadoPagoWebhookResponse = zod.unknown()
 
 
 /**
@@ -1423,7 +2217,10 @@ export const ListMyJobsResponseItem = zod.object({
   "categoria": zod.string(),
   "precioOfrecido": zod.number(),
   "detalle": zod.string().nullable(),
-  "estado": zod.enum(['publicada', 'aceptada', 'en_curso', 'finalizada', 'cancelada']),
+  "estado": zod.enum(['publicada', 'aceptada', 'en_curso', 'trabajo_realizado', 'finalizada', 'cancelada']),
+  "paymentMethod": zod.enum(['mercado_pago', 'efectivo']),
+  "cashConfirmedByClient": zod.boolean(),
+  "cashConfirmedByProfessional": zod.boolean(),
   "createdAt": zod.string(),
   "updatedAt": zod.string(),
   "cliente": zod.object({
@@ -1433,6 +2230,7 @@ export const ListMyJobsResponseItem = zod.object({
   "telefono": zod.string().nullish(),
   "fotoObjectPath": zod.string().nullish(),
   "rol": zod.enum(['cliente', 'profesional', 'admin']),
+  "clientVerified": zod.boolean().optional().describe('Present only in worker-facing views.'),
   "ubicacion": zod.union([zod.object({
   "direccionTexto": zod.string().optional(),
   "ciudad": zod.string().optional(),
@@ -1449,6 +2247,7 @@ export const ListMyJobsResponseItem = zod.object({
   "telefono": zod.string().nullish(),
   "fotoObjectPath": zod.string().nullish(),
   "rol": zod.enum(['cliente', 'profesional', 'admin']),
+  "clientVerified": zod.boolean().optional().describe('Present only in worker-facing views.'),
   "ubicacion": zod.union([zod.object({
   "direccionTexto": zod.string().optional(),
   "ciudad": zod.string().optional(),
@@ -1481,7 +2280,10 @@ export const ListAvailableJobsResponseItem = zod.object({
   "categoria": zod.string(),
   "precioOfrecido": zod.number(),
   "detalle": zod.string().nullable(),
-  "estado": zod.enum(['publicada', 'aceptada', 'en_curso', 'finalizada', 'cancelada']),
+  "estado": zod.enum(['publicada', 'aceptada', 'en_curso', 'trabajo_realizado', 'finalizada', 'cancelada']),
+  "paymentMethod": zod.enum(['mercado_pago', 'efectivo']),
+  "cashConfirmedByClient": zod.boolean(),
+  "cashConfirmedByProfessional": zod.boolean(),
   "createdAt": zod.string(),
   "updatedAt": zod.string(),
   "cliente": zod.object({
@@ -1491,6 +2293,7 @@ export const ListAvailableJobsResponseItem = zod.object({
   "telefono": zod.string().nullish(),
   "fotoObjectPath": zod.string().nullish(),
   "rol": zod.enum(['cliente', 'profesional', 'admin']),
+  "clientVerified": zod.boolean().optional().describe('Present only in worker-facing views.'),
   "ubicacion": zod.union([zod.object({
   "direccionTexto": zod.string().optional(),
   "ciudad": zod.string().optional(),
@@ -1507,6 +2310,7 @@ export const ListAvailableJobsResponseItem = zod.object({
   "telefono": zod.string().nullish(),
   "fotoObjectPath": zod.string().nullish(),
   "rol": zod.enum(['cliente', 'profesional', 'admin']),
+  "clientVerified": zod.boolean().optional().describe('Present only in worker-facing views.'),
   "ubicacion": zod.union([zod.object({
   "direccionTexto": zod.string().optional(),
   "ciudad": zod.string().optional(),
@@ -1539,7 +2343,10 @@ export const ListAssignedJobsResponseItem = zod.object({
   "categoria": zod.string(),
   "precioOfrecido": zod.number(),
   "detalle": zod.string().nullable(),
-  "estado": zod.enum(['publicada', 'aceptada', 'en_curso', 'finalizada', 'cancelada']),
+  "estado": zod.enum(['publicada', 'aceptada', 'en_curso', 'trabajo_realizado', 'finalizada', 'cancelada']),
+  "paymentMethod": zod.enum(['mercado_pago', 'efectivo']),
+  "cashConfirmedByClient": zod.boolean(),
+  "cashConfirmedByProfessional": zod.boolean(),
   "createdAt": zod.string(),
   "updatedAt": zod.string(),
   "cliente": zod.object({
@@ -1549,6 +2356,7 @@ export const ListAssignedJobsResponseItem = zod.object({
   "telefono": zod.string().nullish(),
   "fotoObjectPath": zod.string().nullish(),
   "rol": zod.enum(['cliente', 'profesional', 'admin']),
+  "clientVerified": zod.boolean().optional().describe('Present only in worker-facing views.'),
   "ubicacion": zod.union([zod.object({
   "direccionTexto": zod.string().optional(),
   "ciudad": zod.string().optional(),
@@ -1565,6 +2373,7 @@ export const ListAssignedJobsResponseItem = zod.object({
   "telefono": zod.string().nullish(),
   "fotoObjectPath": zod.string().nullish(),
   "rol": zod.enum(['cliente', 'profesional', 'admin']),
+  "clientVerified": zod.boolean().optional().describe('Present only in worker-facing views.'),
   "ubicacion": zod.union([zod.object({
   "direccionTexto": zod.string().optional(),
   "ciudad": zod.string().optional(),
@@ -1577,6 +2386,28 @@ export const ListAssignedJobsResponseItem = zod.object({
   "calificada": zod.boolean()
 })
 export const ListAssignedJobsResponse = zod.array(ListAssignedJobsResponseItem)
+
+
+/**
+ * @summary Review a completed job as its client
+ */
+export const createJobReviewBodyRatingMax = 5;
+
+export const createJobReviewBodyComentarioMax = 2000;
+
+
+
+export const CreateJobReviewBody = zod.object({
+  "changaId": zod.number(),
+  "rating": zod.number().min(1).max(createJobReviewBodyRatingMax),
+  "comentario": zod.string().max(createJobReviewBodyComentarioMax).nullish()
+})
+
+export const CreateJobReviewResponse = zod.object({
+  "id": zod.number(),
+  "changaId": zod.number(),
+  "rating": zod.number()
+})
 
 
 /**
@@ -1601,7 +2432,10 @@ export const GetJobResponse = zod.object({
   "categoria": zod.string(),
   "precioOfrecido": zod.number(),
   "detalle": zod.string().nullable(),
-  "estado": zod.enum(['publicada', 'aceptada', 'en_curso', 'finalizada', 'cancelada']),
+  "estado": zod.enum(['publicada', 'aceptada', 'en_curso', 'trabajo_realizado', 'finalizada', 'cancelada']),
+  "paymentMethod": zod.enum(['mercado_pago', 'efectivo']),
+  "cashConfirmedByClient": zod.boolean(),
+  "cashConfirmedByProfessional": zod.boolean(),
   "createdAt": zod.string(),
   "updatedAt": zod.string(),
   "cliente": zod.object({
@@ -1611,6 +2445,7 @@ export const GetJobResponse = zod.object({
   "telefono": zod.string().nullish(),
   "fotoObjectPath": zod.string().nullish(),
   "rol": zod.enum(['cliente', 'profesional', 'admin']),
+  "clientVerified": zod.boolean().optional().describe('Present only in worker-facing views.'),
   "ubicacion": zod.union([zod.object({
   "direccionTexto": zod.string().optional(),
   "ciudad": zod.string().optional(),
@@ -1627,6 +2462,7 @@ export const GetJobResponse = zod.object({
   "telefono": zod.string().nullish(),
   "fotoObjectPath": zod.string().nullish(),
   "rol": zod.enum(['cliente', 'profesional', 'admin']),
+  "clientVerified": zod.boolean().optional().describe('Present only in worker-facing views.'),
   "ubicacion": zod.union([zod.object({
   "direccionTexto": zod.string().optional(),
   "ciudad": zod.string().optional(),
@@ -1641,14 +2477,35 @@ export const GetJobResponse = zod.object({
 
 
 /**
- * @summary Update job state
+ * @summary Update a job or its state
  */
 export const UpdateJobParams = zod.object({
   "id": zod.coerce.number()
 })
 
+export const updateJobBodyCategoriaMin = 2;
+
+export const updateJobBodyPrecioOfrecidoMin = 0;
+
+export const updateJobBodyDetalleMin = 3;
+
+
+
 export const UpdateJobBody = zod.object({
-  "estado": zod.enum(['publicada', 'aceptada', 'en_curso', 'finalizada', 'cancelada'])
+  "estado": zod.enum(['publicada', 'aceptada', 'en_curso', 'trabajo_realizado', 'finalizada', 'cancelada']).optional(),
+  "ubicacion": zod.object({
+  "direccionTexto": zod.string().optional(),
+  "ciudad": zod.string().optional(),
+  "provincia": zod.string().optional(),
+  "zona": zod.string().optional(),
+  "capturedAt": zod.coerce.date().nullish(),
+  "coordinates": zod.array(zod.number()).optional()
+}).optional(),
+  "categoria": zod.string().min(updateJobBodyCategoriaMin).optional(),
+  "precioOfrecido": zod.number().min(updateJobBodyPrecioOfrecidoMin).optional(),
+  "detalle": zod.string().min(updateJobBodyDetalleMin).nullish(),
+  "profesionalId": zod.number().nullish(),
+  "paymentMethod": zod.enum(['mercado_pago', 'efectivo']).optional()
 })
 
 export const UpdateJobResponse = zod.object({
@@ -1666,7 +2523,10 @@ export const UpdateJobResponse = zod.object({
   "categoria": zod.string(),
   "precioOfrecido": zod.number(),
   "detalle": zod.string().nullable(),
-  "estado": zod.enum(['publicada', 'aceptada', 'en_curso', 'finalizada', 'cancelada']),
+  "estado": zod.enum(['publicada', 'aceptada', 'en_curso', 'trabajo_realizado', 'finalizada', 'cancelada']),
+  "paymentMethod": zod.enum(['mercado_pago', 'efectivo']),
+  "cashConfirmedByClient": zod.boolean(),
+  "cashConfirmedByProfessional": zod.boolean(),
   "createdAt": zod.string(),
   "updatedAt": zod.string(),
   "cliente": zod.object({
@@ -1676,6 +2536,7 @@ export const UpdateJobResponse = zod.object({
   "telefono": zod.string().nullish(),
   "fotoObjectPath": zod.string().nullish(),
   "rol": zod.enum(['cliente', 'profesional', 'admin']),
+  "clientVerified": zod.boolean().optional().describe('Present only in worker-facing views.'),
   "ubicacion": zod.union([zod.object({
   "direccionTexto": zod.string().optional(),
   "ciudad": zod.string().optional(),
@@ -1692,6 +2553,150 @@ export const UpdateJobResponse = zod.object({
   "telefono": zod.string().nullish(),
   "fotoObjectPath": zod.string().nullish(),
   "rol": zod.enum(['cliente', 'profesional', 'admin']),
+  "clientVerified": zod.boolean().optional().describe('Present only in worker-facing views.'),
+  "ubicacion": zod.union([zod.object({
+  "direccionTexto": zod.string().optional(),
+  "ciudad": zod.string().optional(),
+  "provincia": zod.string().optional(),
+  "zona": zod.string().optional(),
+  "capturedAt": zod.coerce.date().nullish(),
+  "coordinates": zod.array(zod.number()).optional()
+}),zod.null()]).optional()
+}),zod.null()]),
+  "calificada": zod.boolean()
+})
+
+
+/**
+ * @summary Delete an inactive published job with no activity
+ */
+export const DeleteJobParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const DeleteJobResponse = zod.void()
+
+
+/**
+ * @summary Confirm the cash payment as one job participant
+ */
+export const ConfirmCashJobPaymentParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const ConfirmCashJobPaymentResponse = zod.object({
+  "id": zod.number(),
+  "clienteId": zod.number(),
+  "profesionalId": zod.number().nullable(),
+  "ubicacion": zod.object({
+  "direccionTexto": zod.string().optional(),
+  "ciudad": zod.string().optional(),
+  "provincia": zod.string().optional(),
+  "zona": zod.string().optional(),
+  "capturedAt": zod.coerce.date().nullish(),
+  "coordinates": zod.array(zod.number()).optional()
+}),
+  "categoria": zod.string(),
+  "precioOfrecido": zod.number(),
+  "detalle": zod.string().nullable(),
+  "estado": zod.enum(['publicada', 'aceptada', 'en_curso', 'trabajo_realizado', 'finalizada', 'cancelada']),
+  "paymentMethod": zod.enum(['mercado_pago', 'efectivo']),
+  "cashConfirmedByClient": zod.boolean(),
+  "cashConfirmedByProfessional": zod.boolean(),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string(),
+  "cliente": zod.object({
+  "id": zod.number(),
+  "nombre": zod.string(),
+  "email": zod.string(),
+  "telefono": zod.string().nullish(),
+  "fotoObjectPath": zod.string().nullish(),
+  "rol": zod.enum(['cliente', 'profesional', 'admin']),
+  "clientVerified": zod.boolean().optional().describe('Present only in worker-facing views.'),
+  "ubicacion": zod.union([zod.object({
+  "direccionTexto": zod.string().optional(),
+  "ciudad": zod.string().optional(),
+  "provincia": zod.string().optional(),
+  "zona": zod.string().optional(),
+  "capturedAt": zod.coerce.date().nullish(),
+  "coordinates": zod.array(zod.number()).optional()
+}),zod.null()]).optional()
+}),
+  "profesional": zod.union([zod.object({
+  "id": zod.number(),
+  "nombre": zod.string(),
+  "email": zod.string(),
+  "telefono": zod.string().nullish(),
+  "fotoObjectPath": zod.string().nullish(),
+  "rol": zod.enum(['cliente', 'profesional', 'admin']),
+  "clientVerified": zod.boolean().optional().describe('Present only in worker-facing views.'),
+  "ubicacion": zod.union([zod.object({
+  "direccionTexto": zod.string().optional(),
+  "ciudad": zod.string().optional(),
+  "provincia": zod.string().optional(),
+  "zona": zod.string().optional(),
+  "capturedAt": zod.coerce.date().nullish(),
+  "coordinates": zod.array(zod.number()).optional()
+}),zod.null()]).optional()
+}),zod.null()]),
+  "calificada": zod.boolean()
+})
+
+
+/**
+ * @summary Get a job within a professional conversation
+ */
+export const GetProfessionalThreadJobParams = zod.object({
+  "id": zod.coerce.number(),
+  "profesionalId": zod.coerce.number()
+})
+
+export const GetProfessionalThreadJobResponse = zod.object({
+  "id": zod.number(),
+  "clienteId": zod.number(),
+  "profesionalId": zod.number().nullable(),
+  "ubicacion": zod.object({
+  "direccionTexto": zod.string().optional(),
+  "ciudad": zod.string().optional(),
+  "provincia": zod.string().optional(),
+  "zona": zod.string().optional(),
+  "capturedAt": zod.coerce.date().nullish(),
+  "coordinates": zod.array(zod.number()).optional()
+}),
+  "categoria": zod.string(),
+  "precioOfrecido": zod.number(),
+  "detalle": zod.string().nullable(),
+  "estado": zod.enum(['publicada', 'aceptada', 'en_curso', 'trabajo_realizado', 'finalizada', 'cancelada']),
+  "paymentMethod": zod.enum(['mercado_pago', 'efectivo']),
+  "cashConfirmedByClient": zod.boolean(),
+  "cashConfirmedByProfessional": zod.boolean(),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string(),
+  "cliente": zod.object({
+  "id": zod.number(),
+  "nombre": zod.string(),
+  "email": zod.string(),
+  "telefono": zod.string().nullish(),
+  "fotoObjectPath": zod.string().nullish(),
+  "rol": zod.enum(['cliente', 'profesional', 'admin']),
+  "clientVerified": zod.boolean().optional().describe('Present only in worker-facing views.'),
+  "ubicacion": zod.union([zod.object({
+  "direccionTexto": zod.string().optional(),
+  "ciudad": zod.string().optional(),
+  "provincia": zod.string().optional(),
+  "zona": zod.string().optional(),
+  "capturedAt": zod.coerce.date().nullish(),
+  "coordinates": zod.array(zod.number()).optional()
+}),zod.null()]).optional()
+}),
+  "profesional": zod.union([zod.object({
+  "id": zod.number(),
+  "nombre": zod.string(),
+  "email": zod.string(),
+  "telefono": zod.string().nullish(),
+  "fotoObjectPath": zod.string().nullish(),
+  "rol": zod.enum(['cliente', 'profesional', 'admin']),
+  "clientVerified": zod.boolean().optional().describe('Present only in worker-facing views.'),
   "ubicacion": zod.union([zod.object({
   "direccionTexto": zod.string().optional(),
   "ciudad": zod.string().optional(),
@@ -1727,7 +2732,10 @@ export const AcceptJobResponse = zod.object({
   "categoria": zod.string(),
   "precioOfrecido": zod.number(),
   "detalle": zod.string().nullable(),
-  "estado": zod.enum(['publicada', 'aceptada', 'en_curso', 'finalizada', 'cancelada']),
+  "estado": zod.enum(['publicada', 'aceptada', 'en_curso', 'trabajo_realizado', 'finalizada', 'cancelada']),
+  "paymentMethod": zod.enum(['mercado_pago', 'efectivo']),
+  "cashConfirmedByClient": zod.boolean(),
+  "cashConfirmedByProfessional": zod.boolean(),
   "createdAt": zod.string(),
   "updatedAt": zod.string(),
   "cliente": zod.object({
@@ -1737,6 +2745,7 @@ export const AcceptJobResponse = zod.object({
   "telefono": zod.string().nullish(),
   "fotoObjectPath": zod.string().nullish(),
   "rol": zod.enum(['cliente', 'profesional', 'admin']),
+  "clientVerified": zod.boolean().optional().describe('Present only in worker-facing views.'),
   "ubicacion": zod.union([zod.object({
   "direccionTexto": zod.string().optional(),
   "ciudad": zod.string().optional(),
@@ -1753,6 +2762,7 @@ export const AcceptJobResponse = zod.object({
   "telefono": zod.string().nullish(),
   "fotoObjectPath": zod.string().nullish(),
   "rol": zod.enum(['cliente', 'profesional', 'admin']),
+  "clientVerified": zod.boolean().optional().describe('Present only in worker-facing views.'),
   "ubicacion": zod.union([zod.object({
   "direccionTexto": zod.string().optional(),
   "ciudad": zod.string().optional(),
@@ -1775,7 +2785,8 @@ export const ListConversationsQueryParams = zod.object({
 
 export const ListConversationsResponseItem = zod.object({
   "changaId": zod.number(),
-  "estado": zod.enum(['publicada', 'aceptada', 'en_curso', 'finalizada', 'cancelada']),
+  "profesionalId": zod.number().nullable(),
+  "estado": zod.enum(['publicada', 'aceptada', 'en_curso', 'trabajo_realizado', 'finalizada', 'cancelada']),
   "categoria": zod.string(),
   "detalle": zod.string().nullable(),
   "updatedAt": zod.string(),
@@ -1787,6 +2798,7 @@ export const ListConversationsResponseItem = zod.object({
   "telefono": zod.string().nullish(),
   "fotoObjectPath": zod.string().nullish(),
   "rol": zod.enum(['cliente', 'profesional', 'admin']),
+  "clientVerified": zod.boolean().optional().describe('Present only in worker-facing views.'),
   "ubicacion": zod.union([zod.object({
   "direccionTexto": zod.string().optional(),
   "ciudad": zod.string().optional(),
@@ -1814,6 +2826,7 @@ export const ListConversationsResponseItem = zod.object({
   "telefono": zod.string().nullish(),
   "fotoObjectPath": zod.string().nullish(),
   "rol": zod.enum(['cliente', 'profesional', 'admin']),
+  "clientVerified": zod.boolean().optional().describe('Present only in worker-facing views.'),
   "ubicacion": zod.union([zod.object({
   "direccionTexto": zod.string().optional(),
   "ciudad": zod.string().optional(),
@@ -1839,6 +2852,7 @@ export const ListMessagesResponseItem = zod.object({
   "id": zod.number(),
   "changaId": zod.number(),
   "emisorId": zod.number(),
+  "conversacionProfesionalId": zod.number().nullable(),
   "texto": zod.string(),
   "adjuntos": zod.array(zod.object({
   "objectPath": zod.string(),
@@ -1853,6 +2867,7 @@ export const ListMessagesResponseItem = zod.object({
   "telefono": zod.string().nullish(),
   "fotoObjectPath": zod.string().nullish(),
   "rol": zod.enum(['cliente', 'profesional', 'admin']),
+  "clientVerified": zod.boolean().optional().describe('Present only in worker-facing views.'),
   "ubicacion": zod.union([zod.object({
   "direccionTexto": zod.string().optional(),
   "ciudad": zod.string().optional(),
@@ -1884,13 +2899,15 @@ export const CreateMessageBody = zod.object({
   "adjuntos": zod.array(zod.object({
   "objectPath": zod.string(),
   "nombre": zod.string().optional()
-})).max(createMessageBodyAdjuntosMax).optional()
+})).max(createMessageBodyAdjuntosMax).optional(),
+  "profesionalId": zod.number().nullish()
 })
 
 export const CreateMessageResponse = zod.object({
   "id": zod.number(),
   "changaId": zod.number(),
   "emisorId": zod.number(),
+  "conversacionProfesionalId": zod.number().nullable(),
   "texto": zod.string(),
   "adjuntos": zod.array(zod.object({
   "objectPath": zod.string(),
@@ -1905,6 +2922,7 @@ export const CreateMessageResponse = zod.object({
   "telefono": zod.string().nullish(),
   "fotoObjectPath": zod.string().nullish(),
   "rol": zod.enum(['cliente', 'profesional', 'admin']),
+  "clientVerified": zod.boolean().optional().describe('Present only in worker-facing views.'),
   "ubicacion": zod.union([zod.object({
   "direccionTexto": zod.string().optional(),
   "ciudad": zod.string().optional(),
@@ -1915,6 +2933,113 @@ export const CreateMessageResponse = zod.object({
 }),zod.null()]).optional()
 })
 })
+
+
+/**
+ * @summary List messages for one professional and one job
+ */
+export const ListProfessionalThreadMessagesParams = zod.object({
+  "changaId": zod.coerce.number(),
+  "profesionalId": zod.coerce.number()
+})
+
+export const ListProfessionalThreadMessagesResponseItem = zod.object({
+  "id": zod.number(),
+  "changaId": zod.number(),
+  "emisorId": zod.number(),
+  "conversacionProfesionalId": zod.number().nullable(),
+  "texto": zod.string(),
+  "adjuntos": zod.array(zod.object({
+  "objectPath": zod.string(),
+  "nombre": zod.string().optional()
+})),
+  "leido": zod.boolean(),
+  "createdAt": zod.string(),
+  "emisor": zod.object({
+  "id": zod.number(),
+  "nombre": zod.string(),
+  "email": zod.string(),
+  "telefono": zod.string().nullish(),
+  "fotoObjectPath": zod.string().nullish(),
+  "rol": zod.enum(['cliente', 'profesional', 'admin']),
+  "clientVerified": zod.boolean().optional().describe('Present only in worker-facing views.'),
+  "ubicacion": zod.union([zod.object({
+  "direccionTexto": zod.string().optional(),
+  "ciudad": zod.string().optional(),
+  "provincia": zod.string().optional(),
+  "zona": zod.string().optional(),
+  "capturedAt": zod.coerce.date().nullish(),
+  "coordinates": zod.array(zod.number()).optional()
+}),zod.null()]).optional()
+})
+})
+export const ListProfessionalThreadMessagesResponse = zod.array(ListProfessionalThreadMessagesResponseItem)
+
+
+/**
+ * @summary Send a message in one professional thread
+ */
+export const CreateProfessionalThreadMessageParams = zod.object({
+  "changaId": zod.coerce.number(),
+  "profesionalId": zod.coerce.number()
+})
+
+export const createProfessionalThreadMessageBodyTextoMax = 1000;
+
+export const createProfessionalThreadMessageBodyAdjuntosMax = 5;
+
+
+
+export const CreateProfessionalThreadMessageBody = zod.object({
+  "texto": zod.string().min(1).max(createProfessionalThreadMessageBodyTextoMax),
+  "adjuntos": zod.array(zod.object({
+  "objectPath": zod.string(),
+  "nombre": zod.string().optional()
+})).max(createProfessionalThreadMessageBodyAdjuntosMax).optional(),
+  "profesionalId": zod.number().nullish()
+})
+
+export const CreateProfessionalThreadMessageResponse = zod.object({
+  "id": zod.number(),
+  "changaId": zod.number(),
+  "emisorId": zod.number(),
+  "conversacionProfesionalId": zod.number().nullable(),
+  "texto": zod.string(),
+  "adjuntos": zod.array(zod.object({
+  "objectPath": zod.string(),
+  "nombre": zod.string().optional()
+})),
+  "leido": zod.boolean(),
+  "createdAt": zod.string(),
+  "emisor": zod.object({
+  "id": zod.number(),
+  "nombre": zod.string(),
+  "email": zod.string(),
+  "telefono": zod.string().nullish(),
+  "fotoObjectPath": zod.string().nullish(),
+  "rol": zod.enum(['cliente', 'profesional', 'admin']),
+  "clientVerified": zod.boolean().optional().describe('Present only in worker-facing views.'),
+  "ubicacion": zod.union([zod.object({
+  "direccionTexto": zod.string().optional(),
+  "ciudad": zod.string().optional(),
+  "provincia": zod.string().optional(),
+  "zona": zod.string().optional(),
+  "capturedAt": zod.coerce.date().nullish(),
+  "coordinates": zod.array(zod.number()).optional()
+}),zod.null()]).optional()
+})
+})
+
+
+/**
+ * @summary Mark messages in one professional thread as read
+ */
+export const MarkProfessionalThreadMessagesReadParams = zod.object({
+  "changaId": zod.coerce.number(),
+  "profesionalId": zod.coerce.number()
+})
+
+export const MarkProfessionalThreadMessagesReadResponse = zod.void()
 
 
 /**
@@ -1941,7 +3066,22 @@ export const ListAppointmentsResponseItem = zod.object({
   "profesionalId": zod.number(),
   "empiezaAt": zod.coerce.date(),
   "terminaAt": zod.coerce.date().nullable(),
+  "tarifaVisita": zod.number(),
   "estado": zod.enum(['solicitada', 'confirmada', 'en_curso', 'completada', 'cancelada']),
+  "finanzas": zod.union([zod.object({
+  "amount": zod.number(),
+  "commissionAmount": zod.number(),
+  "partnerAmount": zod.number(),
+  "method": zod.enum(['mercado_pago', 'efectivo']),
+  "status": zod.enum(['checkout_started', 'pending_release', 'available', 'cash_pending_visit', 'cash_commission_due', 'cash_commission_settled', 'under_review', 'payment_failed', 'refunded']),
+  "partnerArrivedAt": zod.coerce.date().nullable(),
+  "completedAt": zod.coerce.date().nullable(),
+  "releaseAt": zod.coerce.date().nullable(),
+  "clientConfirmedAt": zod.coerce.date().nullable(),
+  "issueReportedAt": zod.coerce.date().nullable(),
+  "issueType": zod.string().nullable(),
+  "issueDetail": zod.string().nullable()
+}),zod.null()]),
   "createdAt": zod.coerce.date(),
   "updatedAt": zod.coerce.date()
 })
@@ -1955,9 +3095,14 @@ export const ProposeAppointmentParams = zod.object({
   "changaId": zod.coerce.number()
 })
 
+export const proposeAppointmentBodyTarifaVisitaMax = 10000000;
+
+
+
 export const ProposeAppointmentBody = zod.object({
   "empiezaAt": zod.coerce.date(),
-  "terminaAt": zod.coerce.date().nullish()
+  "terminaAt": zod.coerce.date().nullish(),
+  "tarifaVisita": zod.number().min(1).max(proposeAppointmentBodyTarifaVisitaMax)
 })
 
 export const ProposeAppointmentResponse = zod.object({
@@ -1967,7 +3112,22 @@ export const ProposeAppointmentResponse = zod.object({
   "profesionalId": zod.number(),
   "empiezaAt": zod.coerce.date(),
   "terminaAt": zod.coerce.date().nullable(),
+  "tarifaVisita": zod.number(),
   "estado": zod.enum(['solicitada', 'confirmada', 'en_curso', 'completada', 'cancelada']),
+  "finanzas": zod.union([zod.object({
+  "amount": zod.number(),
+  "commissionAmount": zod.number(),
+  "partnerAmount": zod.number(),
+  "method": zod.enum(['mercado_pago', 'efectivo']),
+  "status": zod.enum(['checkout_started', 'pending_release', 'available', 'cash_pending_visit', 'cash_commission_due', 'cash_commission_settled', 'under_review', 'payment_failed', 'refunded']),
+  "partnerArrivedAt": zod.coerce.date().nullable(),
+  "completedAt": zod.coerce.date().nullable(),
+  "releaseAt": zod.coerce.date().nullable(),
+  "clientConfirmedAt": zod.coerce.date().nullable(),
+  "issueReportedAt": zod.coerce.date().nullable(),
+  "issueType": zod.string().nullable(),
+  "issueDetail": zod.string().nullable()
+}),zod.null()]),
   "createdAt": zod.coerce.date(),
   "updatedAt": zod.coerce.date()
 })
@@ -2029,16 +3189,38 @@ export const AcceptAppointmentParams = zod.object({
   "id": zod.coerce.number()
 })
 
+export const AcceptAppointmentBody = zod.object({
+  "paymentMethod": zod.enum(['mercado_pago', 'efectivo'])
+})
+
 export const AcceptAppointmentResponse = zod.object({
+  "appointment": zod.object({
   "id": zod.number(),
   "changaId": zod.number(),
   "clienteId": zod.number(),
   "profesionalId": zod.number(),
   "empiezaAt": zod.coerce.date(),
   "terminaAt": zod.coerce.date().nullable(),
+  "tarifaVisita": zod.number(),
   "estado": zod.enum(['solicitada', 'confirmada', 'en_curso', 'completada', 'cancelada']),
+  "finanzas": zod.union([zod.object({
+  "amount": zod.number(),
+  "commissionAmount": zod.number(),
+  "partnerAmount": zod.number(),
+  "method": zod.enum(['mercado_pago', 'efectivo']),
+  "status": zod.enum(['checkout_started', 'pending_release', 'available', 'cash_pending_visit', 'cash_commission_due', 'cash_commission_settled', 'under_review', 'payment_failed', 'refunded']),
+  "partnerArrivedAt": zod.coerce.date().nullable(),
+  "completedAt": zod.coerce.date().nullable(),
+  "releaseAt": zod.coerce.date().nullable(),
+  "clientConfirmedAt": zod.coerce.date().nullable(),
+  "issueReportedAt": zod.coerce.date().nullable(),
+  "issueType": zod.string().nullable(),
+  "issueDetail": zod.string().nullable()
+}),zod.null()]),
   "createdAt": zod.coerce.date(),
   "updatedAt": zod.coerce.date()
+}),
+  "checkoutUrl": zod.string().nullable()
 })
 
 
@@ -2056,7 +3238,172 @@ export const RejectAppointmentResponse = zod.object({
   "profesionalId": zod.number(),
   "empiezaAt": zod.coerce.date(),
   "terminaAt": zod.coerce.date().nullable(),
+  "tarifaVisita": zod.number(),
   "estado": zod.enum(['solicitada', 'confirmada', 'en_curso', 'completada', 'cancelada']),
+  "finanzas": zod.union([zod.object({
+  "amount": zod.number(),
+  "commissionAmount": zod.number(),
+  "partnerAmount": zod.number(),
+  "method": zod.enum(['mercado_pago', 'efectivo']),
+  "status": zod.enum(['checkout_started', 'pending_release', 'available', 'cash_pending_visit', 'cash_commission_due', 'cash_commission_settled', 'under_review', 'payment_failed', 'refunded']),
+  "partnerArrivedAt": zod.coerce.date().nullable(),
+  "completedAt": zod.coerce.date().nullable(),
+  "releaseAt": zod.coerce.date().nullable(),
+  "clientConfirmedAt": zod.coerce.date().nullable(),
+  "issueReportedAt": zod.coerce.date().nullable(),
+  "issueType": zod.string().nullable(),
+  "issueDetail": zod.string().nullable()
+}),zod.null()]),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date()
+})
+
+
+/**
+ * @summary Record the Partner's arrival for a paid visit
+ */
+export const RecordVisitArrivalParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const RecordVisitArrivalResponse = zod.object({
+  "id": zod.number(),
+  "changaId": zod.number(),
+  "clienteId": zod.number(),
+  "profesionalId": zod.number(),
+  "empiezaAt": zod.coerce.date(),
+  "terminaAt": zod.coerce.date().nullable(),
+  "tarifaVisita": zod.number(),
+  "estado": zod.enum(['solicitada', 'confirmada', 'en_curso', 'completada', 'cancelada']),
+  "finanzas": zod.union([zod.object({
+  "amount": zod.number(),
+  "commissionAmount": zod.number(),
+  "partnerAmount": zod.number(),
+  "method": zod.enum(['mercado_pago', 'efectivo']),
+  "status": zod.enum(['checkout_started', 'pending_release', 'available', 'cash_pending_visit', 'cash_commission_due', 'cash_commission_settled', 'under_review', 'payment_failed', 'refunded']),
+  "partnerArrivedAt": zod.coerce.date().nullable(),
+  "completedAt": zod.coerce.date().nullable(),
+  "releaseAt": zod.coerce.date().nullable(),
+  "clientConfirmedAt": zod.coerce.date().nullable(),
+  "issueReportedAt": zod.coerce.date().nullable(),
+  "issueType": zod.string().nullable(),
+  "issueDetail": zod.string().nullable()
+}),zod.null()]),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date()
+})
+
+
+/**
+ * @summary Mark a visit completed and start the 24-hour review window
+ */
+export const CompleteVisitParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const CompleteVisitResponse = zod.object({
+  "id": zod.number(),
+  "changaId": zod.number(),
+  "clienteId": zod.number(),
+  "profesionalId": zod.number(),
+  "empiezaAt": zod.coerce.date(),
+  "terminaAt": zod.coerce.date().nullable(),
+  "tarifaVisita": zod.number(),
+  "estado": zod.enum(['solicitada', 'confirmada', 'en_curso', 'completada', 'cancelada']),
+  "finanzas": zod.union([zod.object({
+  "amount": zod.number(),
+  "commissionAmount": zod.number(),
+  "partnerAmount": zod.number(),
+  "method": zod.enum(['mercado_pago', 'efectivo']),
+  "status": zod.enum(['checkout_started', 'pending_release', 'available', 'cash_pending_visit', 'cash_commission_due', 'cash_commission_settled', 'under_review', 'payment_failed', 'refunded']),
+  "partnerArrivedAt": zod.coerce.date().nullable(),
+  "completedAt": zod.coerce.date().nullable(),
+  "releaseAt": zod.coerce.date().nullable(),
+  "clientConfirmedAt": zod.coerce.date().nullable(),
+  "issueReportedAt": zod.coerce.date().nullable(),
+  "issueType": zod.string().nullable(),
+  "issueDetail": zod.string().nullable()
+}),zod.null()]),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date()
+})
+
+
+/**
+ * @summary Confirm a visit and release the online balance early
+ */
+export const ConfirmVisitParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const ConfirmVisitResponse = zod.object({
+  "id": zod.number(),
+  "changaId": zod.number(),
+  "clienteId": zod.number(),
+  "profesionalId": zod.number(),
+  "empiezaAt": zod.coerce.date(),
+  "terminaAt": zod.coerce.date().nullable(),
+  "tarifaVisita": zod.number(),
+  "estado": zod.enum(['solicitada', 'confirmada', 'en_curso', 'completada', 'cancelada']),
+  "finanzas": zod.union([zod.object({
+  "amount": zod.number(),
+  "commissionAmount": zod.number(),
+  "partnerAmount": zod.number(),
+  "method": zod.enum(['mercado_pago', 'efectivo']),
+  "status": zod.enum(['checkout_started', 'pending_release', 'available', 'cash_pending_visit', 'cash_commission_due', 'cash_commission_settled', 'under_review', 'payment_failed', 'refunded']),
+  "partnerArrivedAt": zod.coerce.date().nullable(),
+  "completedAt": zod.coerce.date().nullable(),
+  "releaseAt": zod.coerce.date().nullable(),
+  "clientConfirmedAt": zod.coerce.date().nullable(),
+  "issueReportedAt": zod.coerce.date().nullable(),
+  "issueType": zod.string().nullable(),
+  "issueDetail": zod.string().nullable()
+}),zod.null()]),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date()
+})
+
+
+/**
+ * @summary Report a visit problem and hold its balance for review
+ */
+export const ReportVisitIssueParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const reportVisitIssueBodyDetailMin = 5;
+export const reportVisitIssueBodyDetailMax = 1000;
+
+
+
+export const ReportVisitIssueBody = zod.object({
+  "issueType": zod.enum(['partner_no_show', 'client_no_show', 'other']),
+  "detail": zod.string().min(reportVisitIssueBodyDetailMin).max(reportVisitIssueBodyDetailMax)
+})
+
+export const ReportVisitIssueResponse = zod.object({
+  "id": zod.number(),
+  "changaId": zod.number(),
+  "clienteId": zod.number(),
+  "profesionalId": zod.number(),
+  "empiezaAt": zod.coerce.date(),
+  "terminaAt": zod.coerce.date().nullable(),
+  "tarifaVisita": zod.number(),
+  "estado": zod.enum(['solicitada', 'confirmada', 'en_curso', 'completada', 'cancelada']),
+  "finanzas": zod.union([zod.object({
+  "amount": zod.number(),
+  "commissionAmount": zod.number(),
+  "partnerAmount": zod.number(),
+  "method": zod.enum(['mercado_pago', 'efectivo']),
+  "status": zod.enum(['checkout_started', 'pending_release', 'available', 'cash_pending_visit', 'cash_commission_due', 'cash_commission_settled', 'under_review', 'payment_failed', 'refunded']),
+  "partnerArrivedAt": zod.coerce.date().nullable(),
+  "completedAt": zod.coerce.date().nullable(),
+  "releaseAt": zod.coerce.date().nullable(),
+  "clientConfirmedAt": zod.coerce.date().nullable(),
+  "issueReportedAt": zod.coerce.date().nullable(),
+  "issueType": zod.string().nullable(),
+  "issueDetail": zod.string().nullable()
+}),zod.null()]),
   "createdAt": zod.coerce.date(),
   "updatedAt": zod.coerce.date()
 })
@@ -2068,12 +3415,22 @@ export const RejectAppointmentResponse = zod.object({
 export const ListNotificationsResponse = zod.object({
   "items": zod.array(zod.object({
   "id": zod.number(),
+  "changaId": zod.number().nullish(),
   "tipo": zod.string(),
   "titulo": zod.string(),
   "detalle": zod.string().nullable(),
   "href": zod.string().nullable(),
   "leida": zod.boolean(),
-  "createdAt": zod.coerce.date()
+  "createdAt": zod.coerce.date(),
+  "jobContext": zod.union([zod.object({
+  "changaId": zod.number(),
+  "price": zod.number(),
+  "paymentMethod": zod.enum(['mercado_pago', 'efectivo']),
+  "paymentStatus": zod.string(),
+  "paymentConfirmedAt": zod.coerce.date().nullable(),
+  "workerName": zod.string().nullable(),
+  "trade": zod.string().nullable()
+}),zod.null()]).optional()
 })),
   "unread": zod.number()
 })
@@ -2088,12 +3445,22 @@ export const MarkNotificationReadParams = zod.object({
 
 export const MarkNotificationReadResponse = zod.object({
   "id": zod.number(),
+  "changaId": zod.number().nullish(),
   "tipo": zod.string(),
   "titulo": zod.string(),
   "detalle": zod.string().nullable(),
   "href": zod.string().nullable(),
   "leida": zod.boolean(),
-  "createdAt": zod.coerce.date()
+  "createdAt": zod.coerce.date(),
+  "jobContext": zod.union([zod.object({
+  "changaId": zod.number(),
+  "price": zod.number(),
+  "paymentMethod": zod.enum(['mercado_pago', 'efectivo']),
+  "paymentStatus": zod.string(),
+  "paymentConfirmedAt": zod.coerce.date().nullable(),
+  "workerName": zod.string().nullable(),
+  "trade": zod.string().nullable()
+}),zod.null()]).optional()
 })
 
 
@@ -2122,7 +3489,10 @@ export const GetPartnerDashboardResponse = zod.object({
   "categoria": zod.string(),
   "precioOfrecido": zod.number(),
   "detalle": zod.string().nullable(),
-  "estado": zod.enum(['publicada', 'aceptada', 'en_curso', 'finalizada', 'cancelada']),
+  "estado": zod.enum(['publicada', 'aceptada', 'en_curso', 'trabajo_realizado', 'finalizada', 'cancelada']),
+  "paymentMethod": zod.enum(['mercado_pago', 'efectivo']),
+  "cashConfirmedByClient": zod.boolean(),
+  "cashConfirmedByProfessional": zod.boolean(),
   "createdAt": zod.string(),
   "updatedAt": zod.string(),
   "cliente": zod.object({
@@ -2132,6 +3502,7 @@ export const GetPartnerDashboardResponse = zod.object({
   "telefono": zod.string().nullish(),
   "fotoObjectPath": zod.string().nullish(),
   "rol": zod.enum(['cliente', 'profesional', 'admin']),
+  "clientVerified": zod.boolean().optional().describe('Present only in worker-facing views.'),
   "ubicacion": zod.union([zod.object({
   "direccionTexto": zod.string().optional(),
   "ciudad": zod.string().optional(),
@@ -2148,6 +3519,7 @@ export const GetPartnerDashboardResponse = zod.object({
   "telefono": zod.string().nullish(),
   "fotoObjectPath": zod.string().nullish(),
   "rol": zod.enum(['cliente', 'profesional', 'admin']),
+  "clientVerified": zod.boolean().optional().describe('Present only in worker-facing views.'),
   "ubicacion": zod.union([zod.object({
   "direccionTexto": zod.string().optional(),
   "ciudad": zod.string().optional(),
@@ -2169,6 +3541,55 @@ export const GetPartnerDashboardResponse = zod.object({
   "id": zod.number()
 })),
   "notificacionesNoLeidas": zod.number()
+})
+
+
+/**
+ * @summary Get the Partner balance and outstanding commissions
+ */
+export const GetPartnerVisitBalanceResponse = zod.object({
+  "availableAmount": zod.number(),
+  "pendingAmount": zod.number(),
+  "cashCommissionDue": zod.number(),
+  "cashJobCommissionDue": zod.number(),
+  "items": zod.array(zod.object({
+  "bookingId": zod.number(),
+  "amount": zod.number(),
+  "commissionAmount": zod.number(),
+  "partnerAmount": zod.number(),
+  "method": zod.enum(['mercado_pago', 'efectivo']),
+  "status": zod.string(),
+  "releaseAt": zod.coerce.date().nullable(),
+  "createdAt": zod.coerce.date()
+})),
+  "cashJobCommissions": zod.array(zod.object({
+  "changaId": zod.number(),
+  "commissionRate": zod.number(),
+  "amount": zod.number(),
+  "remainingAmount": zod.number(),
+  "status": zod.enum(['due', 'settled']),
+  "createdAt": zod.coerce.date(),
+  "settledAt": zod.coerce.date().nullable()
+}))
+})
+
+
+/**
+ * Returns active false until a real job payment is confirmed in production.
+ * @summary Get the active recommendation ranking status for the Partner
+ */
+export const GetPartnerRecommendationRankingResponse = zod.object({
+  "active": zod.boolean(),
+  "windowDays": zod.number().optional(),
+  "incidentThreshold": zod.number().optional(),
+  "confirmedRecentIncidentCount": zod.number().optional(),
+  "cashVisitCommissionDue": zod.number().optional(),
+  "visibilityAdjusted": zod.boolean().optional(),
+  "incidents": zod.array(zod.object({
+  "jobId": zod.number(),
+  "category": zod.string(),
+  "reviewedAt": zod.coerce.date()
+})).optional()
 })
 
 

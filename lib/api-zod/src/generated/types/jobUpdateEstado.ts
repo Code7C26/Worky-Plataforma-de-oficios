@@ -13,6 +13,7 @@ export const JobUpdateEstado = {
   publicada: 'publicada',
   aceptada: 'aceptada',
   en_curso: 'en_curso',
+  trabajo_realizado: 'trabajo_realizado',
   finalizada: 'finalizada',
   cancelada: 'cancelada',
 } as const;

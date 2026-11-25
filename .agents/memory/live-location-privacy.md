@@ -1,10 +1,12 @@
 ---
-name: Live location privacy
-description: Durable decisions for continuously tracking professional locations without exposing exact coordinates.
+name: Location privacy and distance
+description: Worky's fixed professional workshop address, private coordinates, and one-shot client location rules.
 ---
 
-Use browser geolocation only for an authenticated professional with a professional profile. Combine `watchPosition` with a low-frequency heartbeat because browsers may not emit a new position when the person is stationary. Pause the watcher while offline and clean it up on session or component teardown.
+Professionals have a fixed workshop/base location captured during professional setup or profile updates. The exact street address, city, and province are public on the professional profile, as explicitly chosen by the user; the precise map coordinates remain private and are used only to calculate approximate client-to-workshop distance. Do not continuously track professionals.
 
-**Why:** Public professional responses must never expose exact coordinates; the server needs the private coordinates only to calculate approximate distance. A timestamped heartbeat also makes stale-location handling possible later.
+Clients may grant one-time foreground location access while searching. Send those live coordinates only with the search request to calculate distance; do not persist them to the account or expose them to professionals.
 
-**How to apply:** Keep location updates behind an authenticated endpoint, validate longitude/latitude bounds server-side, and preserve non-coordinate profile location fields when updating the JSON location object.
+**Why:** The user wants customers to see the distance to a professional's fixed place of work, while protecting precise map coordinates and avoiding persistent tracking.
+
+**How to apply:** Require the fixed address when creating/updating a professional profile, validate coordinate bounds server-side, strip precise coordinates from API responses, and keep client location ephemeral.

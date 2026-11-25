@@ -9,7 +9,7 @@ args = ["pnpm", "run", "build:worky"]
 env = { "CI" = "true" }
 
 [deployment.postBuild]
-args = ["pnpm", "store", "prune"]
+args = ["bash", "scripts/prepare-deployment-runtime.sh"]
 env = { "CI" = "true" }
 
 [workflows]
@@ -45,7 +45,7 @@ timeoutMs = 120000
 
 [nix]
 channel = "stable-25_05"
-packages = ["glib", "nss", "nspr", "atk", "cups", "dbus", "expat", "fontconfig", "freetype", "gdk-pixbuf", "gtk3", "pango", "xorg.libX11", "xorg.libXcomposite", "xorg.libXdamage", "xorg.libXext", "xorg.libXfixes", "xorg.libXrandr", "xorg.libxcb", "xorg.libxshmfence", "libgbm", "libxkbcommon", "alsa-lib"]
+packages = ["alsa-lib", "atk", "cmake", "cups", "dbus", "expat", "fontconfig", "freetype", "gdk-pixbuf", "glib", "gtk3", "jdk17", "libgbm", "libsndfile", "libxkbcommon", "ninja", "nspr", "nss", "pango", "patchelf", "unzip", "xorg.libX11", "xorg.libXcomposite", "xorg.libXdamage", "xorg.libXext", "xorg.libXfixes", "xorg.libXrandr", "xorg.libxcb", "xorg.libxshmfence"]
 
 [objectStorage]
 defaultBucketID = "replit-objstore-29e3169f-edfe-4d69-96a3-6b526b73cb71"
@@ -54,3 +54,11 @@ defaultBucketID = "replit-objstore-29e3169f-edfe-4d69-96a3-6b526b73cb71"
 
 [userenv.production]
 RESEND_FROM_EMAIL = "no-reply@worky.devs.surf"
+WORKY_ADMIN_SIGNUP_ALLOWED_EMAILS = "mateovillarreal1809@gmail.com"
+WORKY_ADMIN_GMAIL_USER = "santiagoromero705@gmail.com"
+
+[userenv.shared]
+
+[userenv.development]
+WORKY_ADMIN_GMAIL_USER = "mateovillarreal1809@gmail.com"
+WORKY_ADMIN_SIGNUP_ALLOWED_EMAILS = "mateovillarreal1809@gmail.com,santiromero705@gmail.com"

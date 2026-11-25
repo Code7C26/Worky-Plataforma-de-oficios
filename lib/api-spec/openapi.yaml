@@ -58,6 +58,42 @@ paths:
               schema: { $ref: "#/components/schemas/AdminAccountPage" }
         "401": { description: Authentication required }
         "403": { description: Administrator access required }
+  /admin/admins:
+    get:
+      operationId: listAdminManagers
+      tags: [admin]
+      summary: List administrator accounts for the primary administrator
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Delegated administrator accounts and primary-account status
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AdminManagerPage" }
+        "401": { description: Authentication required }
+        "403": { description: Administrator access required }
+  /admin/admins/{id}/role:
+    patch:
+      operationId: revokeAdminRole
+      tags: [admin]
+      summary: Remove an administrator role
+      security:
+        - bearerAuth: []
+      parameters:
+        - { in: path, name: id, required: true, schema: { type: number } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AdminRoleRevokeInput" }
+      responses:
+        "200": { description: Administrator role removed }
+        "400": { description: Invalid request }
+        "401": { description: Authentication required }
+        "403": { description: Primary administrator required }
+        "404": { description: Account not found }
+        "409": { description: Account cannot be changed }
   /admin/accounts/{id}/status:
     patch:
       operationId: updateAdminAccountStatus
@@ -83,6 +119,48 @@ paths:
         "403": { description: Administrator access required }
         "404": { description: Account not found }
         "409": { description: Account cannot be changed }
+  /admin/cuentas/rol:
+    patch:
+      operationId: grantAdminRole
+      tags: [admin]
+      summary: Assign the administrator role to a verified active account
+      description: Requires the configured primary administrator and records an audit event.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AdminRoleGrantInput" }
+      responses:
+        "200":
+          description: Role assigned or unchanged if the account was already an administrator
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AdminRoleGrantResult" }
+        "400": { description: "Invalid email, reason, or fields" }
+        "401": { description: Authentication required }
+        "403": { description: Administrator role required }
+        "404": { description: Account not found }
+        "409": { description: "Account is disabled, unverified, or changed concurrently" }
+  /admin/partner-applications:
+    get:
+      operationId: listAdminPartnerApplications
+      tags: [admin]
+      summary: Solicitudes de habilitación agrupadas por perfil con documentación privada
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: page, in: query, schema: { type: number, default: 1 } }
+        - { name: limit, in: query, schema: { type: number, default: 20 } }
+        - { name: search, in: query, schema: { type: string } }
+      responses:
+        "200":
+          description: Perfiles sin habilitar y todos sus documentos, incluidos los ya revisados
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AdminPartnerApplicationPage" }
+        "401": { description: Sesión requerida }
+        "403": { description: Se requiere rol admin }
   /admin/partners:
     get:
       operationId: listAdminPartners
@@ -209,6 +287,49 @@ paths:
               schema: { $ref: "#/components/schemas/AdminSettlementPage" }
         "401": { description: Authentication required }
         "403": { description: Administrator access required }
+  /admin/visits:
+    get:
+      operationId: listAdminVisitPayments
+      tags: [admin]
+      summary: Search visit payments and reports
+      security:
+        - bearerAuth: []
+      parameters:
+        - { in: query, name: status, schema: { type: string } }
+        - { in: query, name: page, schema: { type: number, minimum: 1 } }
+        - { in: query, name: limit, schema: { type: number, minimum: 1, maximum: 100 } }
+      responses:
+        "200":
+          description: Visit payment records
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AdminVisitPaymentPage" }
+        "401": { description: Authentication required }
+        "403": { description: Administrator access required }
+  /admin/visits/{id}/resolver:
+    post:
+      operationId: resolveAdminVisitPayment
+      tags: [admin]
+      summary: Release a held visit balance after review
+      security:
+        - bearerAuth: []
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: number } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AdminVisitResolutionInput" }
+      responses:
+        "200":
+          description: Visit balance released
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AdminVisitPayment" }
+        "400": { description: Invalid resolution }
+        "403": { description: Administrator access required }
+        "404": { description: Visit payment not found }
+        "409": { description: Visit payment cannot be released }
   /admin/reviews:
     get:
       operationId: listAdminReviews
@@ -272,6 +393,47 @@ paths:
         "401": { description: Authentication required }
         "403": { description: Administrator access required }
         "404": { description: Recommendation not found }
+  /admin/ranking:
+    get:
+      operationId: getAdminRecommendationRanking
+      tags: [admin]
+      summary: Get the production-gated recommendation ranking review queue
+      description: Returns no signals until a real, confirmed job payment exists in the production environment.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Ranking activation, review candidates, and recent decisions
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AdminRecommendationRanking" }
+        "401": { description: Authentication required }
+        "403": { description: Administrator access required }
+  /admin/ranking/incidents/{jobId}:
+    post:
+      operationId: reviewAdminRecommendationRankingIncident
+      tags: [admin]
+      summary: Confirm or dismiss a structured activity signal
+      security:
+        - bearerAuth: []
+      parameters:
+        - { in: path, name: jobId, required: true, schema: { type: number } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AdminRecommendationIncidentDecisionInput" }
+      responses:
+        "200":
+          description: Review decision recorded in the audit history
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AdminRecommendationIncidentDecisionResult" }
+        "400": { description: Invalid decision or reason }
+        "401": { description: Authentication required }
+        "403": { description: Administrator access required }
+        "404": { description: Job not found }
+        "409": { description: Signal is no longer reviewable or ranking is inactive }
   /admin/catalog:
     get:
       operationId: listAdminCatalog
@@ -416,6 +578,70 @@ paths:
         "401": { description: Authentication required }
         "403": { description: Administrator access required }
         "404": { description: Verification document not found }
+  /admin/client-verifications:
+    get:
+      operationId: listAdminClientVerifications
+      tags: [admin]
+      summary: List customer identity requests awaiting private review
+      security:
+        - bearerAuth: []
+      parameters:
+        - { in: query, name: page, schema: { type: number, minimum: 1 } }
+        - { in: query, name: limit, schema: { type: number, minimum: 1, maximum: 100 } }
+        - { in: query, name: search, schema: { type: string, maxLength: 120 } }
+      responses:
+        "200":
+          description: Pending customer identity cases without private file paths
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AdminClientIdentityVerificationPage" }
+        "401": { description: Authentication required }
+        "403": { description: Administrator access required }
+  /admin/client-verifications/{id}:
+    patch:
+      operationId: reviewAdminClientVerification
+      tags: [admin]
+      summary: Approve or reject a customer identity request and delete its files
+      security:
+        - bearerAuth: []
+      parameters:
+        - { in: path, name: id, required: true, schema: { type: number } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AdminClientIdentityVerificationReviewInput" }
+      responses:
+        "200":
+          description: Final identity decision after private images are deleted
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ClientIdentityVerificationStatus" }
+        "400": { description: Invalid decision or rejection reason }
+        "401": { description: Authentication required }
+        "403": { description: Administrator access required }
+        "404": { description: Identity request not found }
+        "409": { description: The request is not awaiting review }
+        "500": { description: Files could not be deleted; the decision remains queued for retry }
+  /admin/client-verifications/{id}/files/{kind}:
+    get:
+      operationId: getAdminClientVerificationFile
+      tags: [admin]
+      summary: Stream one private customer identity image to an administrator
+      security:
+        - bearerAuth: []
+      parameters:
+        - { in: path, name: id, required: true, schema: { type: number } }
+        - { in: path, name: kind, required: true, schema: { type: string, enum: [dni, selfie] } }
+      responses:
+        "200":
+          description: Private image, streamed with no-store cache policy
+          content:
+            application/octet-stream:
+              schema: { type: string, format: binary }
+        "401": { description: Authentication required }
+        "403": { description: Administrator access required }
+        "404": { description: Image not found }
         "409": { description: Verification document already resolved }
   /healthz:
     get:
@@ -453,20 +679,59 @@ paths:
     post:
       operationId: registerAccount
       tags: [auth]
-      summary: Create an account
+      summary: Create an account and send an email verification code
       requestBody:
         required: true
         content:
           application/json:
             schema: { $ref: "#/components/schemas/AuthRegisterInput" }
       responses:
-        "201":
-          description: Created account and session
+        "202":
+          description: Account created; email verification is required before sign-in
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EmailVerificationMessage" }
+        "400": { description: Invalid registration data }
+        "409": { description: Email already in use }
+        "429": { description: Verification code delivery is temporarily throttled }
+        "503": { description: Email verification delivery unavailable }
+  /auth/email-verification/registration/request:
+    post:
+      operationId: requestRegistrationEmailVerification
+      tags: [auth]
+      summary: Resend a registration email verification code
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/RegistrationEmailVerificationRequest" }
+      responses:
+        "202":
+          description: Request accepted
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EmailVerificationMessage" }
+        "400": { description: Invalid email }
+        "429": { description: Too many requests }
+        "503": { description: Email verification delivery unavailable }
+  /auth/email-verification/registration/confirm:
+    post:
+      operationId: confirmRegistrationEmailVerification
+      tags: [auth]
+      summary: Confirm a registration code and create a session
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/RegistrationEmailVerificationConfirmation" }
+      responses:
+        "200":
+          description: Verified account session
           content:
             application/json:
               schema: { $ref: "#/components/schemas/AuthSession" }
-        "400": { description: Invalid registration data }
-        "409": { description: Email already in use }
+        "400": { description: "Invalid, expired, or already used code" }
+        "429": { description: Too many attempts }
   /auth/email-verification/account/request:
     post:
       operationId: requestAccountEmailVerification
@@ -569,7 +834,136 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/AuthSession" }
+        "202":
+          description: Email verification required for this sign-in
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/TwoFactorLoginChallenge" }
         "401": { description: Invalid email or password }
+        "403": { description: Email verification required }
+  /auth/login/verify:
+    post:
+      operationId: verifyTwoFactorLogin
+      tags: [auth]
+      summary: Verify an email code for a sign-in
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/TwoFactorLoginVerification" }
+      responses:
+        "200":
+          description: Account session
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AuthSession" }
+        "400": { description: "Invalid, expired, or already-used code" }
+        "429": { description: Too many attempts }
+  /auth/security/two-factor:
+    get:
+      operationId: getTwoFactorSecurity
+      tags: [auth]
+      summary: Get two-factor security status
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Two-factor status
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/TwoFactorSecurityStatus" }
+        "401": { description: Authentication required }
+    put:
+      operationId: updateTwoFactorSecurity
+      tags: [auth]
+      summary: Enable or disable email two-factor verification
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/TwoFactorSecurityUpdate" }
+      responses:
+        "200":
+          description: Updated security status
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/TwoFactorSecurityStatus" }
+        "400": { description: Invalid request or unverified email }
+        "401": { description: Current password did not match }
+  /auth/mobile-login/request:
+    post:
+      operationId: requestMobileDeviceLogin
+      tags: [auth]
+      summary: Sign in on a trusted mobile installation or request a one-time code
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/MobileDeviceLoginRequest" }
+      responses:
+        "200":
+          description: Session issued for a previously verified device
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/MobileDeviceLoginResult" }
+        "202":
+          description: Code sent to verify this mobile installation
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/MobileDeviceLoginResult" }
+        "401": { description: Invalid email or password }
+        "403": { description: Email verification required }
+        "429": { description: Too many attempts }
+        "503": { description: Code delivery unavailable }
+  /auth/mobile-login/confirm:
+    post:
+      operationId: confirmMobileDeviceLogin
+      tags: [auth]
+      summary: Confirm a one-time code and trust the mobile installation
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/MobileDeviceLoginConfirmation" }
+      responses:
+        "200":
+          description: Session issued and device trusted
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AuthSession" }
+        "400": { description: Invalid or expired code }
+        "429": { description: Too many attempts }
+        "503": { description: Code delivery unavailable }
+  /auth/mobile-devices:
+    get:
+      operationId: listMyTrustedMobileDevices
+      tags: [auth]
+      summary: List trusted mobile installations for the current account
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          description: Trusted installations without internal database identifiers
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/MobileTrustedDevices" }
+        "401": { description: Authentication required }
+  /auth/mobile-devices/{deviceKey}:
+    delete:
+      operationId: revokeMyTrustedMobileDevice
+      tags: [auth]
+      summary: Revoke a trusted mobile installation for the current account
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - in: path
+          name: deviceKey
+          required: true
+          schema: { type: string, pattern: "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$" }
+      responses:
+        "204": { description: Trusted installation revoked }
+        "401": { description: Authentication required }
+        "404": { description: Installation not found for the current account }
   /auth/logout:
     post:
       operationId: logoutAccount
@@ -578,24 +972,6 @@ paths:
       responses:
         "204": { description: Session ended }
         "401": { description: Invalid session }
-  /auth/location:
-    patch:
-      operationId: updateProfessionalLocation
-      tags: [professionals]
-      summary: Update the current professional's live location
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema: { $ref: "#/components/schemas/ProfessionalLocationUpdate" }
-      responses:
-        "200":
-          description: Updated live location
-          content:
-            application/json:
-              schema: { $ref: "#/components/schemas/ProfessionalLocation" }
-        "400": { description: Invalid coordinates }
-        "403": { description: Only professionals can update a live location }
   /auth/me:
     get:
       operationId: getMyAccount
@@ -626,6 +1002,77 @@ paths:
         "400": { description: Invalid account data }
         "401": { description: Current password required or invalid session }
         "409": { description: Email already in use }
+  /auth/client-verification:
+    get:
+      operationId: getClientIdentityVerificationStatus
+      tags: [auth]
+      summary: Read the current customer's identity verification status
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Status only; private images and file paths are never returned
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ClientIdentityVerificationStatus" }
+        "401": { description: Authentication required }
+        "403": { description: Customer role required }
+    post:
+      operationId: submitClientIdentityVerification
+      tags: [auth]
+      summary: Submit a DNI photo and selfie for private Worky review
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/SubmitClientIdentityVerificationInput" }
+      responses:
+        "201":
+          description: Request submitted for review
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ClientIdentityVerificationStatus" }
+        "400": { description: Invalid or unreadable image }
+        "401": { description: Authentication required }
+        "403": { description: Customer role required }
+        "409": { description: A request is already being reviewed or identity is verified }
+  /auth/profile-photo:
+    post:
+      operationId: updateMyProfilePhoto
+      tags: [auth]
+      summary: Set the authenticated account profile photo from an uploaded source image
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ProfilePhotoUpdateInput" }
+      responses:
+        "200":
+          description: Profile photo saved
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ProfilePhotoUpdateResult" }
+        "400": { description: Invalid or missing uploaded source image }
+        "401": { description: Authentication required }
+        "500": { description: Could not save profile photo }
+    delete:
+      operationId: deleteMyProfilePhoto
+      tags: [auth]
+      summary: Remove the authenticated account profile photo
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Profile photo removed
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ProfilePhotoRemovalResult" }
+        "401": { description: Authentication required }
+        "500": { description: Could not remove profile photo }
   /auth/role:
     patch:
       operationId: switchAccountRole
@@ -827,6 +1274,57 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Job" }
+  /pagos:
+    get:
+      operationId: listMyPayments
+      tags: [jobs]
+      summary: List the current client's payments
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          description: Payment status for the current client's jobs
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/ClientPayment" }
+        "401": { description: Authentication required }
+    post:
+      operationId: createPaymentCheckout
+      tags: [jobs]
+      summary: Start or resume payment for a job marked as performed
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/PaymentCheckoutInput" }
+      responses:
+        "200":
+          description: Existing checkout resumed
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PaymentCheckout" }
+        "201":
+          description: Checkout created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PaymentCheckout" }
+        "400": { description: Invalid job identifier }
+        "401": { description: Authentication required }
+        "403": { description: Only the job's client can pay }
+        "409": { description: Job is not payable or already paid }
+        "502": { description: Mercado Pago checkout could not be created }
+        "503": { description: Payment provider is not configured }
+  /webhooks/mercadopago:
+    post:
+      operationId: receiveMercadoPagoWebhook
+      tags: [jobs]
+      summary: Verify a Mercado Pago payment notification
+      responses:
+        "200": { description: Notification acknowledged }
+        "401": { description: Invalid webhook signature }
+        "503": { description: Webhook verification is not configured }
   /trabajos/mias:
     get:
       operationId: listMyJobs
@@ -866,6 +1364,29 @@ paths:
               schema:
                 type: array
                 items: { $ref: "#/components/schemas/Job" }
+  /reviews:
+    post:
+      operationId: createJobReview
+      tags: [jobs]
+      summary: Review a completed job as its client
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/JobReviewInput"
+      responses:
+        "201":
+          description: Review saved
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [id, changaId, rating]
+                properties:
+                  id: { type: number }
+                  changaId: { type: number }
+                  rating: { type: number }
   /trabajos/{id}:
     get:
       operationId: getJob
@@ -885,7 +1406,7 @@ paths:
     patch:
       operationId: updateJob
       tags: [jobs]
-      summary: Update job state
+      summary: Update a job or its state
       parameters:
         - name: id
           in: path
@@ -902,6 +1423,54 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Job" }
+    delete:
+      operationId: deleteJob
+      tags: [jobs]
+      summary: Delete an inactive published job with no activity
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: number }
+      responses:
+        "204": { description: Job deleted }
+        "403": { description: Job owner access required }
+        "404": { description: Job not found }
+        "409": { description: Job has activity or is no longer editable }
+  /trabajos/{id}/confirmar-pago-efectivo:
+    post:
+      operationId: confirmCashJobPayment
+      tags: [jobs]
+      summary: Confirm the cash payment as one job participant
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: number }
+      responses:
+        "200":
+          description: Cash confirmation recorded
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Job" }
+        "401": { description: Authentication required }
+        "403": { description: Only a job participant can confirm }
+        "409": { description: Job is not awaiting cash confirmation }
+  /trabajos/{id}/hilos/{profesionalId}:
+    get:
+      operationId: getProfessionalThreadJob
+      tags: [jobs]
+      summary: Get a job within a professional conversation
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: number } }
+        - { name: profesionalId, in: path, required: true, schema: { type: number } }
+      responses:
+        "200":
+          description: Job for a conversation
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Job" }
+        "403": { description: Conversation access required }
   /trabajos/{id}/aceptar:
     patch:
       operationId: acceptJob
@@ -973,6 +1542,53 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/ChatMessage" }
+  /chats/{changaId}/hilos/{profesionalId}/mensajes:
+    get:
+      operationId: listProfessionalThreadMessages
+      tags: [messages]
+      summary: List messages for one professional and one job
+      parameters:
+        - { name: changaId, in: path, required: true, schema: { type: number } }
+        - { name: profesionalId, in: path, required: true, schema: { type: number } }
+      responses:
+        "200":
+          description: Conversation messages
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/ChatMessage" }
+        "403": { description: Conversation access required }
+    post:
+      operationId: createProfessionalThreadMessage
+      tags: [messages]
+      summary: Send a message in one professional thread
+      parameters:
+        - { name: changaId, in: path, required: true, schema: { type: number } }
+        - { name: profesionalId, in: path, required: true, schema: { type: number } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/MessageInput" }
+      responses:
+        "201":
+          description: Created message
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ChatMessage" }
+        "403": { description: Conversation access required }
+  /chats/{changaId}/hilos/{profesionalId}/leidos:
+    post:
+      operationId: markProfessionalThreadMessagesRead
+      tags: [messages]
+      summary: Mark messages in one professional thread as read
+      parameters:
+        - { name: changaId, in: path, required: true, schema: { type: number } }
+        - { name: profesionalId, in: path, required: true, schema: { type: number } }
+      responses:
+        "204": { description: Messages marked as read }
+        "403": { description: Conversation access required }
   /chats/{changaId}/leidos:
     post:
       operationId: markMessagesRead
@@ -1078,14 +1694,20 @@ paths:
           in: path
           required: true
           schema: { type: number }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AcceptAppointmentInput" }
       responses:
         "200":
-          description: Accepted appointment
+          description: Accepted appointment or Mercado Pago checkout
           content:
             application/json:
-              schema: { $ref: "#/components/schemas/Appointment" }
+              schema: { $ref: "#/components/schemas/AcceptAppointmentResult" }
         "403": { description: Only the client can accept }
         "404": { description: Appointment not found }
+        "409": { description: Payment or appointment state conflict }
   /citas/{id}/rechazar:
     post:
       operationId: rejectAppointment
@@ -1104,6 +1726,84 @@ paths:
               schema: { $ref: "#/components/schemas/Appointment" }
         "403": { description: Only the client can reject }
         "404": { description: Appointment not found }
+  /citas/{id}/llegada:
+    post:
+      operationId: recordVisitArrival
+      tags: [appointments]
+      summary: Record the Partner's arrival for a paid visit
+      security:
+        - bearerAuth: []
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: number } }
+      responses:
+        "200":
+          description: Arrival recorded
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Appointment" }
+        "403": { description: Only the Partner can record arrival }
+        "404": { description: Appointment not found }
+        "409": { description: Visit is not confirmed or time is too early }
+  /citas/{id}/completar:
+    post:
+      operationId: completeVisit
+      tags: [appointments]
+      summary: Mark a visit completed and start the 24-hour review window
+      security:
+        - bearerAuth: []
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: number } }
+      responses:
+        "200":
+          description: Visit completed; Partner balance is held
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Appointment" }
+        "403": { description: Only the Partner can complete the visit }
+        "404": { description: Appointment not found }
+        "409": { description: Arrival must be recorded first }
+  /citas/{id}/confirmar-visita:
+    post:
+      operationId: confirmVisit
+      tags: [appointments]
+      summary: Confirm a visit and release the online balance early
+      security:
+        - bearerAuth: []
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: number } }
+      responses:
+        "200":
+          description: Visit confirmed and balance released
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Appointment" }
+        "403": { description: Only the client can confirm the visit }
+        "404": { description: Appointment not found }
+        "409": { description: Visit cannot yet be confirmed }
+  /citas/{id}/reportar-problema:
+    post:
+      operationId: reportVisitIssue
+      tags: [appointments]
+      summary: Report a visit problem and hold its balance for review
+      security:
+        - bearerAuth: []
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: number } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/VisitIssueInput" }
+      responses:
+        "200":
+          description: Report recorded; balance held
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Appointment" }
+        "400": { description: Invalid report }
+        "403": { description: Visit participant access required }
+        "404": { description: Appointment not found }
+        "409": { description: Visit cannot be reported in this state }
   /notificaciones:
     get:
       operationId: listNotifications
@@ -1155,6 +1855,33 @@ paths:
               schema: { $ref: "#/components/schemas/PartnerDashboardResponse" }
         "401": { description: Authentication required }
         "403": { description: Partner role required }
+  /partner/saldo-visitas:
+    get:
+      operationId: getPartnerVisitBalance
+      tags: [partner]
+      summary: Get the Partner balance and outstanding commissions
+      responses:
+        "200":
+          description: Available and held visit funds plus remaining cash commissions from visits and jobs
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PartnerVisitBalance" }
+        "401": { description: Authentication required }
+        "403": { description: Partner role required }
+  /partner/recommendation-ranking:
+    get:
+      operationId: getPartnerRecommendationRanking
+      tags: [partner]
+      summary: Get the active recommendation ranking status for the Partner
+      description: Returns active false until a real job payment is confirmed in production.
+      responses:
+        "200":
+          description: Ranking transparency and confirmed visit-balance signals
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PartnerRecommendationRankingStatus" }
+        "401": { description: Authentication required }
+        "403": { description: Approved Partner role required }
 components:
   securitySchemes:
     bearerAuth:
@@ -1162,6 +1889,52 @@ components:
       scheme: bearer
       bearerFormat: JWT
   schemas:
+    ClientIdentityVerificationStatus:
+      type: object
+      additionalProperties: false
+      required: [status, submittedAt, reviewedAt, reasonCode]
+      properties:
+        status: { type: string, enum: [not_requested, pending_verification, verified, rejected] }
+        submittedAt: { type: ["string", "null"], format: date-time }
+        reviewedAt: { type: ["string", "null"], format: date-time }
+        reasonCode: { type: ["string", "null"], enum: [dni_unreadable, selfie_unusable, identity_mismatch, null] }
+    SubmitClientIdentityVerificationInput:
+      type: object
+      additionalProperties: false
+      required: [dniUploadId, selfieUploadId, consent]
+      properties:
+        dniUploadId: { type: number, minimum: 1 }
+        selfieUploadId: { type: number, minimum: 1 }
+        consent: { type: boolean, enum: [true] }
+    AdminClientIdentityVerification:
+      type: object
+      additionalProperties: false
+      required: [id, userId, name, email, submittedAt, hasDni, hasSelfie]
+      properties:
+        id: { type: number }
+        userId: { type: number }
+        name: { type: string }
+        email: { type: string }
+        submittedAt: { type: string, format: date-time }
+        hasDni: { type: boolean }
+        hasSelfie: { type: boolean }
+    AdminClientIdentityVerificationPage:
+      type: object
+      required: [items, total, page, limit]
+      properties:
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/AdminClientIdentityVerification" }
+        total: { type: number }
+        page: { type: number }
+        limit: { type: number }
+    AdminClientIdentityVerificationReviewInput:
+      type: object
+      additionalProperties: false
+      required: [decision]
+      properties:
+        decision: { type: string, enum: [verified, rejected] }
+        reasonCode: { type: string, enum: [dni_unreadable, selfie_unusable, identity_mismatch] }
     AdminDashboard:
       type: object
       required: [accountsTotal, accountsActive, partnersTotal, partnersPendingReview, partnersVerified, partnersEnabled, jobsTotal, bookingsTotal, paymentsTotal, settlementsTotal, reviewsTotal, recommendationsTotal, catalogItems, portfolioAssets, profilePhotos, chatMessages, recentActivity]
@@ -1214,12 +1987,50 @@ components:
       properties:
         active: { type: boolean }
         reason: { type: string, minLength: 5, maxLength: 1000 }
+    AdminRoleGrantInput:
+      type: object
+      additionalProperties: false
+      required: [email, motivo]
+      properties:
+        email: { type: string, maxLength: 320 }
+        motivo: { type: string, minLength: 5, maxLength: 500 }
+    AdminRoleGrantResult:
+      type: object
+      additionalProperties: false
+      required: [rol, changed]
+      properties:
+        rol: { type: string, enum: [admin] }
+        changed: { type: boolean }
+    AdminManagerPage:
+      type: object
+      required: [isPrimaryAdmin, primaryAdminId, items]
+      properties:
+        isPrimaryAdmin: { type: boolean }
+        primaryAdminId: { type: ["number", "null"] }
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/AdminManagerAccount" }
+    AdminManagerAccount:
+      type: object
+      required: [id, name, email, emailVerifiedAt, createdAt]
+      properties:
+        id: { type: number }
+        name: { type: string }
+        email: { type: string }
+        emailVerifiedAt: { type: ["string", "null"], format: date-time }
+        createdAt: { type: string, format: date-time }
+    AdminRoleRevokeInput:
+      type: object
+      additionalProperties: false
+      required: [reason]
+      properties:
+        reason: { type: string, minLength: 5, maxLength: 1000 }
     AdminVerificationDocumentSummary:
       type: object
       required: [id, type, status, name, sizeBytes, createdAt]
       properties:
         id: { type: number }
-        type: { type: string, enum: [dni_frente, dni_dorso, antecedentes_penales] }
+        type: { type: string, enum: [dni_frente, dni_dorso, antecedentes_penales, matricula] }
         status: { type: string, enum: [pending_verification, verified, rejected] }
         name: { type: string }
         sizeBytes: { type: number }
@@ -1253,6 +2064,26 @@ components:
         items:
           type: array
           items: { $ref: "#/components/schemas/AdminPartner" }
+        total: { type: number }
+        page: { type: number }
+        limit: { type: number }
+    AdminPartnerApplication:
+      type: object
+      required: [partner, emailVerifiedAt, matriculaHabilitante, documents]
+      properties:
+        partner: { $ref: "#/components/schemas/AdminPartner" }
+        emailVerifiedAt: { type: ["string", "null"], format: date-time }
+        matriculaHabilitante: { type: ["string", "null"] }
+        documents:
+          type: array
+          items: { $ref: "#/components/schemas/AdminVerificationDocument" }
+    AdminPartnerApplicationPage:
+      type: object
+      required: [items, total, page, limit]
+      properties:
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/AdminPartnerApplication" }
         total: { type: number }
         page: { type: number }
         limit: { type: number }
@@ -1356,6 +2187,43 @@ components:
         total: { type: number }
         page: { type: number }
         limit: { type: number }
+    AdminVisitPayment:
+      type: object
+      required: [id, bookingId, clientId, clientName, partnerId, partnerName, amount, commissionAmount, partnerAmount, method, status, issueType, issueDetail, completedAt, releaseAt, createdAt, updatedAt]
+      properties:
+        id: { type: number }
+        bookingId: { type: number }
+        clientId: { type: number }
+        clientName: { type: string }
+        partnerId: { type: number }
+        partnerName: { type: string }
+        amount: { type: number }
+        commissionAmount: { type: number }
+        partnerAmount: { type: number }
+        method: { type: string, enum: [mercado_pago, efectivo] }
+        status: { type: string, enum: [checkout_started, pending_release, available, cash_pending_visit, cash_commission_due, cash_commission_settled, under_review, payment_failed, refunded] }
+        issueType: { type: ["string", "null"] }
+        issueDetail: { type: ["string", "null"] }
+        completedAt: { type: ["string", "null"], format: date-time }
+        releaseAt: { type: ["string", "null"], format: date-time }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+    AdminVisitPaymentPage:
+      type: object
+      required: [items, total, page, limit]
+      properties:
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/AdminVisitPayment" }
+        total: { type: number }
+        page: { type: number }
+        limit: { type: number }
+    AdminVisitResolutionInput:
+      type: object
+      required: [detail]
+      additionalProperties: false
+      properties:
+        detail: { type: string, minLength: 5, maxLength: 1000 }
     AdminReview:
       type: object
       required: [id, jobId, clientId, clientName, partnerId, partnerName, rating, comment, createdAt]
@@ -1408,6 +2276,79 @@ components:
       properties:
         visibility: { type: string, enum: [publica, privada] }
         reason: { type: string, minLength: 5, maxLength: 1000 }
+    AdminRecommendationRankingCandidate:
+      type: object
+      required: [jobId, partnerId, partnerName, clientId, clientName, category, updatedAt, messageCount, acceptedVisitCount]
+      properties:
+        jobId: { type: number }
+        partnerId: { type: ["number", "null"] }
+        partnerName: { type: string }
+        clientId: { type: number }
+        clientName: { type: string }
+        category: { type: string }
+        updatedAt: { type: string, format: date-time }
+        messageCount: { type: number }
+        acceptedVisitCount: { type: number }
+    AdminRecommendationIncident:
+      type: object
+      required: [jobId, partnerId, partnerName, clientName, category, decision, reason, reviewedAt]
+      properties:
+        jobId: { type: number }
+        partnerId: { type: ["number", "null"] }
+        partnerName: { type: string }
+        clientName: { type: string }
+        category: { type: string }
+        decision: { type: string, enum: [confirmed, dismissed] }
+        reason: { type: ["string", "null"] }
+        reviewedAt: { type: string, format: date-time }
+    AdminRecommendationRanking:
+      type: object
+      required: [active, windowDays, candidates, incidents]
+      properties:
+        active: { type: boolean }
+        windowDays: { type: number }
+        incidentThreshold: { type: number }
+        activatedAt: { type: ["string", "null"], format: date-time }
+        activationProvider: { type: ["string", "null"], enum: [mercado_pago, efectivo, null] }
+        candidates:
+          type: array
+          items: { $ref: "#/components/schemas/AdminRecommendationRankingCandidate" }
+        incidents:
+          type: array
+          items: { $ref: "#/components/schemas/AdminRecommendationIncident" }
+    AdminRecommendationIncidentDecisionInput:
+      type: object
+      required: [decision, reason]
+      properties:
+        decision: { type: string, enum: [confirmed, dismissed] }
+        reason: { type: string, minLength: 5, maxLength: 1000 }
+    AdminRecommendationIncidentDecisionResult:
+      type: object
+      required: [jobId, decision, unchanged]
+      properties:
+        jobId: { type: number }
+        decision: { type: string, enum: [confirmed, dismissed] }
+        unchanged: { type: boolean }
+    PartnerRecommendationRankingIncident:
+      type: object
+      required: [jobId, category, reviewedAt]
+      properties:
+        jobId: { type: number }
+        category: { type: string }
+        reviewedAt: { type: string, format: date-time }
+    PartnerRecommendationRankingStatus:
+      type: object
+      required: [active]
+      properties:
+        active: { type: boolean }
+        windowDays: { type: number }
+        incidentThreshold: { type: number }
+        confirmedRecentIncidentCount: { type: number }
+        cashVisitCommissionDue: { type: number }
+        visibilityAdjusted: { type: boolean }
+        incidents:
+          type: array
+          items: { $ref: "#/components/schemas/PartnerRecommendationRankingIncident" }
     AdminCatalogItem:
       type: object
       required: [id, category, specialty, active, createdAt, updatedAt]
@@ -1482,7 +2423,7 @@ components:
       properties:
         id: { type: number }
         profesionalId: { type: number }
-        tipo: { type: string, enum: [dni_frente, dni_dorso, antecedentes_penales] }
+        tipo: { type: string, enum: [dni_frente, dni_dorso, antecedentes_penales, matricula] }
         objectPath: { type: string }
         nombre: { type: string }
         contentType: { type: string }
@@ -1532,6 +2473,43 @@ components:
       properties:
         email: { type: string, maxLength: 320 }
         password: { type: string, minLength: 1, maxLength: 200 }
+    MobileDeviceLoginRequest:
+      type: object
+      additionalProperties: false
+      required: [email, password, deviceId]
+      properties:
+        email: { type: string, maxLength: 320 }
+        password: { type: string, minLength: 1, maxLength: 200 }
+        deviceId: { type: string, minLength: 32, maxLength: 128 }
+    MobileDeviceLoginResult:
+      type: object
+      required: [requiresCode]
+      properties:
+        requiresCode: { type: boolean }
+        challengeId: { type: number }
+        message: { type: string }
+        token: { type: string }
+        usuario: { $ref: "#/components/schemas/Account" }
+    MobileDeviceLoginConfirmation:
+      type: object
+      additionalProperties: false
+      required: [email, deviceId, challengeId, code]
+      properties:
+        email: { type: string, maxLength: 320 }
+        deviceId: { type: string, minLength: 32, maxLength: 128 }
+        challengeId: { type: number }
+        code: { type: string, pattern: "^[0-9]{6}$", minLength: 6, maxLength: 6 }
+    MobileTrustedDevices:
+      type: array
+      items:
+        $ref: "#/components/schemas/MobileTrustedDevice"
+    MobileTrustedDevice:
+      type: object
+      required: [deviceKey, createdAt, lastSeenAt]
+      properties:
+        deviceKey: { type: string, pattern: "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$" }
+        createdAt: { type: string, format: date-time }
+        lastSeenAt: { type: string, format: date-time }
     AuthRegisterInput:
       type: object
       required: [nombre, email, password]
@@ -1550,6 +2528,17 @@ components:
       type: object
       required: [code]
       properties:
+        code: { type: string, pattern: "^[0-9]{6}$", minLength: 6, maxLength: 6 }
+    RegistrationEmailVerificationRequest:
+      type: object
+      required: [email]
+      properties:
+        email: { type: string, maxLength: 320 }
+    RegistrationEmailVerificationConfirmation:
+      type: object
+      required: [email, code]
+      properties:
+        email: { type: string, maxLength: 320 }
         code: { type: string, pattern: "^[0-9]{6}$", minLength: 6, maxLength: 6 }
     EmailVerificationMessage:
       type: object
@@ -1588,25 +2577,30 @@ components:
       properties:
         token: { type: string }
         usuario: { $ref: "#/components/schemas/Account" }
-    ProfessionalLocationUpdate:
+    TwoFactorLoginChallenge:
       type: object
-      required: [coordinates]
+      required: [requiresTwoFactor, challengeId, maskedEmail]
       properties:
-        coordinates:
-          type: array
-          minItems: 2
-          maxItems: 2
-          items: { type: number }
-    ProfessionalLocation:
+        requiresTwoFactor: { type: boolean, const: true }
+        challengeId: { type: number }
+        maskedEmail: { type: string }
+    TwoFactorLoginVerification:
       type: object
-      required: [coordinates, capturedAt]
+      required: [challengeId, code]
       properties:
-        coordinates:
-          type: array
-          minItems: 2
-          maxItems: 2
-          items: { type: number }
-        capturedAt: { type: string, format: date-time }
+        challengeId: { type: number }
+        code: { type: string, pattern: "^[0-9]{6}$" }
+    TwoFactorSecurityStatus:
+      type: object
+      required: [enabled]
+      properties:
+        enabled: { type: boolean }
+    TwoFactorSecurityUpdate:
+      type: object
+      required: [enabled, currentPassword]
+      properties:
+        enabled: { type: boolean }
+        currentPassword: { type: string, minLength: 6, maxLength: 200 }
     Account:
       type: object
       required: [id, nombre, email, rol, emailVerifiedAt]
@@ -1618,6 +2612,7 @@ components:
         telefono: { type: ["string", "null"] }
         edad: { type: ["number", "null"] }
         fotoObjectPath: { type: ["string", "null"] }
+        username: { type: ["string", "null"], minLength: 3, maxLength: 20, pattern: "^[A-Za-z0-9_]{3,20}$" }
         rol: { type: string, enum: [cliente, profesional, admin] }
         ubicacion:
           oneOf:
@@ -1631,6 +2626,7 @@ components:
         nombre: { type: string, minLength: 2, maxLength: 100 }
         email: { type: string, maxLength: 200 }
         telefono: { type: ["string", "null"], maxLength: 40 }
+        username: { type: ["string", "null"], minLength: 3, maxLength: 20, pattern: "^[A-Za-z0-9_]{3,20}$" }
         edad: { type: ["number", "null"], minimum: 13, maximum: 120 }
         ubicacion:
           oneOf:
@@ -1641,6 +2637,22 @@ components:
                 provincia: { type: ["string", "null"], maxLength: 100 }
             - type: "null"
         currentPassword: { type: ["string", "null"], maxLength: 200 }
+    ProfilePhotoUpdateInput:
+      type: object
+      additionalProperties: false
+      required: [objectPath]
+      properties:
+        objectPath: { type: string, minLength: 1 }
+    ProfilePhotoUpdateResult:
+      type: object
+      required: [fotoObjectPath]
+      properties:
+        fotoObjectPath: { type: string }
+    ProfilePhotoRemovalResult:
+      type: object
+      required: [fotoObjectPath]
+      properties:
+        fotoObjectPath: { type: ["string", "null"] }
     AccountRoleUpdate:
       type: object
       required: [rol]
@@ -1711,18 +2723,23 @@ components:
         telefono: { type: ["string", "null"] }
         fotoObjectPath: { type: ["string", "null"] }
         rol: { type: string, enum: [cliente, profesional, admin] }
+        clientVerified: { type: boolean, description: "Present only in worker-facing views." }
         ubicacion:
           oneOf:
             - $ref: "#/components/schemas/UserLocation"
             - type: "null"
     ProfessionalProfile:
       type: object
-      required: [id, usuarioId, oficio, categoria, verificado, estadoVerificacion, skills, experienciaAnios, precioReferencia, disponible, rating, cantidadChangas, createdAt, updatedAt, usuario, reviewsCount, completedJobs, recommendationsCount]
+      required: [id, usuarioId, oficio, categoria, ubicacionFija, verificado, estadoVerificacion, skills, experienciaAnios, precioReferencia, disponible, rating, cantidadChangas, createdAt, updatedAt, usuario, reviewsCount, completedJobs, recommendationsCount]
       properties:
         id: { type: number }
         usuarioId: { type: number }
         oficio: { type: string }
         categoria: { type: string }
+        ubicacionFija:
+          oneOf:
+            - $ref: "#/components/schemas/ProfessionalFixedLocation"
+            - type: "null"
         matriculaHabilitante: { type: ["string", "null"] }
         verificado: { type: boolean }
         estadoVerificacion: { type: string, enum: [pending_verification, verified, rejected] }
@@ -1741,16 +2758,18 @@ components:
         reviewsCount: { type: number }
         completedJobs: { type: number }
         recommendationsCount: { type: number }
+        visibilityRank: { type: number, minimum: 0, maximum: 1, description: "Internal ordering tier; 1 means the profile is shown lower in discovery results." }
         distanceKm:
           type: ["number", "null"]
-          description: "Distancia aproximada en kilómetros; es null cuando la ubicación del profesional no tiene un heartbeat vigente (máximo 5 minutos)."
+          description: "Distancia aproximada entre la ubicación en vivo del cliente y la ubicación fija del taller del profesional."
     ProfessionalProfileInput:
       type: object
-      required: [oficio, categoria, precioReferencia]
+      required: [oficio, categoria, precioReferencia, ubicacionFija]
       properties:
         oficio: { type: string, minLength: 2 }
         categoria: { type: string }
         precioReferencia: { type: number, minimum: 0 }
+        ubicacionFija: { $ref: "#/components/schemas/ProfessionalFixedLocationInput" }
         experienciaAnios: { type: number, minimum: 0 }
         about: { type: ["string", "null"] }
         skills:
@@ -1758,12 +2777,38 @@ components:
           items: { type: string }
         disponible: { type: boolean }
         matriculaHabilitante: { type: ["string", "null"] }
+    ProfessionalFixedLocation:
+      type: object
+      required: [direccionTexto, ciudad, provincia]
+      properties:
+        direccionTexto: { type: string }
+        ciudad: { type: string }
+        provincia: { type: ["string", "null"] }
+    ProfessionalFixedLocationInput:
+      type: object
+      required: [direccionTexto, ciudad]
+      properties:
+        direccionTexto: { type: string, minLength: 3, maxLength: 200 }
+        ciudad: { type: string, minLength: 2, maxLength: 100 }
+        provincia: { type: ["string", "null"], maxLength: 100 }
+        coordinates:
+          type: array
+          minItems: 2
+          maxItems: 2
+          items: { type: number }
     ReputationAuthor:
       type: object
       required: [id, nombre]
       properties:
         id: { type: number }
         nombre: { type: string }
+    JobReviewInput:
+      type: object
+      required: [changaId, rating]
+      properties:
+        changaId: { type: number }
+        rating: { type: number, minimum: 1, maximum: 5 }
+        comentario: { type: ["string", "null"], maxLength: 2000 }
     ProfessionalReview:
       type: object
       required: [id, rating, autor, adjuntos]
@@ -1805,7 +2850,7 @@ components:
           items: { $ref: "#/components/schemas/ProfessionalRecommendation" }
     Job:
       type: object
-      required: [id, clienteId, profesionalId, ubicacion, categoria, precioOfrecido, detalle, estado, createdAt, updatedAt, cliente, profesional, calificada]
+      required: [id, clienteId, profesionalId, ubicacion, categoria, precioOfrecido, detalle, estado, paymentMethod, cashConfirmedByClient, cashConfirmedByProfessional, createdAt, updatedAt, cliente, profesional, calificada]
       properties:
         id: { type: number }
         clienteId: { type: number }
@@ -1814,7 +2859,10 @@ components:
         categoria: { type: string }
         precioOfrecido: { type: number }
         detalle: { type: ["string", "null"] }
-        estado: { type: string, enum: [publicada, aceptada, en_curso, finalizada, cancelada] }
+        estado: { type: string, enum: [publicada, aceptada, en_curso, trabajo_realizado, finalizada, cancelada] }
+        paymentMethod: { type: string, enum: [mercado_pago, efectivo] }
+        cashConfirmedByClient: { type: boolean }
+        cashConfirmedByProfessional: { type: boolean }
         createdAt: { type: string }
         updatedAt: { type: string }
         cliente: { $ref: "#/components/schemas/ParticipantUser" }
@@ -1823,6 +2871,34 @@ components:
             - $ref: "#/components/schemas/ParticipantUser"
             - type: "null"
         calificada: { type: boolean }
+    PaymentCheckoutInput:
+      type: object
+      required: [changaId]
+      additionalProperties: false
+      properties:
+        changaId: { type: number, minimum: 1 }
+    PaymentCheckout:
+      type: object
+      required: [id, changaId, amount, currency, status, checkoutUrl]
+      properties:
+        id: { type: number }
+        changaId: { type: number }
+        amount: { type: number }
+        currency: { type: string, enum: [ARS] }
+        status: { type: string, enum: [pendiente, iniciado, aprobado, rechazado, reembolsado] }
+        checkoutUrl: { type: string }
+    ClientPayment:
+      type: object
+      required: [id, changaId, amount, currency, status, checkoutUrl, createdAt, updatedAt]
+      properties:
+        id: { type: number }
+        changaId: { type: number }
+        amount: { type: number }
+        currency: { type: string, enum: [ARS] }
+        status: { type: string, enum: [pendiente, iniciado, aprobado, rechazado, reembolsado] }
+        checkoutUrl: { type: ["string", "null"] }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
     JobInput:
       type: object
       required: [ubicacion, categoria, precioOfrecido]
@@ -1832,11 +2908,17 @@ components:
         precioOfrecido: { type: number, minimum: 0 }
         detalle: { type: ["string", "null"], minLength: 3 }
         profesionalId: { type: ["number", "null"] }
+        paymentMethod: { type: string, enum: [mercado_pago, efectivo] }
     JobUpdate:
       type: object
-      required: [estado]
       properties:
-        estado: { type: string, enum: [publicada, aceptada, en_curso, finalizada, cancelada] }
+        estado: { type: string, enum: [publicada, aceptada, en_curso, trabajo_realizado, finalizada, cancelada] }
+        ubicacion: { $ref: "#/components/schemas/UserLocation" }
+        categoria: { type: string, minLength: 2 }
+        precioOfrecido: { type: number, minimum: 0 }
+        detalle: { type: ["string", "null"], minLength: 3 }
+        profesionalId: { type: ["number", "null"] }
+        paymentMethod: { type: string, enum: [mercado_pago, efectivo] }
     MessageAttachment:
       type: object
       required: [objectPath]
@@ -1845,11 +2927,12 @@ components:
         nombre: { type: string }
     ChatMessage:
       type: object
-      required: [id, changaId, emisorId, texto, adjuntos, leido, createdAt, emisor]
+      required: [id, changaId, emisorId, conversacionProfesionalId, texto, adjuntos, leido, createdAt, emisor]
       properties:
         id: { type: number }
         changaId: { type: number }
         emisorId: { type: number }
+        conversacionProfesionalId: { type: ["number", "null"] }
         texto: { type: string }
         adjuntos:
           type: array
@@ -1866,6 +2949,7 @@ components:
           type: array
           maxItems: 5
           items: { $ref: "#/components/schemas/MessageAttachment" }
+        profesionalId: { type: ["number", "null"] }
     UploadUrlRequest:
       type: object
       required: [name, size, contentType, purpose]
@@ -1873,8 +2957,10 @@ components:
         name: { type: string, minLength: 1 }
         size: { type: number, minimum: 1 }
         contentType: { type: string, minLength: 1 }
-        purpose: { type: string, enum: [profile_photo, chat_image, file] }
+        purpose: { type: string, enum: [profile_photo, chat_image, client_verification, file] }
+        documentType: { type: string, enum: [dni, selfie] }
         changaId: { type: number }
+        profesionalId: { type: number }
     UploadUrlResponse:
       type: object
       required: [uploadURL, objectPath, metadata, purpose]
@@ -1889,10 +2975,10 @@ components:
             name: { type: string }
             size: { type: number }
             contentType: { type: string }
-        purpose: { type: string, enum: [profile_photo, chat_image, file] }
+        purpose: { type: string, enum: [profile_photo, chat_image, client_verification, file] }
     Appointment:
       type: object
-      required: [id, changaId, clienteId, profesionalId, empiezaAt, terminaAt, estado, createdAt, updatedAt]
+      required: [id, changaId, clienteId, profesionalId, empiezaAt, terminaAt, tarifaVisita, estado, createdAt, updatedAt, finanzas]
       properties:
         id: { type: number }
         changaId: { type: number }
@@ -1900,15 +2986,56 @@ components:
         profesionalId: { type: number }
         empiezaAt: { type: string, format: date-time }
         terminaAt: { type: ["string", "null"], format: date-time }
+        tarifaVisita: { type: number }
         estado: { type: string, enum: [solicitada, confirmada, en_curso, completada, cancelada] }
+        finanzas:
+          oneOf:
+            - $ref: "#/components/schemas/VisitPaymentSummary"
+            - type: "null"
         createdAt: { type: string, format: date-time }
         updatedAt: { type: string, format: date-time }
     AppointmentInput:
       type: object
-      required: [empiezaAt]
+      required: [empiezaAt, tarifaVisita]
       properties:
         empiezaAt: { type: string, format: date-time }
         terminaAt: { type: ["string", "null"], format: date-time }
+        tarifaVisita: { type: number, minimum: 1, maximum: 10000000 }
+    VisitPaymentSummary:
+      type: object
+      required: [amount, commissionAmount, partnerAmount, method, status, partnerArrivedAt, completedAt, releaseAt, clientConfirmedAt, issueReportedAt, issueType, issueDetail]
+      properties:
+        amount: { type: number }
+        commissionAmount: { type: number }
+        partnerAmount: { type: number }
+        method: { type: string, enum: [mercado_pago, efectivo] }
+        status: { type: string, enum: [checkout_started, pending_release, available, cash_pending_visit, cash_commission_due, cash_commission_settled, under_review, payment_failed, refunded] }
+        partnerArrivedAt: { type: ["string", "null"], format: date-time }
+        completedAt: { type: ["string", "null"], format: date-time }
+        releaseAt: { type: ["string", "null"], format: date-time }
+        clientConfirmedAt: { type: ["string", "null"], format: date-time }
+        issueReportedAt: { type: ["string", "null"], format: date-time }
+        issueType: { type: ["string", "null"] }
+        issueDetail: { type: ["string", "null"] }
+    AcceptAppointmentInput:
+      type: object
+      required: [paymentMethod]
+      additionalProperties: false
+      properties:
+        paymentMethod: { type: string, enum: [mercado_pago, efectivo] }
+    AcceptAppointmentResult:
+      type: object
+      required: [appointment, checkoutUrl]
+      properties:
+        appointment: { $ref: "#/components/schemas/Appointment" }
+        checkoutUrl: { type: ["string", "null"] }
+    VisitIssueInput:
+      type: object
+      required: [issueType, detail]
+      additionalProperties: false
+      properties:
+        issueType: { type: string, enum: [partner_no_show, client_no_show, other] }
+        detail: { type: string, minLength: 5, maxLength: 1000 }
     AppointmentAttempt:
       type: object
       required: [id, changaId, accion, resultado, detalle, appointmentId, empiezaAt, createdAt]
@@ -1944,10 +3071,11 @@ components:
         emisor: { $ref: "#/components/schemas/ParticipantUser" }
     Conversation:
       type: object
-      required: [changaId, estado, categoria, detalle, updatedAt, unread, interlocutor, ultimoMensaje]
+      required: [changaId, profesionalId, estado, categoria, detalle, updatedAt, unread, interlocutor, ultimoMensaje]
       properties:
         changaId: { type: number }
-        estado: { type: string, enum: [publicada, aceptada, en_curso, finalizada, cancelada] }
+        profesionalId: { type: ["number", "null"] }
+        estado: { type: string, enum: [publicada, aceptada, en_curso, trabajo_realizado, finalizada, cancelada] }
         categoria: { type: string }
         detalle: { type: ["string", "null"] }
         updatedAt: { type: string }
@@ -1965,12 +3093,28 @@ components:
       required: [id, tipo, titulo, detalle, href, leida, createdAt]
       properties:
         id: { type: number }
+        changaId: { type: ["number", "null"] }
         tipo: { type: string }
         titulo: { type: string }
         detalle: { type: ["string", "null"] }
         href: { type: ["string", "null"] }
         leida: { type: boolean }
         createdAt: { type: string, format: date-time }
+        jobContext:
+          oneOf:
+            - $ref: "#/components/schemas/NotificationJobContext"
+            - type: "null"
+    NotificationJobContext:
+      type: object
+      required: [changaId, price, paymentMethod, paymentStatus, paymentConfirmedAt, workerName, trade]
+      properties:
+        changaId: { type: number }
+        price: { type: number }
+        paymentMethod: { type: string, enum: [mercado_pago, efectivo] }
+        paymentStatus: { type: string }
+        paymentConfirmedAt: { type: ["string", "null"], format: date-time }
+        workerName: { type: ["string", "null"] }
+        trade: { type: ["string", "null"] }
     NotificationListResponse:
       type: object
       required: [items, unread]
@@ -2007,3 +3151,40 @@ components:
           type: array
           items: { $ref: "#/components/schemas/PartnerDashboardAssetSummary" }
         notificacionesNoLeidas: { type: number }
+    PartnerVisitBalanceItem:
+      type: object
+      required: [bookingId, amount, commissionAmount, partnerAmount, method, status, releaseAt, createdAt]
+      properties:
+        bookingId: { type: number }
+        amount: { type: number }
+        commissionAmount: { type: number }
+        partnerAmount: { type: number }
+        method: { type: string, enum: [mercado_pago, efectivo] }
+        status: { type: string }
+        releaseAt: { type: ["string", "null"], format: date-time }
+        createdAt: { type: string, format: date-time }
+    PartnerCashJobCommissionItem:
+      type: object
+      required: [changaId, commissionRate, amount, remainingAmount, status, createdAt, settledAt]
+      properties:
+        changaId: { type: number }
+        commissionRate: { type: number }
+        amount: { type: number }
+        remainingAmount: { type: number }
+        status: { type: string, enum: [due, settled] }
+        createdAt: { type: string, format: date-time }
+        settledAt: { type: ["string", "null"], format: date-time }
+    PartnerVisitBalance:
+      type: object
+      required: [availableAmount, pendingAmount, cashCommissionDue, cashJobCommissionDue, items, cashJobCommissions]
+      properties:
+        availableAmount: { type: number }
+        pendingAmount: { type: number }
+        cashCommissionDue: { type: number }
+        cashJobCommissionDue: { type: number }
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/PartnerVisitBalanceItem" }
+        cashJobCommissions:
+          type: array
+          items: { $ref: "#/components/schemas/PartnerCashJobCommissionItem" }

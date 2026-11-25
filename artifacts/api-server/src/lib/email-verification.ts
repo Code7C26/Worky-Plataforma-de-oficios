@@ -1,38 +1,19 @@
-import { createHmac, randomInt, timingSafeEqual } from "node:crypto";
+import { createHmac, randomInt, randomUUID, timingSafeEqual } from "node:crypto";
 import { and, desc, eq, gt, isNull, lt, sql } from "drizzle-orm";
 import { db, emailVerificationTokens } from "@workspace/db";
+import { gmailDeliveryFailureDetails, sendGmailEmail } from "./gmail-mailer";
+
+export { GmailDeliveryError as EmailVerificationDeliveryError } from "./gmail-mailer";
 
 export const EMAIL_VERIFICATION_TTL_MS = 15 * 60 * 1000;
 export const EMAIL_VERIFICATION_RESEND_COOLDOWN_MS = 60 * 1000;
 const MAX_EMAIL_VERIFICATION_ATTEMPTS = 5;
 
-type VerificationPurpose = "account";
+type VerificationPurpose = "account" | "registration";
 type ConfirmedVerification = { challengeId: number; expiresAt: Date };
 
-type DeliveryFailureReason = "missing_api_key" | "missing_sender" | "provider_rejected" | "network_or_timeout";
-
-export class EmailVerificationDeliveryError extends Error {
-  constructor(readonly reason: DeliveryFailureReason, readonly providerStatus?: number) {
-    super(`Email verification delivery failed: ${reason}`);
-    this.name = "EmailVerificationDeliveryError";
-  }
-}
-
 export function emailVerificationFailureDetails(error: unknown) {
-  return error instanceof EmailVerificationDeliveryError
-    ? { reason: error.reason, providerStatus: error.providerStatus }
-    : { reason: "internal_error" };
-}
-
-function verificationMailConfig() {
-  const apiKey = process.env.RESEND_API_KEY;
-  if (!apiKey) throw new EmailVerificationDeliveryError("missing_api_key");
-  const configuredSender = process.env.RESEND_FROM_EMAIL?.trim();
-  if (process.env.NODE_ENV === "production" &&
-      (!configuredSender || /@resend\.dev(?:>|$)/i.test(configuredSender))) {
-    throw new EmailVerificationDeliveryError("missing_sender");
-  }
-  return { apiKey, from: configuredSender || "Worky <onboarding@resend.dev>" };
+  return gmailDeliveryFailureDetails(error);
 }
 
 function normalizeEmail(email: string) {
@@ -61,29 +42,17 @@ function escapeHtml(value: string) {
   })[character] ?? character);
 }
 
-async function sendVerificationEmail(email: string, name: string, code: string, config: ReturnType<typeof verificationMailConfig>) {
+async function sendVerificationEmail(email: string, name: string, code: string) {
   const greeting = name.trim() ? `Hola ${name.trim()}` : "Hola";
-  const response = await fetch("https://api.resend.com/emails", {
-    method: "POST",
-    signal: AbortSignal.timeout(15_000),
-    headers: {
-      Authorization: `Bearer ${config.apiKey}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      from: config.from,
-      to: [email],
-      subject: "Verificá tu email de Worky",
-      text: `${greeting}.\n\nTu código para verificar el email es ${code}. Es válido durante 15 minutos y solo puede usarse una vez.\n\nSi no pediste este código, podés ignorar este correo.`,
-      html: `<p>${escapeHtml(greeting)}.</p><p>Ingresá este código en Worky para verificar tu email:</p><p style="font-size:28px;font-weight:700;letter-spacing:8px">${code}</p><p>El código vence en 15 minutos y solo puede usarse una vez.</p><p>Si no pediste este código, podés ignorar este correo.</p>`,
-    }),
-  }).catch(() => {
-    throw new EmailVerificationDeliveryError("network_or_timeout");
-  });
+  const text = `${greeting}.\n\nTu código para verificar el email es ${code}. Es válido durante 15 minutos y solo puede usarse una vez.\n\nSi no pediste este código, podés ignorar este correo.`;
+  const html = `<p>${escapeHtml(greeting)}.</p><p>Ingresá este código en Worky para verificar tu email:</p><p style="font-size:28px;font-weight:700;letter-spacing:8px">${code}</p><p>El código vence en 15 minutos y solo puede usarse una vez.</p><p>Si no pediste este código, podés ignorar este correo.</p>`;
 
-  if (!response.ok) {
-    throw new EmailVerificationDeliveryError("provider_rejected", response.status);
-  }
+  await sendGmailEmail({
+    to: email,
+    subject: "Verificá tu email de Worky",
+    text,
+    html,
+  });
 }
 
 export async function createEmailVerificationChallenge({
@@ -97,7 +66,6 @@ export async function createEmailVerificationChallenge({
   purpose: VerificationPurpose;
   usuarioId?: number | null;
 }): Promise<{ sent: boolean; throttled: boolean }> {
-  const mailConfig = verificationMailConfig();
   const normalizedEmail = normalizeEmail(email);
   const now = new Date();
 
@@ -132,7 +100,7 @@ export async function createEmailVerificationChallenge({
   }).returning({ id: emailVerificationTokens.id });
 
   try {
-    await sendVerificationEmail(normalizedEmail, name, code, mailConfig);
+    await sendVerificationEmail(normalizedEmail, name, code);
   } catch (error) {
     if (created) await db.delete(emailVerificationTokens).where(eq(emailVerificationTokens.id, created.id));
     throw error;
