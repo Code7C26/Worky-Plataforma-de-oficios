@@ -1,0 +1,29 @@
+kind = "video"
+videoAspectRatio = "9:16"
+previewPath = "/worky-publicidad-ingles/"
+title = "Worky — English vertical video"
+description = "A short English-language vertical promotional video for Worky, prepared for the team to add its own voiceover."
+version = "1.0.0"
+id = "artifacts/worky-publicidad-ingles"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/worky-publicidad-ingles/" ]
+localPort = 21398
+
+[services.development]
+run = "pnpm --filter @workspace/worky-publicidad-ingles run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/worky-publicidad-ingles", "run", "build" ]
+serve = "static"
+publicDir = "artifacts/worky-publicidad-ingles/dist/public"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "21398"
+BASE_PATH = "/worky-publicidad-ingles/"
